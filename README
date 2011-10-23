@@ -1,0 +1,31 @@
+D-Bus Simulator
+===============
+
+D-Bus Simulator is a system to mock up parts of D-Bus server–client systems in order to test the other part.
+
+News
+====
+
+See NEWS file.
+
+Dependencies
+============
+
+GNOME 3.0 development platform
+	http://www.gnome.org
+
+Copyright
+=========
+
+Philip Withnall <philip@tecnocode.co.uk>
+
+Bugs
+====
+
+Bugs should be reported by e-mail:
+	philip@tecnocode.co.uk
+
+Contact
+=======
+
+Philip Withnall <philip@tecnocode.co.uk>
