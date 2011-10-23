@@ -1,0 +1,239 @@
+%option reentrant
+%option bison-bridge
+%option bison-locations
+%option noyywrap
+%option yylineno
+%option extra-type="DfsmParserData*"
+
+%{
+	#include <glib.h>
+
+	#include "dfsm-ast.h"
+	#include "dfsm-parser.h"
+	#include "libdfsm_libdfsm_la-dfsm-bison.h"
+
+	static int comment_caller = 0;
+	static int string_caller = 0;
+	static int regexp_caller = 0;
+
+	#define MAX_STRING_CONST_SIZE 4096
+	static char string_buf[MAX_STRING_CONST_SIZE + 1 /* nul delimiter */];
+	static char *string_buf_ptr = NULL;
+
+	#define MAX_REGEXP_CONST_SIZE 4096
+	static char regexp_buf[MAX_REGEXP_CONST_SIZE + 1 /* nul delimiter */];
+	static char *regexp_buf_ptr = NULL;
+
+	#define YY_INPUT(buf, result, max_size) result = yy_input_proc (buf, max_size, yyscanner)
+	static int yy_input_proc (gchar *out_buf, gint size, yyscan_t yyscanner);
+%}
+
+%x comment
+%x string
+%x regexp
+
+/* Definitions, mainly extracted from http://dbus.freedesktop.org/doc/dbus-specification.html. */
+DBUS_OBJECT_PATH_ELEMENT		[A-Za-z0-9_]+
+DBUS_OBJECT_PATH			\/({DBUS_OBJECT_PATH_ELEMENT}(\/{DBUS_OBJECT_PATH_ELEMENT})*)?
+
+/* Additional restrictions not encoded here:
+ *  • Must be UTF-8.
+ *  • Must not exceed 255 characters in length.
+ */
+DBUS_INTERFACE_NAME_ELEMENT		[A-Za-z_]+[A-Za-z0-9_]*
+DBUS_INTERFACE_NAME			{DBUS_INTERFACE_NAME_ELEMENT}\.{DBUS_INTERFACE_NAME_ELEMENT}(\.{DBUS_INTERFACE_NAME_ELEMENT})*
+
+/* Additional restrictions not encoded here:
+ *  • Must be UTF-8.
+ *  • Must not exceed 255 characters in length.
+ */
+DBUS_UNIQUE_BUS_NAME_ELEMENT		[A-Za-z0-9_-]+
+DBUS_UNIQUE_BUS_NAME			:{DBUS_UNIQUE_BUS_NAME_ELEMENT}\.{DBUS_UNIQUE_BUS_NAME_ELEMENT}(\.{DBUS_UNIQUE_BUS_NAME_ELEMENT})*
+DBUS_WELL_KNOWN_BUS_NAME_ELEMENT	[A-Za-z_-]+[A-Za-z0-9_-]*
+DBUS_WELL_KNOWN_BUS_NAME		{DBUS_WELL_KNOWN_BUS_NAME_ELEMENT}\.{DBUS_WELL_KNOWN_BUS_NAME_ELEMENT}(\.{DBUS_WELL_KNOWN_BUS_NAME_ELEMENT})*
+
+/* Additional restrictions not encoded here:
+ *  • Must be UTF-8.
+ *  • Must not exceed 255 characters in length.
+ */
+DBUS_MEMBER_OR_ERROR_NAME		[A-Za-z_]+[A-Za-z0-9_]*
+
+/* Additional restrictions not encoded here:
+ *  • Must be well-formed and encode a complete type.
+ *  • Must not exceed 255 characters in length.
+ *  • Must be nul-terminated.
+ */
+DBUS_TYPE_SIGNATURE			[\(\)\{\}ybnqiuxtdsogarvehm\*\?@&^]+
+
+VARIABLE_OR_FUNCTION_OR_STATE_NAME	[A-Za-z0-9_]+
+
+INTEGER					(\+-)?[0-9]+
+FLOAT					(\+-)?[0-9]+\.[0-9]+
+
+%%
+
+"/*" { comment_caller = YYSTATE; BEGIN(comment); }
+<comment>{
+	[^*]* { /* Eat anything not a '*' */ }
+	"*"+[^*/]* { /* Eat any '*'s not followed by '/' */ }
+	"*"+"/" { BEGIN(comment_caller); /* close comment */ }
+}
+
+"\"" { string_caller = YYSTATE; string_buf_ptr = string_buf; BEGIN(string); }
+<string>{
+	"\"" { /* closing quote */
+		BEGIN(string_caller);
+		*string_buf_ptr = '\0';
+		yylval->str = strdup (string_buf_ptr);
+		return STRING;
+	}
+
+	"\n" {
+		/* Unterminated string constant */
+		return FLEX_ERROR;
+	}
+
+	"\\x[0-9a-fA-F]{1,2}" { /* hexadecimal escape */
+		int result;
+
+		(void) sscanf (yytext + 1, "%x", &result);
+
+		if (result > 0xff) {
+			/* Constant is too large */
+			return FLEX_ERROR;
+		}
+
+		if (string_buf_ptr - string_buf + 1 > MAX_STRING_CONST_SIZE) {
+			return FLEX_ERROR;
+		}
+
+		*string_buf_ptr++ = result;
+	}
+
+	"\\[0-9]+" {
+		/* Bad escape sequence */
+		return FLEX_ERROR;
+	}
+
+	"\\n" { if (string_buf_ptr - string_buf + 1 > MAX_STRING_CONST_SIZE) { return FLEX_ERROR; } *string_buf_ptr++ = '\n'; }
+	"\\t" { if (string_buf_ptr - string_buf + 1 > MAX_STRING_CONST_SIZE) { return FLEX_ERROR; } *string_buf_ptr++ = '\t'; }
+	"\\r" { if (string_buf_ptr - string_buf + 1 > MAX_STRING_CONST_SIZE) { return FLEX_ERROR; } *string_buf_ptr++ = '\r'; }
+	"\\b" { if (string_buf_ptr - string_buf + 1 > MAX_STRING_CONST_SIZE) { return FLEX_ERROR; } *string_buf_ptr++ = '\b'; }
+	"\\f" { if (string_buf_ptr - string_buf + 1 > MAX_STRING_CONST_SIZE) { return FLEX_ERROR; } *string_buf_ptr++ = '\f'; }
+
+	"\\(.|\n)" { if (string_buf_ptr - string_buf + 1 > MAX_STRING_CONST_SIZE) { return FLEX_ERROR; } *string_buf_ptr++ = yytext[1]; }
+	"[^\\\n\"]+" {
+		if (string_buf_ptr - string_buf + strlen (yytext) > MAX_STRING_CONST_SIZE) {
+			return FLEX_ERROR;
+		}
+
+		strcpy (string_buf_ptr, yytext);
+	}
+}
+
+"#" { regexp_caller = YYSTATE; regexp_buf_ptr = regexp_buf; BEGIN(regexp); }
+<regexp>{
+	"#" { /* closing delimiter */
+		BEGIN(regexp_caller);
+		*regexp_buf_ptr = '\0';
+		yylval->str = strdup (regexp_buf_ptr);
+		return REGEXP;
+	}
+
+	"\n" {
+		/* Unterminated regexp constant */
+		return FLEX_ERROR;
+	}
+
+	"\\(.|\n)" { if (regexp_buf_ptr - regexp_buf + 1 > MAX_REGEXP_CONST_SIZE) { return FLEX_ERROR; } *regexp_buf_ptr++ = yytext[1]; }
+	"[^\\\n\"]+" {
+		if (regexp_buf_ptr - regexp_buf + strlen (yytext) > MAX_REGEXP_CONST_SIZE) {
+			return FLEX_ERROR;
+		}
+
+		strcpy (regexp_buf_ptr, yytext);
+	}
+}
+
+"object" { return OBJECT; }
+"at" { return AT; }
+"implements" { return IMPLEMENTS; }
+"data" { return DATA; }
+"states" { return STATES; }
+"transition" { return TRANSITION; }
+"from" { return FROM; }
+"to" { return TO; }
+"on" { return ON; }
+"method" { return METHOD; }
+"precondition" { return PRECONDITION; }
+"throwing" { return THROWING; }
+"throw" { return THROW; }
+"emit" { return EMIT; }
+"reply" { return REPLY; }
+"!" { return NOT; }
+"*" { return TIMES; }
+"/" { return DIVIDE; }
+"%" { return MODULUS; }
+"+" { return PLUS; }
+"-" { return MINUS; }
+"<" { return LT; }
+"<=" { return LTE; }
+">" { return GT; }
+">=" { return GTE; }
+"=" { return EQ; }
+"!=" { return NEQ; }
+"&&" { return AND; }
+"||" { return OR; }
+"true" { return TRUE_LITERAL; }
+"false" { return FALSE_LITERAL; }
+"[" { return ARRAY_INDEX_L_BRACKET; }
+"]" { return ARRAY_INDEX_R_BRACKET; }
+"{" { return BLOCK_L_BRACKET; }
+"}" { return R_BRACE; }
+"(" { return EXPR_L_BRACKET; }
+")" { return R_PAREN; }
+"a(" { return ARRAY_L_BRACKET; }
+"a{" { return DICT_L_BRACKET; }
+"?" { return FUZZY; }
+
+{DBUS_OBJECT_PATH} { yylval->str = strdup (yytext); return DBUS_OBJECT_PATH; }
+{DBUS_INTERFACE_NAME} { yylval->str = strdup (yytext); return DBUS_INTERFACE_NAME; }
+{DBUS_MEMBER_OR_ERROR_NAME} { yylval->str = strdup (yytext); return DBUS_MEMBER_OR_ERROR_NAME; }
+{DBUS_TYPE_SIGNATURE} { yylval->str = strdup (yytext); return DBUS_TYPE_SIGNATURE; }
+
+{VARIABLE_OR_FUNCTION_OR_STATE_NAME} { yylval->str = strdup (yytext); return VARIABLE_OR_FUNCTION_OR_STATE_NAME; }
+
+{INTEGER} { yylval->integer = g_ascii_strtoll (yytext, NULL, 10); return INTEGER; }
+{FLOAT} { yylval->flt = g_ascii_strtod (yytext, NULL); return FLOAT; }
+
+[ \t\n\r\v\f] { /* Ignore whitespace */ }
+
+. { return (int) yytext[0]; } /* Unmatched characters */
+
+%%
+
+static int
+yy_input_proc (gchar *out_buf, gint size, yyscan_t yyscanner)
+{
+	gunichar unichar;
+	DfsmParserData *data = (DfsmParserData*) yyget_extra (yyscanner);
+
+	if (data->source_pos >= data->source_len) {
+		return 0;
+	}
+
+	/* Copy up to size bytes' worth of complete UTF-8 characters to out_buf. We do this by validating the byte at (source_pos + size);
+	 * if it's the start a valid UTF-8 character, we return exactly size bytes. Otherwise, we backtrack to the start of the previous
+	 * character and return slightly fewer bytes. */
+	size = MIN (size, data->source_len - data->source_pos);
+
+	unichar = g_utf8_get_char_validated (data->source_buf + data->source_pos + size, -1);
+	if (unichar == (gunichar) -2 || unichar == (gunichar) -1) {
+		size = g_utf8_prev_char (data->source_buf + data->source_pos + size) - data->source_buf - data->source_pos;
+	}
+
+	memcpy (out_buf, data->source_buf + data->source_pos, size);
+	data->source_pos += size;
+
+	return size;
+}

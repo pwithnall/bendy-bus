@@ -1,0 +1,411 @@
+%pure-parser
+%locations
+%defines
+%error-verbose
+
+%expect 13 /* shift-reduce conflicts */
+
+%code top {
+	#include <stdio.h>
+	#include <glib.h>
+}
+
+%code requires {
+	#include "dfsm-ast.h"
+	#include "dfsm-parser.h"
+}
+
+%code {
+	static void yyerror (const char *message);
+
+	#define YYPARSE_PARAM parse_data
+	#define YYLEX_PARAM ((DfsmParserData*) YYPARSE_PARAM)->yyscanner
+
+	#define ERROR (((DfsmParserData*) YYPARSE_PARAM)->error)
+	#define ABORT_ON_ERROR \
+	if (ERROR != NULL) { \
+		YYABORT; \
+	}
+}
+
+%union {
+	char *str;
+	gint64 integer;
+	double flt;
+	GPtrArray *ptr_array;
+	GHashTable *hash_table;
+	DfsmAstObject *ast_object;
+	DfsmAstDataStructure *ast_data_structure;
+	DfsmAstExpression *ast_expression;
+	DfsmAstTransition *ast_transition;
+	DfsmAstStatement *ast_statement;
+	DfsmAstVariable *ast_variable;
+	DfsmParserBlockList *block_list;
+}
+
+%destructor { free ($$); } <str>
+%destructor {} <integer> <flt>
+%destructor { if ($$ != NULL) { g_ptr_array_unref ($$); } } <ptr_array>
+%destructor { if ($$ != NULL) { g_hash_table_unref ($$); } } <hash_table>
+%destructor { dfsm_ast_node_unref ($$); } <ast_object> <ast_data_structure> <ast_expression> <ast_transition> <ast_statement> <ast_variable>
+%destructor { dfsm_parser_block_list_free ($$); } <block_list>
+
+/* TODO:
+ * Priorities for fuzzing
+ */
+
+%token <str> DBUS_OBJECT_PATH
+%token <str> DBUS_INTERFACE_NAME
+%token <str> DBUS_MEMBER_OR_ERROR_NAME
+%token <str> DBUS_TYPE_SIGNATURE
+
+%token <str> VARIABLE_OR_FUNCTION_OR_STATE_NAME
+
+%token <str> STRING
+%token <integer> INTEGER
+%token <flt> FLOAT
+%token TRUE_LITERAL
+%token FALSE_LITERAL
+%token <str> REGEXP
+
+%token FLEX_ERROR
+
+%token OBJECT
+%token AT
+%token IMPLEMENTS
+%token THROWING
+%token DATA
+%token FROM
+%token PRECONDITION
+%token TO
+%token STATES
+%token TRANSITION
+%token METHOD
+%token ON
+%token THROW
+%token EMIT
+%token REPLY
+%token ARRAY_INDEX_L_BRACKET
+%token ARRAY_INDEX_R_BRACKET
+%token BLOCK_L_BRACKET
+%token R_BRACE
+%token EXPR_L_BRACKET
+%token R_PAREN
+%token ARRAY_L_BRACKET
+%token DICT_L_BRACKET
+%token FUZZY
+
+%right NOT
+%left TIMES DIVIDE MODULUS
+%left PLUS MINUS
+%left LT LTE GT GTE
+%left EQ NEQ
+%left AND
+%left OR
+
+%start Input
+
+%type <ptr_array> Input
+%type <ast_object> ObjectBlock
+%type <block_list> BlockList
+%type <ptr_array> InterfaceNameList
+%type <hash_table> DataBlock
+%type <hash_table> DataList
+%type <ptr_array> StatesBlock
+%type <ptr_array> StateList
+%type <str> StateName
+%type <ast_transition> TransitionBlock
+%type <str> TransitionType
+%type <ptr_array> PreconditionList
+%type <str> PreconditionThrow
+%type <ptr_array> StatementList
+%type <ast_statement> Statement
+%type <ast_expression> Expression
+%type <str> FunctionName
+%type <str> VariableName
+%type <ast_variable> Variable
+%type <ptr_array> VariableDeref
+%type <ast_data_structure> FuzzyDataStructure
+%type <ast_data_structure> DataStructure
+%type <ptr_array> ArrayList
+%type <ptr_array> DictionaryList
+
+%%
+
+/* Returns a GPtrArray of DfsmAstObjects. */
+Input: /* empty */			{ $$ = ((DfsmParserData*) YYPARSE_PARAM)->object_array = g_ptr_array_new_with_free_func (dfsm_ast_node_unref); }
+     | Input ObjectBlock		{ $$ = $1; g_ptr_array_add ($$, $2); }
+;
+
+/* Returns a new DfsmAstObject. */
+ObjectBlock:
+	OBJECT AT DBUS_OBJECT_PATH IMPLEMENTS InterfaceNameList BLOCK_L_BRACKET
+		BlockList
+	R_BRACE									{
+											$$ = dfsm_ast_object_new ($3, $5,
+											                          g_ptr_array_ref ($7->data_blocks),
+											                          g_ptr_array_ref ($7->state_blocks),
+											                          g_ptr_array_ref ($7->transitions),
+											                          &ERROR);
+											ABORT_ON_ERROR;
+										}
+|	OBJECT AT DBUS_OBJECT_PATH IMPLEMENTS InterfaceNameList BLOCK_L_BRACKET
+		error
+	R_BRACE									{ $$ = NULL; YYABORT; }
+;
+
+/* Returns a DfsmParserBlockList */
+BlockList: /* empty */								{ $$ = dfsm_parser_block_list_new (); }
+         | BlockList DataBlock							{ $$ = $1; g_ptr_array_add ($$->data_blocks, $2); }
+         | BlockList StatesBlock						{ $$ = $1; g_ptr_array_add ($$->state_blocks, $2); }
+         | BlockList TransitionBlock						{ $$ = $1; g_ptr_array_add ($$->transitions, $2); }
+;
+
+/* Returns a GPtrArray of interface names (strings). */
+InterfaceNameList: DBUS_INTERFACE_NAME						{
+											$$ = g_ptr_array_new_with_free_func (g_free);
+											g_ptr_array_add ($$, $1 /* steal */);
+										}
+                 | InterfaceNameList ',' DBUS_INTERFACE_NAME			{ $$ = $1; g_ptr_array_add ($$, $3); }
+;
+
+/* Returns a new GHashTable for the data items. */
+DataBlock:
+	DATA BLOCK_L_BRACKET
+		DataList
+	R_BRACE									{ $$ = $3; }
+|	DATA BLOCK_L_BRACKET
+		error
+	R_BRACE									{ $$ = NULL; YYABORT; }
+;
+
+/* Returns a new GHashTable mapping variable names (strings) to DfsmAstDataItems. */
+DataList: /* empty */
+		{
+			$$ = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) dfsm_ast_data_item_free);
+		}
+        | VariableName ':' DBUS_TYPE_SIGNATURE '=' FuzzyDataStructure
+		{
+			$$ = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) dfsm_ast_data_item_free);
+			g_hash_table_insert ($$, $1 /* steal ownership from flex */, dfsm_ast_data_item_new ($3, $5));
+		}
+        | VariableName ':' DBUS_TYPE_SIGNATURE '=' FuzzyDataStructure ';' DataList
+		{
+			$$ = $7;
+			g_hash_table_insert ($$, $1 /* steal ownership from flex */, dfsm_ast_data_item_new ($3, $5));
+		}
+        | error ';' DataList
+		{ $$ = $3; YYABORT; }
+;
+
+/* Returns a new GPtrArray of the state names. */
+StatesBlock:
+	STATES BLOCK_L_BRACKET
+		StateList
+	R_BRACE									{ $$ = $3; }
+|	STATES BLOCK_L_BRACKET
+		error
+	R_BRACE									{ $$ = NULL; YYABORT; }
+;
+
+/* Returns a new GPtrArray of state names (strings). */
+StateList: /* empty */								{ $$ = g_ptr_array_new_with_free_func (g_free); }
+         | StateName								{
+											$$ = g_ptr_array_new_with_free_func (g_free);
+											g_ptr_array_add ($$, $1 /* steal */);
+										}
+         | StateName ';' StateList						{ $$ = $3; g_ptr_array_add ($$, $1 /* steal */); }
+         | error ';' StateList							{ $$ = $3; YYABORT; }
+;
+
+/* Returns a new string containing the state name. */
+StateName: VARIABLE_OR_FUNCTION_OR_STATE_NAME					{ $$ = $1; /* steal ownership from flex */ }
+;
+
+/* Returns a new DfsmAstTransition. */
+TransitionBlock:
+	TRANSITION FROM StateName TO StateName ON TransitionType BLOCK_L_BRACKET
+		PreconditionList
+		StatementList
+	R_BRACE									{ $$ = dfsm_ast_transition_new ($3, $5, $7, $9, $10, &ERROR);
+										  ABORT_ON_ERROR; }
+|	TRANSITION FROM StateName TO StateName ON TransitionType BLOCK_L_BRACKET
+		error
+	R_BRACE									{ $$ = NULL; YYABORT; }
+;
+
+/* Returns a string representing the transition type. We hackily mix "*" in with method names, since it can never be a valid method name. */
+TransitionType: METHOD DBUS_MEMBER_OR_ERROR_NAME				{ $$ = $2; /* steal ownership from flex */ }
+              | '*'								{ $$ = g_strdup ("*"); }
+;
+
+/* Returns a new GPtrArray containing DfsmAstPreconditions. */
+PreconditionList: /* empty */							{ $$ = g_ptr_array_new_with_free_func (dfsm_ast_node_unref); }
+                | PreconditionList PRECONDITION PreconditionThrow BLOCK_L_BRACKET Expression R_BRACE
+			{
+				$$ = $1;
+				g_ptr_array_add ($$, dfsm_ast_precondition_new ($3, $5, &ERROR));
+				ABORT_ON_ERROR;
+			}
+                | PreconditionList PRECONDITION PreconditionThrow BLOCK_L_BRACKET error R_BRACE
+;
+
+/* Returns a string containing the error name, or NULL for no error. */
+PreconditionThrow: /* empty */							{ $$ = NULL; }
+                 | THROWING DBUS_MEMBER_OR_ERROR_NAME				{ $$ = $2; /* steal ownership from flex */ }
+;
+
+/* Returns a new GPtrArray of DfsmAstStatements. */
+StatementList: Statement ';'							{
+											$$ = g_ptr_array_new_with_free_func (dfsm_ast_node_unref);
+											g_ptr_array_add ($$, $1 /* steal */);
+										}
+             | StatementList Statement ';'					{ $$ = $1; g_ptr_array_add ($$, $2); }
+             | StatementList error ';'						{ $$ = $1; YYABORT; }
+;
+
+/* Returns a new DfsmAstStatement (or subclass). */
+Statement: DataStructure '=' Expression					{ $$ = dfsm_ast_statement_assignment_new ($1, $3, &ERROR); ABORT_ON_ERROR; }
+         | THROW DBUS_MEMBER_OR_ERROR_NAME				{ $$ = dfsm_ast_statement_throw_new ($2, &ERROR); ABORT_ON_ERROR; }
+         | EMIT DBUS_MEMBER_OR_ERROR_NAME Expression			{ $$ = dfsm_ast_statement_emit_new ($2, $3, &ERROR); ABORT_ON_ERROR; }
+         | REPLY Expression						{ $$ = dfsm_ast_statement_reply_new ($2, &ERROR); ABORT_ON_ERROR; }
+;
+
+/* Returns a new DfsmAstExpression. */
+Expression: EXPR_L_BRACKET Expression R_PAREN	{ $$ = $2; }
+          | EXPR_L_BRACKET error R_PAREN	{ $$ = NULL; YYABORT; }
+          | FunctionName Expression		{ $$ = dfsm_ast_expression_function_call_new ($1, $2, &ERROR); ABORT_ON_ERROR; }
+          | FuzzyDataStructure			{ $$ = dfsm_ast_expression_data_structure_new ($1, &ERROR); ABORT_ON_ERROR; }
+          | NOT Expression			{ $$ = dfsm_ast_expression_unary_new (DFSM_AST_EXPRESSION_NOT, $2, &ERROR); ABORT_ON_ERROR; }
+          | Expression TIMES Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_TIMES, $1, $3, &ERROR); ABORT_ON_ERROR; }
+          | Expression DIVIDE Expression	{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_DIVIDE, $1, $3, &ERROR); ABORT_ON_ERROR; }
+          | Expression MODULUS Expression	{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_MODULUS, $1, $3, &ERROR); ABORT_ON_ERROR; }
+          | Expression PLUS Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_PLUS, $1, $3, &ERROR); ABORT_ON_ERROR; }
+          | Expression MINUS Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_MINUS, $1, $3, &ERROR); ABORT_ON_ERROR; }
+          | Expression LT Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_LT, $1, $3, &ERROR); ABORT_ON_ERROR; }
+          | Expression LTE Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_LTE, $1, $3, &ERROR); ABORT_ON_ERROR; }
+          | Expression GT Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_GT, $1, $3, &ERROR); ABORT_ON_ERROR; }
+          | Expression GTE Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_GTE, $1, $3, &ERROR); ABORT_ON_ERROR; }
+          | Expression EQ Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_EQ, $1, $3, &ERROR); ABORT_ON_ERROR; }
+          | Expression NEQ Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_NEQ, $1, $3, &ERROR); ABORT_ON_ERROR; }
+          | Expression AND Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_AND, $1, $3, &ERROR); ABORT_ON_ERROR; }
+          | Expression OR Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_OR, $1, $3, &ERROR); ABORT_ON_ERROR; }
+;
+
+/* Returns the function name as a string. */
+FunctionName: VARIABLE_OR_FUNCTION_OR_STATE_NAME				{ $$ = $1; /* steal ownership from flex */ }
+;
+
+/* Returns the variable name as a string. */
+VariableName: VARIABLE_OR_FUNCTION_OR_STATE_NAME				{ $$ = $1; /* steal ownership from flex */ }
+;
+
+/* Returns a new DfsmAstVariable. */
+Variable: VariableDeref								{ $$ = dfsm_ast_variable_new (DFSM_AST_SCOPE_LOCAL,
+										                              g_ptr_array_remove_index ($1, 0),
+										                              $1, &ERROR); ABORT_ON_ERROR; }
+        | OBJECT '.' VariableDeref						{ $$ = dfsm_ast_variable_new (DFSM_AST_SCOPE_OBJECT,
+										                              g_ptr_array_remove_index ($3, 0),
+										                              $3, &ERROR); ABORT_ON_ERROR; }
+;
+
+/* Returns a new GPtrArray of DfsmAstExpressions, with index 0 being a string variable name. */
+VariableDeref: VariableName							{ $$ = g_ptr_array_new (); g_ptr_array_add ($$, $1); }
+             | VariableDeref ARRAY_INDEX_L_BRACKET Expression ARRAY_INDEX_R_BRACKET	{ $$ = $1; g_ptr_array_add ($$, $3); }
+;
+
+/* Returns a new DfsmAstDataStructure or DfsmAstFuzzyDataStructure (which is a subclass). */
+FuzzyDataStructure: DataStructure						{ $$ = $1; }
+                  | DataStructure FUZZY						{ $$ = dfsm_ast_fuzzy_data_structure_new ($1, &ERROR); ABORT_ON_ERROR; }
+;
+
+/* Returns a new DfsmAstDataStructure or DfsmAstVariable. */
+DataStructure: STRING					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_STRING, $1, &ERROR); ABORT_ON_ERROR; }
+             | INTEGER					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_INTEGER, &$1, &ERROR); ABORT_ON_ERROR; }
+             | FLOAT					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_FLOAT, &$1, &ERROR); ABORT_ON_ERROR; }
+             | TRUE_LITERAL				{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BOOLEAN,
+							                                    GUINT_TO_POINTER (TRUE), &ERROR); ABORT_ON_ERROR; }
+             | FALSE_LITERAL				{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BOOLEAN,
+							                                    GUINT_TO_POINTER (FALSE), &ERROR); ABORT_ON_ERROR; }
+             | REGEXP					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_REGEXP, $1, &ERROR); ABORT_ON_ERROR; }
+             | ARRAY_L_BRACKET ArrayList R_PAREN	{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_ARRAY, $2, &ERROR); ABORT_ON_ERROR; }
+             | ARRAY_L_BRACKET error R_PAREN		{ $$ = NULL; YYABORT; }
+             | DICT_L_BRACKET DictionaryList R_BRACE	{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_DICTIONARY, $2, &ERROR); ABORT_ON_ERROR; }
+             | DICT_L_BRACKET error R_BRACE		{ $$ = NULL; YYABORT; }
+             | Variable					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_VARIABLE, $1, &ERROR); ABORT_ON_ERROR; }
+;
+
+/* Returns a new GPtrArray of DfsmAstExpressions */
+ArrayList: /* empty */								{ $$ = g_ptr_array_new_with_free_func (dfsm_ast_node_unref); }
+         | ArrayList Expression ','						{ $$ = $1; g_ptr_array_add ($$, $2); }
+;
+
+/* Returns a new GPtrArray of DfsmAstDictionaryEntrys */
+DictionaryList: /* empty */				{
+								$$ = g_ptr_array_new_with_free_func ((GDestroyNotify) dfsm_ast_dictionary_entry_free);
+							}
+              | DictionaryList Expression ':' Expression ','			{
+											$$ = $1;
+											g_ptr_array_add ($$, dfsm_ast_dictionary_entry_new ($2, $4));
+										}
+;
+
+%%
+
+GPtrArray *
+dfsm_bison_parse (const gchar *source_buf, GError **error)
+{
+	GError *child_error = NULL;
+	DfsmParserData data = { 0, };
+	int result;
+	GPtrArray *retval = NULL;
+
+	/* Set up the parsing environment. */
+	data.yyscanner = NULL;
+	data.object_array = NULL;
+	data.error = child_error;
+
+	data.source_buf = source_buf;
+	data.source_len = g_utf8_strlen (source_buf, -1);
+	data.source_pos = 0;
+
+	yylex_init (&(data.yyscanner));
+	yyset_extra (&data, data.yyscanner);
+
+	/* Parse! */
+	result = yyparse (&data);
+
+	yylex_destroy (data.yyscanner);
+
+	if (result == 0) {
+		/* Success! */
+		retval = g_ptr_array_ref (data.object_array);
+	} else if (result == 1) {
+		/* Parse error */
+		g_assert (child_error != NULL);
+		g_propagate_error (error, child_error);
+		retval = NULL;
+	} else if (result == 2) {
+		/* OOM */
+		retval = NULL;
+
+		/* If an error had already been set, return that; otherwise report the OOM. */
+		if (child_error != NULL) {
+			g_propagate_error (error, child_error);
+		} else {
+			/* TODO */
+		}
+	} else {
+		g_assert_not_reached ();
+	}
+
+	g_assert ((retval != NULL && error == NULL) || (retval == NULL && error != NULL));
+
+	return retval;
+}
+
+static void
+yyerror (const char *message)
+{
+	fprintf (stderr, "%s\n", message);
+}
