@@ -12,70 +12,70 @@ BUILT_SOURCES =
 
 # libdfsm
 
-lib_LTLIBRARIES += libdfsm/libdfsm.la
+lib_LTLIBRARIES += dfsm/libdfsm.la
 
-libdfsm_main_header = libdfsm/dfsm.h
-libdfsm_public_headers = \
-	libdfsm/dfsm-ast.h \
-	libdfsm/dfsm-utils.h \
+dfsm_main_header = dfsm/dfsm.h
+dfsm_public_headers = \
+	dfsm/dfsm-ast.h \
+	dfsm/dfsm-utils.h \
 	$(NULL)
-libdfsm_sources = \
-	libdfsm/dfsm-bison.y \
-	libdfsm/dfsm-flex.l \
-	libdfsm/dfsm-ast.c \
-	libdfsm/dfsm-parser.c \
-	libdfsm/dfsm-parser.h \
-	$(NULL)
-
-libdfsmincludedir = $(pkgincludedir)/dfsm
-libdfsminclude_HEADERS = \
-	$(libdfsm_main_header) \
-	$(libdfsm_public_headers) \
+dfsm_sources = \
+	dfsm/dfsm-bison.y \
+	dfsm/dfsm-flex.l \
+	dfsm/dfsm-ast.c \
+	dfsm/dfsm-parser.c \
+	dfsm/dfsm-parser.h \
 	$(NULL)
 
-libdfsm_libdfsm_la_SOURCES = \
-	$(libdfsm_sources) \
+dfsmincludedir = $(pkgincludedir)/dfsm
+dfsminclude_HEADERS = \
+	$(dfsm_main_header) \
+	$(dfsm_public_headers) \
 	$(NULL)
 
-libdfsm_libdfsm_la_YFLAGS = \
+dfsm_libdfsm_la_SOURCES = \
+	$(dfsm_sources) \
+	$(NULL)
+
+dfsm_libdfsm_la_YFLAGS = \
 	--warnings=all \
 	-d \
 	--report=all \
 	$(NULL)
 
-libdfsm_libdfsm_la_CPPFLAGS = \
+dfsm_libdfsm_la_CPPFLAGS = \
 	-I$(top_srcdir) \
-	-I$(top_srcdir)/libdfsm \
+	-I$(top_srcdir)/dfsm \
 	-DG_LOG_DOMAIN=\"libdfsm\" \
 	$(DISABLE_DEPRECATED) \
 	$(AM_CPPFLAGS) \
 	$(NULL)
 
-libdfsm_libdfsm_la_CFLAGS = \
+dfsm_libdfsm_la_CFLAGS = \
 	$(WARN_CFLAGS) \
 	$(GLIB_CFLAGS) \
 	$(AM_CFLAGS) \
 	$(NULL)
 
-libdfsm_libdfsm_la_LIBADD = \
+dfsm_libdfsm_la_LIBADD = \
 	$(GLIB_LIBS) \
 	$(AM_LIBADD) \
 	$(NULL)
 
-libdfsm_libdfsm_la_LDFLAGS = \
-	-version-info $(LIBDFSM_LT_VERSION) \
-	-export-symbols $(srcdir)/libdfsm/dfsm.symbols \
+dfsm_libdfsm_la_LDFLAGS = \
+	-version-info $(DFSM_LT_VERSION) \
+	-export-symbols $(srcdir)/dfsm/dfsm.symbols \
 	-no-undefined \
 	$(AM_LDFLAGS) \
 	$(NULL)
 
-EXTRA_DIST += libdfsm/dfsm.symbols
+EXTRA_DIST += dfsm/dfsm.symbols
 
 CLEANFILES += \
-	libdfsm/dfsm-flex.c \
-	libdfsm/libdfsm_libdfsm_la-dfsm-bison.c \
-	libdfsm/libdfsm_libdfsm_la-dfsm-bison.h \
-	libdfsm/libdfsm_libdfsm_la-dfsm-bison.output \
+	dfsm/dfsm-flex.c \
+	dfsm/dfsm_libdfsm_la-dfsm-bison.c \
+	dfsm/dfsm_libdfsm_la-dfsm-bison.h \
+	dfsm/dfsm_libdfsm_la-dfsm-bison.output \
 	$(NULL)
 
 # Gubbins

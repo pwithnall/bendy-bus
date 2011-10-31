@@ -33,8 +33,8 @@ IT_PROG_INTLTOOL([0.40.0])
 #  2. If any interfaces have been added, removed, or changed since the last update, increment current, and set revision to 0.
 #  3. If any interfaces have been added since the last public release, then increment age.
 #  4. If any interfaces have been removed or changed since the last public release, then set age to 0.
-LIBDFSM_LT_VERSION=0:0:0
-AC_SUBST(LIBDFSM_LT_VERSION)
+DFSM_LT_VERSION=0:0:0
+AC_SUBST(DFSM_LT_VERSION)
 
 # Dependencies
 GLIB_REQS=2.0.0

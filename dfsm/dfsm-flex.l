@@ -10,7 +10,7 @@
 
 	#include "dfsm-ast.h"
 	#include "dfsm-parser.h"
-	#include "libdfsm_libdfsm_la-dfsm-bison.h"
+	#include "dfsm_libdfsm_la-dfsm-bison.h"
 
 	static int comment_caller = 0;
 	static int string_caller = 0;
