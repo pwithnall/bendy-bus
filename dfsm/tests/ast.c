@@ -41,9 +41,9 @@ test_ast_single_object (void)
 			"}\n"
 			"\n"
 			"transition from Main to Main on method GetParameters {\n"
-				"precondition throwing NotImplemented { Protocol in keys(object.Protocols) }\n"
+				"precondition throwing NotImplemented { Protocol == keys(object->Protocols) }\n"
 				"\n"
-				"reply object._Params\n"
+				"reply object->_Params;\n"
 			"}\n"
 		"}", &error);
 

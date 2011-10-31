@@ -195,6 +195,7 @@ FLOAT					(\+-)?[0-9]+\.[0-9]+
 "⟨" { return L_ANGLE; }
 "⟩" { return R_ANGLE; }
 "?" { return FUZZY; }
+"->" { return DOT; }
 
 {DBUS_OBJECT_PATH} { yylval->str = strdup (yytext); return DBUS_OBJECT_PATH; }
 {DBUS_INTERFACE_NAME} { yylval->str = strdup (yytext); return DBUS_INTERFACE_NAME; }
