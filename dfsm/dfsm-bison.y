@@ -136,7 +136,7 @@
 %%
 
 /* Returns a GPtrArray of DfsmAstObjects. */
-Input: /* empty */			{ $$ = parser_data->object_array = g_ptr_array_new_with_free_func (dfsm_ast_node_unref); }
+Input: /* empty */			{ $$ = g_ptr_array_new_with_free_func (dfsm_ast_node_unref); parser_data->object_array = g_ptr_array_ref ($$); }
      | Input ObjectBlock		{ $$ = $1; g_ptr_array_add ($$, $2); }
 ;
 
@@ -385,6 +385,7 @@ dfsm_bison_parse (const gchar *source_buf, GError **error)
 
 	if (result == 0) {
 		/* Success! */
+		g_assert (data.object_array != NULL);
 		retval = g_ptr_array_ref (data.object_array);
 	} else if (result == 1) {
 		/* Parse error */
@@ -405,7 +406,13 @@ dfsm_bison_parse (const gchar *source_buf, GError **error)
 		g_assert_not_reached ();
 	}
 
-	g_assert ((retval != NULL && error == NULL) || (retval == NULL && error != NULL));
+	/* Tidy up */
+	g_clear_error (&child_error);
+	if (data.object_array != NULL) {
+		g_ptr_array_unref (data.object_array);
+	}
+
+	g_assert ((retval != NULL && child_error == NULL) || (retval == NULL && child_error != NULL));
 
 	return retval;
 }
