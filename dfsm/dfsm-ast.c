@@ -486,6 +486,9 @@ _dfsm_ast_data_structure_free (DfsmAstNode *node)
 			case DFSM_AST_DATA_DICTIONARY:
 				g_ptr_array_unref (data_structure->dictionary);
 				break;
+			case DFSM_AST_DATA_STRUCTURE:
+				g_ptr_array_unref (data_structure->structure);
+				break;
 			case DFSM_AST_DATA_VARIABLE:
 				dfsm_ast_node_unref (data_structure->variable);
 				break;
@@ -541,6 +544,9 @@ dfsm_ast_data_structure_new (DfsmAstDataStructureType data_structure_type, gpoin
 			break;
 		case DFSM_AST_DATA_DICTIONARY:
 			data_structure->dictionary = g_ptr_array_ref (value); /* array of DfsmAstDictionaryEntrys */
+			break;
+		case DFSM_AST_DATA_STRUCTURE:
+			data_structure->structure = g_ptr_array_ref (value); /* array of DfsmAstExpressions */
 			break;
 		case DFSM_AST_DATA_VARIABLE:
 			data_structure->variable = dfsm_ast_node_ref (value); /* DfsmAstVariable */

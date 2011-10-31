@@ -89,10 +89,12 @@
 %token REPLY
 %token L_BRACE
 %token R_BRACE
-%token EXPR_L_BRACKET
+%token L_PAREN
 %token R_PAREN
 %token ARRAY_L_BRACKET
 %token ARRAY_R_BRACKET
+%token L_ANGLE
+%token R_ANGLE
 %token FUZZY
 
 %right NOT
@@ -128,6 +130,7 @@
 %type <ast_data_structure> DataStructure
 %type <ptr_array> ArrayList
 %type <ptr_array> DictionaryList
+%type <ptr_array> StructureList StructureListInner
 
 %%
 
@@ -271,8 +274,8 @@ Statement: DataStructure '=' Expression					{ $$ = dfsm_ast_statement_assignment
 ;
 
 /* Returns a new DfsmAstExpression. */
-Expression: EXPR_L_BRACKET Expression R_PAREN	{ $$ = $2; }
-          | EXPR_L_BRACKET error R_PAREN	{ $$ = NULL; YYABORT; }
+Expression: L_ANGLE Expression R_ANGLE		{ $$ = $2; }
+          | L_ANGLE error R_ANGLE		{ $$ = NULL; YYABORT; }
           | FunctionName Expression		{ $$ = dfsm_ast_expression_function_call_new ($1, $2, &ERROR); ABORT_ON_ERROR; }
           | FuzzyDataStructure			{ $$ = dfsm_ast_expression_data_structure_new ($1, &ERROR); ABORT_ON_ERROR; }
           | NOT Expression			{ $$ = dfsm_ast_expression_unary_new (DFSM_AST_EXPRESSION_NOT, $2, &ERROR); ABORT_ON_ERROR; }
@@ -324,6 +327,8 @@ DataStructure: STRING					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_STRI
              | ARRAY_L_BRACKET error ARRAY_R_BRACKET		{ $$ = NULL; YYABORT; }
              | L_BRACE DictionaryList R_BRACE		{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_DICTIONARY, $2, &ERROR); ABORT_ON_ERROR; }
              | L_BRACE error R_BRACE			{ $$ = NULL; YYABORT; }
+             | L_PAREN StructureList R_PAREN		{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_STRUCTURE, $2, &ERROR); ABORT_ON_ERROR; }
+             | L_PAREN error R_PAREN			{ $$ = NULL; YYABORT; }
              | Variable					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_VARIABLE, $1, &ERROR); ABORT_ON_ERROR; }
 ;
 
@@ -340,6 +345,14 @@ DictionaryList: /* empty */				{
 											$$ = $1;
 											g_ptr_array_add ($$, dfsm_ast_dictionary_entry_new ($2, $4));
 										}
+;
+
+/* Returns a new GPtrArray of DfsmAstExpressions */
+StructureList: StructureListInner						{ $$ = $1; }
+             | StructureListInner Expression					{ $$ = $1; g_ptr_array_add ($$, $2); }
+;
+StructureListInner: /* empty */							{ $$ = g_ptr_array_new_with_free_func (dfsm_ast_node_unref); }
+                  | StructureListInner Expression ','				{ $$ = $1; g_ptr_array_add ($$, $2); }
 ;
 
 %%

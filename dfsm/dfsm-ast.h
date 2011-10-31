@@ -139,6 +139,7 @@ typedef enum {
 	DFSM_AST_DATA_REGEXP,
 	DFSM_AST_DATA_ARRAY,
 	DFSM_AST_DATA_DICTIONARY,
+	DFSM_AST_DATA_STRUCTURE,
 	DFSM_AST_DATA_VARIABLE,
 } DfsmAstDataStructureType;
 
@@ -155,6 +156,7 @@ struct _DfsmAstDataStructure {
 		gchar *regexp;
 		GPtrArray *array;
 		GPtrArray *dictionary;
+		GPtrArray *structure;
 		DfsmAstVariable *variable;
 	};
 };
