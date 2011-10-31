@@ -180,7 +180,7 @@ FLOAT					(\+-)?[0-9]+\.[0-9]+
 "<=" { return LTE; }
 ">" { return GT; }
 ">=" { return GTE; }
-"=" { return EQ; }
+"==" { return EQ; }
 "!=" { return NEQ; }
 "&&" { return AND; }
 "||" { return OR; }
