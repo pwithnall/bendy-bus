@@ -3,6 +3,10 @@
 %defines
 %error-verbose
 
+%lex-param {GError **error}
+%parse-param {DfsmParserData *parser_data}
+%parse-param {GError **error}
+
 %expect 13 /* shift-reduce conflicts */
 
 %code top {
@@ -16,12 +20,11 @@
 }
 
 %code {
-	static void yyerror (const char *message);
+	static void yyerror (YYLTYPE *yylloc, DfsmParserData *parser_data, GError **error, const char *message);
 
-	#define YYPARSE_PARAM parse_data
-	#define YYLEX_PARAM ((DfsmParserData*) YYPARSE_PARAM)->yyscanner
+	#define YYLEX_PARAM parser_data->yyscanner
 
-	#define ERROR (((DfsmParserData*) YYPARSE_PARAM)->error)
+	#define ERROR (parser_data->error)
 	#define ABORT_ON_ERROR \
 	if (ERROR != NULL) { \
 		YYABORT; \
@@ -133,7 +136,7 @@
 %%
 
 /* Returns a GPtrArray of DfsmAstObjects. */
-Input: /* empty */			{ $$ = ((DfsmParserData*) YYPARSE_PARAM)->object_array = g_ptr_array_new_with_free_func (dfsm_ast_node_unref); }
+Input: /* empty */			{ $$ = parser_data->object_array = g_ptr_array_new_with_free_func (dfsm_ast_node_unref); }
      | Input ObjectBlock		{ $$ = $1; g_ptr_array_add ($$, $2); }
 ;
 
@@ -373,7 +376,7 @@ dfsm_bison_parse (const gchar *source_buf, GError **error)
 	yyset_extra (&data, data.yyscanner);
 
 	/* Parse! */
-	result = yyparse (&data);
+	result = yyparse (&data, &child_error);
 
 	yylex_destroy (data.yyscanner);
 
@@ -405,7 +408,7 @@ dfsm_bison_parse (const gchar *source_buf, GError **error)
 }
 
 static void
-yyerror (const char *message)
+yyerror (YYLTYPE *yylloc, DfsmParserData *parser_data, GError **error, const char *message)
 {
 	fprintf (stderr, "%s\n", message);
 }
