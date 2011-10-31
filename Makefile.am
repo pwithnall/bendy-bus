@@ -2,6 +2,7 @@ SUBDIRS = po
 
 # Setup
 bin_PROGRAMS =
+noinst_PROGRAMS =
 lib_LTLIBRARIES =
 EXTRA_DIST =
 CLEANFILES =
@@ -77,6 +78,31 @@ CLEANFILES += \
 	dfsm/dfsm_libdfsm_la-dfsm-bison.h \
 	dfsm/dfsm_libdfsm_la-dfsm-bison.output \
 	$(NULL)
+
+# libdfsm tests
+test_cppflags = \
+	-I$(top_srcdir) \
+	$(DISABLE_DEPRECATED) \
+	$(AM_CPPFLAGS) \
+	$(NULL)
+
+test_cflags = \
+	$(WARN_CFLAGS) \
+	$(GLIB_CFLAGS) \
+	$(AM_CFLAGS) \
+	$(NULL)
+
+test_ldadd = \
+	$(top_builddir)/dfsm/libdfsm.la \
+	$(GLIB_LIBS) \
+	$(NULL)
+
+noinst_PROGRAMS += dfsm/tests/ast
+
+dfsm_tests_ast_SOURCES = dfsm/tests/ast.c
+dfsm_tests_ast_CPPFLAGS = $(test_cppflags)
+dfsm_tests_ast_CFLAGS = $(test_cflags)
+dfsm_tests_ast_LDADD = $(test_ldadd)
 
 # Gubbins
 ACLOCAL_AMFLAGS = -I m4
