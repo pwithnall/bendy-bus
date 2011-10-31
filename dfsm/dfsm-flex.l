@@ -188,11 +188,10 @@ FLOAT					(\+-)?[0-9]+\.[0-9]+
 "false" { return FALSE_LITERAL; }
 "[" { return ARRAY_L_BRACKET; }
 "]" { return ARRAY_R_BRACKET; }
-"{" { return BLOCK_L_BRACKET; }
+"{" { return L_BRACE; }
 "}" { return R_BRACE; }
 "(" { return EXPR_L_BRACKET; }
 ")" { return R_PAREN; }
-"a{" { return DICT_L_BRACKET; }
 "?" { return FUZZY; }
 
 {DBUS_OBJECT_PATH} { yylval->str = strdup (yytext); return DBUS_OBJECT_PATH; }

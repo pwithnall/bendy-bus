@@ -87,13 +87,12 @@
 %token THROW
 %token EMIT
 %token REPLY
-%token BLOCK_L_BRACKET
+%token L_BRACE
 %token R_BRACE
 %token EXPR_L_BRACKET
 %token R_PAREN
 %token ARRAY_L_BRACKET
 %token ARRAY_R_BRACKET
-%token DICT_L_BRACKET
 %token FUZZY
 
 %right NOT
@@ -139,7 +138,7 @@ Input: /* empty */			{ $$ = parser_data->object_array = g_ptr_array_new_with_fre
 
 /* Returns a new DfsmAstObject. */
 ObjectBlock:
-	OBJECT AT DBUS_OBJECT_PATH IMPLEMENTS InterfaceNameList BLOCK_L_BRACKET
+	OBJECT AT DBUS_OBJECT_PATH IMPLEMENTS InterfaceNameList L_BRACE
 		BlockList
 	R_BRACE									{
 											$$ = dfsm_ast_object_new ($3, $5,
@@ -149,7 +148,7 @@ ObjectBlock:
 											                          &ERROR);
 											ABORT_ON_ERROR;
 										}
-|	OBJECT AT DBUS_OBJECT_PATH IMPLEMENTS InterfaceNameList BLOCK_L_BRACKET
+|	OBJECT AT DBUS_OBJECT_PATH IMPLEMENTS InterfaceNameList L_BRACE
 		error
 	R_BRACE									{ $$ = NULL; YYABORT; }
 ;
@@ -171,10 +170,10 @@ InterfaceNameList: DBUS_INTERFACE_NAME						{
 
 /* Returns a new GHashTable for the data items. */
 DataBlock:
-	DATA BLOCK_L_BRACKET
+	DATA L_BRACE
 		DataList
 	R_BRACE									{ $$ = $3; }
-|	DATA BLOCK_L_BRACKET
+|	DATA L_BRACE
 		error
 	R_BRACE									{ $$ = NULL; YYABORT; }
 ;
@@ -200,10 +199,10 @@ DataList: /* empty */
 
 /* Returns a new GPtrArray of the state names. */
 StatesBlock:
-	STATES BLOCK_L_BRACKET
+	STATES L_BRACE
 		StateList
 	R_BRACE									{ $$ = $3; }
-|	STATES BLOCK_L_BRACKET
+|	STATES L_BRACE
 		error
 	R_BRACE									{ $$ = NULL; YYABORT; }
 ;
@@ -224,12 +223,12 @@ StateName: IDENTIFIER								{ $$ = $1; /* steal ownership from flex */ }
 
 /* Returns a new DfsmAstTransition. */
 TransitionBlock:
-	TRANSITION FROM StateName TO StateName ON TransitionType BLOCK_L_BRACKET
+	TRANSITION FROM StateName TO StateName ON TransitionType L_BRACE
 		PreconditionList
 		StatementList
 	R_BRACE									{ $$ = dfsm_ast_transition_new ($3, $5, $7, $9, $10, &ERROR);
 										  ABORT_ON_ERROR; }
-|	TRANSITION FROM StateName TO StateName ON TransitionType BLOCK_L_BRACKET
+|	TRANSITION FROM StateName TO StateName ON TransitionType L_BRACE
 		error
 	R_BRACE									{ $$ = NULL; YYABORT; }
 ;
@@ -241,13 +240,13 @@ TransitionType: METHOD IDENTIFIER						{ $$ = $2; /* steal ownership from flex *
 
 /* Returns a new GPtrArray containing DfsmAstPreconditions. */
 PreconditionList: /* empty */							{ $$ = g_ptr_array_new_with_free_func (dfsm_ast_node_unref); }
-                | PreconditionList PRECONDITION PreconditionThrow BLOCK_L_BRACKET Expression R_BRACE
+                | PreconditionList PRECONDITION PreconditionThrow L_BRACE Expression R_BRACE
 			{
 				$$ = $1;
 				g_ptr_array_add ($$, dfsm_ast_precondition_new ($3, $5, &ERROR));
 				ABORT_ON_ERROR;
 			}
-                | PreconditionList PRECONDITION PreconditionThrow BLOCK_L_BRACKET error R_BRACE
+                | PreconditionList PRECONDITION PreconditionThrow L_BRACE error R_BRACE
 ;
 
 /* Returns a string containing the error name, or NULL for no error. */
@@ -323,8 +322,8 @@ DataStructure: STRING					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_STRI
              | REGEXP					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_REGEXP, $1, &ERROR); ABORT_ON_ERROR; }
              | ARRAY_L_BRACKET ArrayList ARRAY_R_BRACKET	{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_ARRAY, $2, &ERROR); ABORT_ON_ERROR; }
              | ARRAY_L_BRACKET error ARRAY_R_BRACKET		{ $$ = NULL; YYABORT; }
-             | DICT_L_BRACKET DictionaryList R_BRACE	{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_DICTIONARY, $2, &ERROR); ABORT_ON_ERROR; }
-             | DICT_L_BRACKET error R_BRACE		{ $$ = NULL; YYABORT; }
+             | L_BRACE DictionaryList R_BRACE		{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_DICTIONARY, $2, &ERROR); ABORT_ON_ERROR; }
+             | L_BRACE error R_BRACE			{ $$ = NULL; YYABORT; }
              | Variable					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_VARIABLE, $1, &ERROR); ABORT_ON_ERROR; }
 ;
 
