@@ -87,13 +87,12 @@
 %token THROW
 %token EMIT
 %token REPLY
-%token ARRAY_INDEX_L_BRACKET
-%token ARRAY_INDEX_R_BRACKET
 %token BLOCK_L_BRACKET
 %token R_BRACE
 %token EXPR_L_BRACKET
 %token R_PAREN
 %token ARRAY_L_BRACKET
+%token ARRAY_R_BRACKET
 %token DICT_L_BRACKET
 %token FUZZY
 
@@ -126,7 +125,6 @@
 %type <str> FunctionName
 %type <str> VariableName
 %type <ast_variable> Variable
-%type <ptr_array> VariableDeref
 %type <ast_data_structure> FuzzyDataStructure
 %type <ast_data_structure> DataStructure
 %type <ptr_array> ArrayList
@@ -303,17 +301,10 @@ VariableName: IDENTIFIER							{ $$ = $1; /* steal ownership from flex */ }
 ;
 
 /* Returns a new DfsmAstVariable. */
-Variable: VariableDeref								{ $$ = dfsm_ast_variable_new (DFSM_AST_SCOPE_LOCAL,
-										                              g_ptr_array_remove_index ($1, 0),
+Variable: VariableName								{ $$ = dfsm_ast_variable_new (DFSM_AST_SCOPE_LOCAL,
 										                              $1, &ERROR); ABORT_ON_ERROR; }
-        | OBJECT '.' VariableDeref						{ $$ = dfsm_ast_variable_new (DFSM_AST_SCOPE_OBJECT,
-										                              g_ptr_array_remove_index ($3, 0),
+        | OBJECT '.' VariableName						{ $$ = dfsm_ast_variable_new (DFSM_AST_SCOPE_OBJECT,
 										                              $3, &ERROR); ABORT_ON_ERROR; }
-;
-
-/* Returns a new GPtrArray of DfsmAstExpressions, with index 0 being a string variable name. */
-VariableDeref: VariableName							{ $$ = g_ptr_array_new (); g_ptr_array_add ($$, $1); }
-             | VariableDeref ARRAY_INDEX_L_BRACKET Expression ARRAY_INDEX_R_BRACKET	{ $$ = $1; g_ptr_array_add ($$, $3); }
 ;
 
 /* Returns a new DfsmAstDataStructure or DfsmAstFuzzyDataStructure (which is a subclass). */
@@ -330,8 +321,8 @@ DataStructure: STRING					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_STRI
              | FALSE_LITERAL				{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BOOLEAN,
 							                                    GUINT_TO_POINTER (FALSE), &ERROR); ABORT_ON_ERROR; }
              | REGEXP					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_REGEXP, $1, &ERROR); ABORT_ON_ERROR; }
-             | ARRAY_L_BRACKET ArrayList R_PAREN	{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_ARRAY, $2, &ERROR); ABORT_ON_ERROR; }
-             | ARRAY_L_BRACKET error R_PAREN		{ $$ = NULL; YYABORT; }
+             | ARRAY_L_BRACKET ArrayList ARRAY_R_BRACKET	{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_ARRAY, $2, &ERROR); ABORT_ON_ERROR; }
+             | ARRAY_L_BRACKET error ARRAY_R_BRACKET		{ $$ = NULL; YYABORT; }
              | DICT_L_BRACKET DictionaryList R_BRACE	{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_DICTIONARY, $2, &ERROR); ABORT_ON_ERROR; }
              | DICT_L_BRACKET error R_BRACE		{ $$ = NULL; YYABORT; }
              | Variable					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_VARIABLE, $1, &ERROR); ABORT_ON_ERROR; }

@@ -186,13 +186,12 @@ FLOAT					(\+-)?[0-9]+\.[0-9]+
 "||" { return OR; }
 "true" { return TRUE_LITERAL; }
 "false" { return FALSE_LITERAL; }
-"[" { return ARRAY_INDEX_L_BRACKET; }
-"]" { return ARRAY_INDEX_R_BRACKET; }
+"[" { return ARRAY_L_BRACKET; }
+"]" { return ARRAY_R_BRACKET; }
 "{" { return BLOCK_L_BRACKET; }
 "}" { return R_BRACE; }
 "(" { return EXPR_L_BRACKET; }
 ")" { return R_PAREN; }
-"a(" { return ARRAY_L_BRACKET; }
 "a{" { return DICT_L_BRACKET; }
 "?" { return FUZZY; }
 

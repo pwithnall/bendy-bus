@@ -922,7 +922,6 @@ _dfsm_ast_variable_free (DfsmAstNode *node)
 	DfsmAstVariable *variable = (DfsmAstVariable*) node;
 
 	if (variable != NULL) {
-		g_ptr_array_unref (variable->index_expressions);
 		g_free (variable->variable_name);
 
 		g_slice_free (DfsmAstVariable, variable);
@@ -933,22 +932,18 @@ _dfsm_ast_variable_free (DfsmAstNode *node)
  * dfsm_ast_variable_new:
  * @scope: scope of the variable reference
  * @variable_name: name of the variable being referenced
- * @index_expressions: array of zero or more #DfsmAstExpression<!-- -->s giving the array indices used in the variable reference
  * @error: (allow-none): a #GError, or %NULL
  *
- * Create a new #DfsmAstVariable representing a variable dereferencing operation. The expressions in @index_expressions will be evaluated to give
- * the indices into an array, or keys into a dictionary, to use. Index 0 in @index_expressions gives the left-most array index (i.e. for the top-level
- * array or dictionay), which will be evaluated first.
+ * Create a new #DfsmAstVariable representing a variable dereferencing operation.
  *
  * Return value: (transfer full): a new AST node
  */
 DfsmAstVariable *
-dfsm_ast_variable_new (DfsmAstScope scope, const gchar *variable_name, GPtrArray/*<DfsmAstExpression>*/ *index_expressions, GError **error)
+dfsm_ast_variable_new (DfsmAstScope scope, const gchar *variable_name, GError **error)
 {
 	DfsmAstVariable *variable;
 
 	g_return_val_if_fail (variable_name != NULL && *variable_name != '\0', NULL);
-	g_return_val_if_fail (index_expressions != NULL, NULL);
 	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	variable = g_slice_new (DfsmAstVariable);
@@ -957,7 +952,6 @@ dfsm_ast_variable_new (DfsmAstScope scope, const gchar *variable_name, GPtrArray
 
 	variable->scope = scope;
 	variable->variable_name = g_strdup (variable_name);
-	variable->index_expressions = g_ptr_array_ref (index_expressions);
 
 	return variable;
 }

@@ -258,11 +258,9 @@ struct _DfsmAstVariable {
 	DfsmAstNode parent;
 	DfsmAstScope scope;
 	gchar *variable_name;
-	GPtrArray *index_expressions; /* array of DfsmAstExpressions */
 };
 
-DfsmAstVariable *dfsm_ast_variable_new (DfsmAstScope scope, const gchar *variable_name,
-                                        GPtrArray/*<DfsmAstExpression>*/ *index_expressions, GError **error) DFSM_CONSTRUCTOR;
+DfsmAstVariable *dfsm_ast_variable_new (DfsmAstScope scope, const gchar *variable_name, GError **error) DFSM_CONSTRUCTOR;
 
 G_END_DECLS
 
