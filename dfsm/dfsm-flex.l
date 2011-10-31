@@ -53,19 +53,19 @@ DBUS_WELL_KNOWN_BUS_NAME_ELEMENT	[A-Za-z_-]+[A-Za-z0-9_-]*
 DBUS_WELL_KNOWN_BUS_NAME		{DBUS_WELL_KNOWN_BUS_NAME_ELEMENT}\.{DBUS_WELL_KNOWN_BUS_NAME_ELEMENT}(\.{DBUS_WELL_KNOWN_BUS_NAME_ELEMENT})*
 
 /* Additional restrictions not encoded here:
- *  • Must be UTF-8.
- *  • Must not exceed 255 characters in length.
- */
-DBUS_MEMBER_OR_ERROR_NAME		[A-Za-z_]+[A-Za-z0-9_]*
-
-/* Additional restrictions not encoded here:
  *  • Must be well-formed and encode a complete type.
  *  • Must not exceed 255 characters in length.
  *  • Must be nul-terminated.
  */
 DBUS_TYPE_SIGNATURE			[\(\)\{\}ybnqiuxtdsogarvehm\*\?@&^]+
 
-VARIABLE_OR_FUNCTION_OR_STATE_NAME	[A-Za-z0-9_]+
+/* Includes variable names, state names, function names, D-Bus member names, D-Bus error names.
+ *
+ * Additional restrictions on D-Bus member and error names not encoded here:
+ *  • Must be UTF-8.
+ *  • Must not exceed 255 characters in length.
+ */
+IDENTIFIER				[A-Za-z0-9_]+
 
 INTEGER					(\+-)?[0-9]+
 FLOAT					(\+-)?[0-9]+\.[0-9]+
@@ -198,10 +198,9 @@ FLOAT					(\+-)?[0-9]+\.[0-9]+
 
 {DBUS_OBJECT_PATH} { yylval->str = strdup (yytext); return DBUS_OBJECT_PATH; }
 {DBUS_INTERFACE_NAME} { yylval->str = strdup (yytext); return DBUS_INTERFACE_NAME; }
-{DBUS_MEMBER_OR_ERROR_NAME} { yylval->str = strdup (yytext); return DBUS_MEMBER_OR_ERROR_NAME; }
 {DBUS_TYPE_SIGNATURE} { yylval->str = strdup (yytext); return DBUS_TYPE_SIGNATURE; }
 
-{VARIABLE_OR_FUNCTION_OR_STATE_NAME} { yylval->str = strdup (yytext); return VARIABLE_OR_FUNCTION_OR_STATE_NAME; }
+{IDENTIFIER} { yylval->str = strdup (yytext); return IDENTIFIER; }
 
 {INTEGER} { yylval->integer = g_ascii_strtoll (yytext, NULL, 10); return INTEGER; }
 {FLOAT} { yylval->flt = g_ascii_strtod (yytext, NULL); return FLOAT; }

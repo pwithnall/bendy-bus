@@ -59,10 +59,9 @@
 
 %token <str> DBUS_OBJECT_PATH
 %token <str> DBUS_INTERFACE_NAME
-%token <str> DBUS_MEMBER_OR_ERROR_NAME
 %token <str> DBUS_TYPE_SIGNATURE
 
-%token <str> VARIABLE_OR_FUNCTION_OR_STATE_NAME
+%token <str> IDENTIFIER
 
 %token <str> STRING
 %token <integer> INTEGER
@@ -222,7 +221,7 @@ StateList: /* empty */								{ $$ = g_ptr_array_new_with_free_func (g_free); }
 ;
 
 /* Returns a new string containing the state name. */
-StateName: VARIABLE_OR_FUNCTION_OR_STATE_NAME					{ $$ = $1; /* steal ownership from flex */ }
+StateName: IDENTIFIER								{ $$ = $1; /* steal ownership from flex */ }
 ;
 
 /* Returns a new DfsmAstTransition. */
@@ -238,7 +237,7 @@ TransitionBlock:
 ;
 
 /* Returns a string representing the transition type. We hackily mix "*" in with method names, since it can never be a valid method name. */
-TransitionType: METHOD DBUS_MEMBER_OR_ERROR_NAME				{ $$ = $2; /* steal ownership from flex */ }
+TransitionType: METHOD IDENTIFIER						{ $$ = $2; /* steal ownership from flex */ }
               | '*'								{ $$ = g_strdup ("*"); }
 ;
 
@@ -255,7 +254,7 @@ PreconditionList: /* empty */							{ $$ = g_ptr_array_new_with_free_func (dfsm_
 
 /* Returns a string containing the error name, or NULL for no error. */
 PreconditionThrow: /* empty */							{ $$ = NULL; }
-                 | THROWING DBUS_MEMBER_OR_ERROR_NAME				{ $$ = $2; /* steal ownership from flex */ }
+                 | THROWING IDENTIFIER						{ $$ = $2; /* steal ownership from flex */ }
 ;
 
 /* Returns a new GPtrArray of DfsmAstStatements. */
@@ -269,8 +268,8 @@ StatementList: Statement ';'							{
 
 /* Returns a new DfsmAstStatement (or subclass). */
 Statement: DataStructure '=' Expression					{ $$ = dfsm_ast_statement_assignment_new ($1, $3, &ERROR); ABORT_ON_ERROR; }
-         | THROW DBUS_MEMBER_OR_ERROR_NAME				{ $$ = dfsm_ast_statement_throw_new ($2, &ERROR); ABORT_ON_ERROR; }
-         | EMIT DBUS_MEMBER_OR_ERROR_NAME Expression			{ $$ = dfsm_ast_statement_emit_new ($2, $3, &ERROR); ABORT_ON_ERROR; }
+         | THROW IDENTIFIER						{ $$ = dfsm_ast_statement_throw_new ($2, &ERROR); ABORT_ON_ERROR; }
+         | EMIT IDENTIFIER Expression					{ $$ = dfsm_ast_statement_emit_new ($2, $3, &ERROR); ABORT_ON_ERROR; }
          | REPLY Expression						{ $$ = dfsm_ast_statement_reply_new ($2, &ERROR); ABORT_ON_ERROR; }
 ;
 
@@ -296,11 +295,11 @@ Expression: EXPR_L_BRACKET Expression R_PAREN	{ $$ = $2; }
 ;
 
 /* Returns the function name as a string. */
-FunctionName: VARIABLE_OR_FUNCTION_OR_STATE_NAME				{ $$ = $1; /* steal ownership from flex */ }
+FunctionName: IDENTIFIER							{ $$ = $1; /* steal ownership from flex */ }
 ;
 
 /* Returns the variable name as a string. */
-VariableName: VARIABLE_OR_FUNCTION_OR_STATE_NAME				{ $$ = $1; /* steal ownership from flex */ }
+VariableName: IDENTIFIER							{ $$ = $1; /* steal ownership from flex */ }
 ;
 
 /* Returns a new DfsmAstVariable. */
