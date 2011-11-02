@@ -19,6 +19,7 @@
 
 #include <glib.h>
 
+#include "dfsm-environment.h"
 #include "dfsm-utils.h"
 
 #ifndef DFSM_AST_H
@@ -38,12 +39,17 @@ typedef enum {
 
 typedef struct _DfsmAstNode DfsmAstNode;
 
+typedef void (*DfsmAstNodeCheckFunc) (DfsmAstNode *node, GError **error);
+typedef void (*DfsmAstNodeFreeFunc) (DfsmAstNode *node);
+
 struct _DfsmAstNode {
 	DfsmAstNodeType node_type;
-	void (*free_func) (DfsmAstNode *node);
+	DfsmAstNodeCheckFunc check_func;
+	DfsmAstNodeFreeFunc free_func;
 	gint ref_count;
 };
 
+void dfsm_ast_node_check (DfsmAstNode *node, GError **error);
 gpointer dfsm_ast_node_ref (gpointer/*<DfsmAstNode>*/ node);
 void dfsm_ast_node_unref (gpointer/*<DfsmAstNode>*/ node);
 
@@ -51,7 +57,7 @@ typedef struct {
 	DfsmAstNode parent;
 	gchar *object_path;
 	GPtrArray *interface_names; /* array of strings */
-	GHashTable *data_items; /* string for variable name → DfsmAstDataItem */
+	GHashTable *data_items; /* string for variable name → DfsmAstDataItem; TODO: perhaps separate this out into a reusable environment struct? */
 	GPtrArray *states; /* array of strings (indexed by DfsmAstStateNumber) */
 	GPtrArray *transitions; /* array of DfsmAstTransitions */
 } DfsmAstObject;
@@ -64,8 +70,10 @@ typedef enum {
 	/* Function calls */
 	DFSM_AST_EXPRESSION_FUNCTION_CALL,
 
-	/* Unary expressions */
+	/* Data structures */
 	DFSM_AST_EXPRESSION_DATA_STRUCTURE,
+
+	/* Unary expressions */
 	DFSM_AST_EXPRESSION_NOT,
 
 	/* Binary expressions */
@@ -84,11 +92,21 @@ typedef enum {
 	DFSM_AST_EXPRESSION_OR,
 } DfsmAstExpressionType;
 
+typedef struct _DfsmAstExpression DfsmAstExpression;
+
+typedef GVariantType *(*DfsmAstExpressionCalculateTypeFunc) (DfsmAstExpression *expression);
+typedef GVariant *(*DfsmAstExpressionEvaluateFunc) (DfsmAstExpression *expression, DfsmEnvironment *environment, GError **error);
+
 /* abstract */
-typedef struct {
+struct _DfsmAstExpression {
 	DfsmAstNode parent;
 	DfsmAstExpressionType expression_type;
-} DfsmAstExpression;
+	DfsmAstExpressionCalculateTypeFunc calculate_type_func;
+	DfsmAstExpressionEvaluateFunc evaluate_func;
+};
+
+GVariantType *dfsm_ast_expression_calculate_type (DfsmAstExpression *expression) DFSM_CONSTRUCTOR;
+GVariant *dfsm_ast_expression_evaluate (DfsmAstExpression *expression, DfsmEnvironment *environment, GError **error) DFSM_CONSTRUCTOR;
 
 typedef struct {
 	DfsmAstExpression parent;
@@ -170,11 +188,11 @@ struct _DfsmAstDataStructure {
 		gdouble double_val;
 		gchar *string_val;
 		gchar *object_path_val;
-		GVariantType *signature_val;
-		GPtrArray *array_val;
-		GPtrArray *struct_val;
+		gchar *signature_val;
+		GPtrArray/*<DfsmAstExpression>*/ *array_val;
+		GPtrArray/*<DfsmAstExpression>*/ *struct_val;
 		GVariant *variant_val;
-		GPtrArray *dict_val;
+		GPtrArray/*<DfsmAstDictionaryEntry>*/ *dict_val;
 		gint unix_fd_val;
 		gchar *regexp_val;
 		DfsmAstVariable *variable_val;
@@ -182,6 +200,10 @@ struct _DfsmAstDataStructure {
 };
 
 DfsmAstDataStructure *dfsm_ast_data_structure_new (DfsmAstDataStructureType data_structure_type, gpointer value, GError **error) DFSM_CONSTRUCTOR;
+GVariantType *dfsm_ast_data_structure_calculate_type (DfsmAstDataStructure *data_structure, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
+
+GVariant *dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *data_structure, DfsmEnvironment *environment, GError **error) DFSM_CONSTRUCTOR;
+void dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *data_structure, DfsmEnvironment *environment, GVariant *new_value, GError **error);
 
 typedef struct {
 	DfsmAstDataStructure parent;
@@ -198,6 +220,8 @@ typedef struct {
 
 DfsmAstDataItem *dfsm_ast_data_item_new (const gchar *type_string, DfsmAstDataStructure *value_expression) DFSM_CONSTRUCTOR;
 void dfsm_ast_data_item_free (DfsmAstDataItem *data_item);
+
+void dfsm_ast_data_item_check (DfsmAstDataItem *data_item, GError **error);
 
 typedef enum {
 	DFSM_AST_TRANSITION_METHOD_CALL,
@@ -219,6 +243,8 @@ typedef struct {
 DfsmAstTransition *dfsm_ast_transition_new (const gchar *from_state_name, const gchar *to_state_name, const gchar *transition_type,
                                             GPtrArray/*<DfsmAstPrecondition>*/ *preconditions,
                                             GPtrArray/*<DfsmAstStatement>*/ *statements, GError **error) DFSM_CONSTRUCTOR;
+gboolean dfsm_ast_transition_check_preconditions (DfsmAstTransition *transition, DfsmEnvironment *environment, GError **error);
+GVariant *dfsm_ast_transition_execute (DfsmAstTransition *transition, DfsmEnvironment *environment, GError **error) DFSM_CONSTRUCTOR;
 
 typedef struct {
 	DfsmAstNode parent;
@@ -227,6 +253,7 @@ typedef struct {
 } DfsmAstPrecondition;
 
 DfsmAstPrecondition *dfsm_ast_precondition_new (const gchar *error_name /* nullable */, DfsmAstExpression *condition, GError **error) DFSM_CONSTRUCTOR;
+gboolean dfsm_ast_precondition_check (DfsmAstPrecondition *precondition, DfsmEnvironment *environment, GError **error);
 
 typedef enum {
 	DFSM_AST_STATEMENT_ASSIGNMENT,
@@ -235,11 +262,18 @@ typedef enum {
 	DFSM_AST_STATEMENT_REPLY,
 } DfsmAstStatementType;
 
+typedef struct _DfsmAstStatement DfsmAstStatement;
+
+typedef GVariant *(*DfsmAstStatementExecuteFunc) (DfsmAstStatement *statement, DfsmEnvironment *environment, GError **error);
+
 /* abstract */
-typedef struct {
+struct _DfsmAstStatement {
 	DfsmAstNode parent;
 	DfsmAstStatementType statement_type;
-} DfsmAstStatement;
+	DfsmAstStatementExecuteFunc execute_func;
+};
+
+GVariant *dfsm_ast_statement_execute (DfsmAstStatement *statement, DfsmEnvironment *environment, GError **error) DFSM_CONSTRUCTOR;
 
 typedef struct {
 	DfsmAstStatement parent;
@@ -272,18 +306,17 @@ typedef struct {
 
 DfsmAstStatement *dfsm_ast_statement_reply_new (DfsmAstExpression *expression, GError **error) DFSM_CONSTRUCTOR;
 
-typedef enum {
-	DFSM_AST_SCOPE_LOCAL,
-	DFSM_AST_SCOPE_OBJECT,
-} DfsmAstScope;
-
 struct _DfsmAstVariable {
 	DfsmAstNode parent;
-	DfsmAstScope scope;
+	DfsmVariableScope scope;
 	gchar *variable_name;
 };
 
-DfsmAstVariable *dfsm_ast_variable_new (DfsmAstScope scope, const gchar *variable_name, GError **error) DFSM_CONSTRUCTOR;
+DfsmAstVariable *dfsm_ast_variable_new (DfsmVariableScope scope, const gchar *variable_name, GError **error) DFSM_CONSTRUCTOR;
+GVariantType *dfsm_ast_variable_calculate_type (DfsmAstVariable *variable, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
+
+GVariant *dfsm_ast_variable_to_variant (DfsmAstVariable *variable, DfsmEnvironment *environment, GError **error) DFSM_CONSTRUCTOR;
+void dfsm_ast_variable_set_from_variant (DfsmAstVariable *variable, DfsmEnvironment *environment, GVariant *new_value, GError **error);
 
 G_END_DECLS
 

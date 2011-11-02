@@ -19,12 +19,26 @@
 
 #include <glib.h>
 
-#ifndef DFSM_H
-#define DFSM_H
+#include "dfsm-environment.h"
 
-#include <dfsm/dfsm-parser.h> /* TODO: Shouldn't be public */
-#include <dfsm/dfsm-ast.h>
-#include <dfsm/dfsm-machine.h>
-#include <dfsm/dfsm-utils.h>
+#ifndef DFSM_FUNCTIONS_H
+#define DFSM_FUNCTIONS_H
 
-#endif /* !DFSM_H */
+G_BEGIN_DECLS
+
+typedef struct _DfsmFunctionInfo DfsmFunctionInfo;
+
+typedef GVariant *(*DfsmFunctionEvaluateFunc) (GVariant *parameters, DfsmEnvironment *environment, GError **error);
+
+struct _DfsmFunctionInfo {
+	const gchar *name;
+	const GVariantType *parameters_type;
+	const GVariantType *return_type;
+	const DfsmFunctionEvaluateFunc evaluate_func;
+};
+
+const DfsmFunctionInfo *dfsm_functions_look_up_function_info (const gchar *function_name) G_GNUC_PURE;
+
+G_END_DECLS
+
+#endif /* !DFSM_FUNCTIONS_H */

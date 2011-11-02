@@ -52,6 +52,10 @@ typedef struct {
 DfsmParserBlockList *dfsm_parser_block_list_new (void) DFSM_CONSTRUCTOR;
 void dfsm_parser_block_list_free (DfsmParserBlockList *block_list);
 
+gboolean dfsm_is_variable_name (const gchar *variable_name) G_GNUC_PURE;
+gboolean dfsm_is_state_name (const gchar *state_name) G_GNUC_PURE;
+gboolean dfsm_is_function_name (const gchar *function_name) G_GNUC_PURE;
+
 G_END_DECLS
 
 #endif /* !DFSM_PARSER_H */

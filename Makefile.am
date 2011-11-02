@@ -18,6 +18,8 @@ lib_LTLIBRARIES += dfsm/libdfsm.la
 dfsm_main_header = dfsm/dfsm.h
 dfsm_public_headers = \
 	dfsm/dfsm-ast.h \
+	dfsm/dfsm-environment.h \
+	dfsm/dfsm-machine.h \
 	dfsm/dfsm-utils.h \
 	$(NULL)
 dfsm_sources = \
@@ -26,6 +28,10 @@ dfsm_sources = \
 	dfsm/dfsm-ast.c \
 	dfsm/dfsm-parser.c \
 	dfsm/dfsm-parser.h \
+	dfsm/dfsm-functions.c \
+	dfsm/dfsm-functions.h \
+	dfsm/dfsm-machine.c \
+	dfsm/dfsm-environment.c \
 	$(NULL)
 
 dfsmincludedir = $(pkgincludedir)/dfsm

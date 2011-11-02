@@ -307,9 +307,9 @@ VariableName: IDENTIFIER							{ $$ = $1; /* steal ownership from flex */ }
 ;
 
 /* Returns a new DfsmAstVariable. */
-Variable: VariableName								{ $$ = dfsm_ast_variable_new (DFSM_AST_SCOPE_LOCAL,
+Variable: VariableName								{ $$ = dfsm_ast_variable_new (DFSM_VARIABLE_SCOPE_LOCAL,
 										                              $1, &ERROR); ABORT_ON_ERROR; }
-        | OBJECT DOT VariableName						{ $$ = dfsm_ast_variable_new (DFSM_AST_SCOPE_OBJECT,
+        | OBJECT DOT VariableName						{ $$ = dfsm_ast_variable_new (DFSM_VARIABLE_SCOPE_OBJECT,
 										                              $3, &ERROR); ABORT_ON_ERROR; }
 ;
 
