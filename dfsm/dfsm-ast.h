@@ -132,14 +132,24 @@ DfsmAstDictionaryEntry *dfsm_ast_dictionary_entry_new (DfsmAstExpression *key, D
 void dfsm_ast_dictionary_entry_free (DfsmAstDictionaryEntry *entry);
 
 typedef enum {
-	DFSM_AST_DATA_STRING,
-	DFSM_AST_DATA_INTEGER,
-	DFSM_AST_DATA_FLOAT,
+	DFSM_AST_DATA_BYTE,
 	DFSM_AST_DATA_BOOLEAN,
-	DFSM_AST_DATA_REGEXP,
+	DFSM_AST_DATA_INT16,
+	DFSM_AST_DATA_UINT16,
+	DFSM_AST_DATA_INT32,
+	DFSM_AST_DATA_UINT32,
+	DFSM_AST_DATA_INT64,
+	DFSM_AST_DATA_UINT64,
+	DFSM_AST_DATA_DOUBLE,
+	DFSM_AST_DATA_STRING,
+	DFSM_AST_DATA_OBJECT_PATH,
+	DFSM_AST_DATA_SIGNATURE,
 	DFSM_AST_DATA_ARRAY,
-	DFSM_AST_DATA_DICTIONARY,
-	DFSM_AST_DATA_STRUCTURE,
+	DFSM_AST_DATA_STRUCT,
+	DFSM_AST_DATA_VARIANT,
+	DFSM_AST_DATA_DICT,
+	DFSM_AST_DATA_UNIX_FD,
+	DFSM_AST_DATA_REGEXP,
 	DFSM_AST_DATA_VARIABLE,
 } DfsmAstDataStructureType;
 
@@ -149,15 +159,25 @@ struct _DfsmAstDataStructure {
 	DfsmAstNode parent;
 	DfsmAstDataStructureType data_structure_type;
 	union {
-		gchar *str;
-		gint64 integer;
-		gdouble flt;
-		gboolean boolean;
-		gchar *regexp;
-		GPtrArray *array;
-		GPtrArray *dictionary;
-		GPtrArray *structure;
-		DfsmAstVariable *variable;
+		guchar byte_val;
+		gboolean boolean_val;
+		gint16 int16_val;
+		guint16 uint16_val;
+		gint32 int32_val;
+		guint32 uint32_val;
+		gint64 int64_val;
+		guint64 uint64_val;
+		gdouble double_val;
+		gchar *string_val;
+		gchar *object_path_val;
+		GVariantType *signature_val;
+		GPtrArray *array_val;
+		GPtrArray *struct_val;
+		GVariant *variant_val;
+		GPtrArray *dict_val;
+		gint unix_fd_val;
+		gchar *regexp_val;
+		DfsmAstVariable *variable_val;
 	};
 };
 

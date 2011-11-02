@@ -55,11 +55,13 @@ dfsm_libdfsm_la_CPPFLAGS = \
 dfsm_libdfsm_la_CFLAGS = \
 	$(WARN_CFLAGS) \
 	$(GLIB_CFLAGS) \
+	$(GIO_CFLAGS) \
 	$(AM_CFLAGS) \
 	$(NULL)
 
 dfsm_libdfsm_la_LIBADD = \
 	$(GLIB_LIBS) \
+	$(GIO_LIBS) \
 	$(AM_LIBADD) \
 	$(NULL)
 

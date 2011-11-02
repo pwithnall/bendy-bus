@@ -65,10 +65,16 @@ DBUS_TYPE_SIGNATURE			[\(\)\{\}ybnqiuxtdsogarvehm\*\?@&^]+
  *  • Must be UTF-8.
  *  • Must not exceed 255 characters in length.
  */
-IDENTIFIER				[A-Za-z0-9_]+
+IDENTIFIER				[A-Za-z_]+[A-Za-z0-9_]*
 
-INTEGER					(\+-)?[0-9]+
-FLOAT					(\+-)?[0-9]+\.[0-9]+
+BYTE					[0-9]+y
+INT16					(\+-)?[0-9]+n
+UINT16					[0-9]+q
+INT32					(\+-)?[0-9]+i
+UINT32					[0-9]+u
+INT64					(\+-)?[0-9]+x
+UINT64					[0-9]+t
+DOUBLE					(\+-)?[0-9]+\.[0-9]+d
 
 %%
 
@@ -90,28 +96,6 @@ FLOAT					(\+-)?[0-9]+\.[0-9]+
 
 	"\n" {
 		/* Unterminated string constant */
-		return FLEX_ERROR;
-	}
-
-	"\\x[0-9a-fA-F]{1,2}" { /* hexadecimal escape */
-		int result;
-
-		(void) sscanf (yytext + 1, "%x", &result);
-
-		if (result > 0xff) {
-			/* Constant is too large */
-			return FLEX_ERROR;
-		}
-
-		if (string_buf_ptr - string_buf + 1 > MAX_STRING_CONST_SIZE) {
-			return FLEX_ERROR;
-		}
-
-		*string_buf_ptr++ = result;
-	}
-
-	"\\[0-9]+" {
-		/* Bad escape sequence */
 		return FLEX_ERROR;
 	}
 
@@ -203,8 +187,14 @@ FLOAT					(\+-)?[0-9]+\.[0-9]+
 
 {IDENTIFIER} { yylval->str = strdup (yytext); return IDENTIFIER; }
 
-{INTEGER} { yylval->integer = g_ascii_strtoll (yytext, NULL, 10); return INTEGER; }
-{FLOAT} { yylval->flt = g_ascii_strtod (yytext, NULL); return FLOAT; }
+{BYTE} { yylval->unsigned_integer = g_ascii_strtoull (yytext, NULL, 10); return BYTE; }
+{INT16} { yylval->integer = g_ascii_strtoll (yytext, NULL, 10); return INT16; }
+{UINT16} { yylval->unsigned_integer = g_ascii_strtoull (yytext, NULL, 10); return UINT16; }
+{INT32} { yylval->integer = g_ascii_strtoll (yytext, NULL, 10); return INT32; }
+{UINT32} { yylval->unsigned_integer = g_ascii_strtoull (yytext, NULL, 10); return UINT32; }
+{INT64} { yylval->integer = g_ascii_strtoll (yytext, NULL, 10); return INT64; }
+{UINT64} { yylval->unsigned_integer = g_ascii_strtoull (yytext, NULL, 10); return UINT64; }
+{DOUBLE} { yylval->flt = g_ascii_strtod (yytext, NULL); return DOUBLE; }
 
 [ \t\n\r\v\f] { /* Ignore whitespace */ }
 

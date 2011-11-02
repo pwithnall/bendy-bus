@@ -32,9 +32,10 @@
 }
 
 %union {
-	char *str;
+	gchar *str;
 	gint64 integer;
-	double flt;
+	guint64 unsigned_integer;
+	gdouble flt;
 	GPtrArray *ptr_array;
 	GHashTable *hash_table;
 	DfsmAstObject *ast_object;
@@ -47,7 +48,7 @@
 }
 
 %destructor { free ($$); } <str>
-%destructor {} <integer> <flt>
+%destructor {} <integer> <unsigned_integer> <flt>
 %destructor { if ($$ != NULL) { g_ptr_array_unref ($$); } } <ptr_array>
 %destructor { if ($$ != NULL) { g_hash_table_unref ($$); } } <hash_table>
 %destructor { dfsm_ast_node_unref ($$); } <ast_object> <ast_data_structure> <ast_expression> <ast_transition> <ast_statement> <ast_variable>
@@ -64,8 +65,14 @@
 %token <str> IDENTIFIER
 
 %token <str> STRING
-%token <integer> INTEGER
-%token <flt> FLOAT
+%token <unsigned_integer> BYTE
+%token <integer> INT16
+%token <unsigned_integer> UINT16
+%token <integer> INT32
+%token <unsigned_integer> UINT32
+%token <integer> INT64
+%token <unsigned_integer> UINT64
+%token <flt> DOUBLE
 %token TRUE_LITERAL
 %token FALSE_LITERAL
 %token <str> REGEXP
@@ -316,20 +323,28 @@ FuzzyDataStructure: DataStructure						{ $$ = $1; }
 ;
 
 /* Returns a new DfsmAstDataStructure or DfsmAstVariable. */
-DataStructure: STRING					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_STRING, $1, &ERROR); ABORT_ON_ERROR; }
-             | INTEGER					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_INTEGER, &$1, &ERROR); ABORT_ON_ERROR; }
-             | FLOAT					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_FLOAT, &$1, &ERROR); ABORT_ON_ERROR; }
+DataStructure: BYTE					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BYTE, &$1, &ERROR); ABORT_ON_ERROR; }
              | TRUE_LITERAL				{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BOOLEAN,
 							                                    GUINT_TO_POINTER (TRUE), &ERROR); ABORT_ON_ERROR; }
              | FALSE_LITERAL				{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BOOLEAN,
 							                                    GUINT_TO_POINTER (FALSE), &ERROR); ABORT_ON_ERROR; }
-             | REGEXP					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_REGEXP, $1, &ERROR); ABORT_ON_ERROR; }
+             | INT16					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_INT16, &$1, &ERROR); ABORT_ON_ERROR; }
+             | UINT16					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_UINT16, &$1, &ERROR); ABORT_ON_ERROR; }
+             | INT32					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_INT32, &$1, &ERROR); ABORT_ON_ERROR; }
+             | UINT32					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_UINT32, &$1, &ERROR); ABORT_ON_ERROR; }
+             | INT64					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_INT64, &$1, &ERROR); ABORT_ON_ERROR; }
+             | UINT64					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_UINT64, &$1, &ERROR); ABORT_ON_ERROR; }
+             | DOUBLE					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_DOUBLE, &$1, &ERROR); ABORT_ON_ERROR; }
+             | STRING					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_STRING, $1, &ERROR); ABORT_ON_ERROR; }
+             | DBUS_OBJECT_PATH				{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_OBJECT_PATH, $1, &ERROR); ABORT_ON_ERROR; }
+             | DBUS_TYPE_SIGNATURE			{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_SIGNATURE, $1, &ERROR); ABORT_ON_ERROR; }
              | ARRAY_L_BRACKET ArrayList ARRAY_R_BRACKET	{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_ARRAY, $2, &ERROR); ABORT_ON_ERROR; }
              | ARRAY_L_BRACKET error ARRAY_R_BRACKET		{ $$ = NULL; YYABORT; }
-             | L_BRACE DictionaryList R_BRACE		{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_DICTIONARY, $2, &ERROR); ABORT_ON_ERROR; }
-             | L_BRACE error R_BRACE			{ $$ = NULL; YYABORT; }
-             | L_PAREN StructureList R_PAREN		{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_STRUCTURE, $2, &ERROR); ABORT_ON_ERROR; }
+             | L_PAREN StructureList R_PAREN		{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_STRUCT, $2, &ERROR); ABORT_ON_ERROR; }
              | L_PAREN error R_PAREN			{ $$ = NULL; YYABORT; }
+             | L_BRACE DictionaryList R_BRACE		{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_DICT, $2, &ERROR); ABORT_ON_ERROR; }
+             | L_BRACE error R_BRACE			{ $$ = NULL; YYABORT; }
+             | REGEXP					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_REGEXP, $1, &ERROR); ABORT_ON_ERROR; }
              | Variable					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_VARIABLE, $1, &ERROR); ABORT_ON_ERROR; }
 ;
 

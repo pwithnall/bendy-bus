@@ -19,6 +19,7 @@
 
 #include <string.h>
 #include <glib.h>
+#include <gio/gio.h>
 
 #include "dfsm-ast.h"
 #include "dfsm-utils.h"
@@ -469,28 +470,46 @@ _dfsm_ast_data_structure_free (DfsmAstNode *node)
 
 	if (data_structure != NULL) {
 		switch (data_structure->data_structure_type) {
-			case DFSM_AST_DATA_STRING:
-				g_free (data_structure->str);
-				break;
-			case DFSM_AST_DATA_INTEGER:
-			case DFSM_AST_DATA_FLOAT:
+			case DFSM_AST_DATA_BYTE:
 			case DFSM_AST_DATA_BOOLEAN:
+			case DFSM_AST_DATA_INT16:
+			case DFSM_AST_DATA_UINT16:
+			case DFSM_AST_DATA_INT32:
+			case DFSM_AST_DATA_UINT32:
+			case DFSM_AST_DATA_INT64:
+			case DFSM_AST_DATA_UINT64:
+			case DFSM_AST_DATA_DOUBLE:
+				/* Nothing to free here */
+				break;
+			case DFSM_AST_DATA_STRING:
+				g_free (data_structure->string_val);
+				break;
+			case DFSM_AST_DATA_OBJECT_PATH:
+				g_free (data_structure->object_path_val);
+				break;
+			case DFSM_AST_DATA_SIGNATURE:
+				g_free (data_structure->signature_val);
+				break;
+			case DFSM_AST_DATA_ARRAY:
+				g_ptr_array_unref (data_structure->array_val);
+				break;
+			case DFSM_AST_DATA_STRUCT:
+				g_ptr_array_unref (data_structure->struct_val);
+				break;
+			case DFSM_AST_DATA_VARIANT:
+				g_variant_unref (data_structure->variant_val);
+				break;
+			case DFSM_AST_DATA_DICT:
+				g_ptr_array_unref (data_structure->dict_val);
+				break;
+			case DFSM_AST_DATA_UNIX_FD:
 				/* Nothing to free here */
 				break;
 			case DFSM_AST_DATA_REGEXP:
-				g_free (data_structure->regexp);
-				break;
-			case DFSM_AST_DATA_ARRAY:
-				g_ptr_array_unref (data_structure->array);
-				break;
-			case DFSM_AST_DATA_DICTIONARY:
-				g_ptr_array_unref (data_structure->dictionary);
-				break;
-			case DFSM_AST_DATA_STRUCTURE:
-				g_ptr_array_unref (data_structure->structure);
+				g_free (data_structure->regexp_val);
 				break;
 			case DFSM_AST_DATA_VARIABLE:
-				dfsm_ast_node_unref (data_structure->variable);
+				dfsm_ast_node_unref (data_structure->variable_val);
 				break;
 			default:
 				g_assert_not_reached ();
@@ -523,33 +542,64 @@ dfsm_ast_data_structure_new (DfsmAstDataStructureType data_structure_type, gpoin
 	_dfsm_ast_node_init (&(data_structure->parent), DFSM_AST_NODE_DATA_STRUCTURE, _dfsm_ast_data_structure_free);
 
 	switch (data_structure_type) {
-		/* TODO: Per-type validation */
-		case DFSM_AST_DATA_STRING:
-			data_structure->str = g_strdup ((gchar*) value);
-			break;
-		case DFSM_AST_DATA_INTEGER:
-			data_structure->integer = *((gint64*) value);
-			break;
-		case DFSM_AST_DATA_FLOAT:
-			data_structure->flt = *((gdouble*) value);
+		case DFSM_AST_DATA_BYTE:
+			data_structure->byte_val = *((guint64*) value);
 			break;
 		case DFSM_AST_DATA_BOOLEAN:
-			data_structure->boolean = (GPOINTER_TO_UINT (value) == 1) ? TRUE : FALSE;
+			data_structure->boolean_val = (GPOINTER_TO_UINT (value) == 1) ? TRUE : FALSE;
 			break;
-		case DFSM_AST_DATA_REGEXP:
-			data_structure->regexp = g_strdup ((gchar*) value);
+		case DFSM_AST_DATA_INT16:
+			data_structure->int16_val = *((gint64*) value);
+			break;
+		case DFSM_AST_DATA_UINT16:
+			data_structure->uint16_val = *((guint64*) value);
+			break;
+		case DFSM_AST_DATA_INT32:
+			data_structure->int32_val = *((gint64*) value);
+			break;
+		case DFSM_AST_DATA_UINT32:
+			data_structure->uint32_val = *((guint64*) value);
+			break;
+		case DFSM_AST_DATA_INT64:
+			data_structure->int64_val = *((gint64*) value);
+			break;
+		case DFSM_AST_DATA_UINT64:
+			data_structure->uint64_val = *((guint64*) value);
+			break;
+		case DFSM_AST_DATA_DOUBLE:
+			data_structure->double_val = *((gdouble*) value);
+			break;
+		case DFSM_AST_DATA_STRING:
+			data_structure->string_val = g_strdup ((gchar*) value);
+			break;
+		case DFSM_AST_DATA_OBJECT_PATH:
+			data_structure->object_path_val = g_strdup ((gchar*) value);
+			break;
+		case DFSM_AST_DATA_SIGNATURE:
+			data_structure->signature_val = g_variant_type_new ((gchar*) value);
 			break;
 		case DFSM_AST_DATA_ARRAY:
-			data_structure->array = g_ptr_array_ref (value); /* array of DfsmAstExpressions */
+			data_structure->array_val = g_ptr_array_ref (value); /* array of DfsmAstExpressions */
 			break;
-		case DFSM_AST_DATA_DICTIONARY:
-			data_structure->dictionary = g_ptr_array_ref (value); /* array of DfsmAstDictionaryEntrys */
+		case DFSM_AST_DATA_STRUCT:
+			data_structure->struct_val = g_ptr_array_ref (value); /* array of DfsmAstExpressions */
 			break;
-		case DFSM_AST_DATA_STRUCTURE:
-			data_structure->structure = g_ptr_array_ref (value); /* array of DfsmAstExpressions */
+		case DFSM_AST_DATA_VARIANT:
+			/* Note: not representable in the FSM language. */
+			data_structure->variant_val = NULL;
+			break;
+		case DFSM_AST_DATA_DICT:
+			data_structure->dict_val = g_ptr_array_ref (value); /* array of DfsmAstDictionaryEntrys */
+			break;
+		case DFSM_AST_DATA_UNIX_FD:
+			/* Note: not representable in the FSM language. */
+			data_structure->unix_fd_val = 0;
+			break;
+		case DFSM_AST_DATA_REGEXP:
+			data_structure->regexp_val = g_strdup ((gchar*) value);
 			break;
 		case DFSM_AST_DATA_VARIABLE:
-			data_structure->variable = dfsm_ast_node_ref (value); /* DfsmAstVariable */
+			data_structure->variable_val = dfsm_ast_node_ref (value); /* DfsmAstVariable */
 			break;
 		default:
 			g_assert_not_reached ();
