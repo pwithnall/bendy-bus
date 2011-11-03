@@ -185,10 +185,11 @@ DfsmAstDataStructure *dfsm_ast_data_structure_new (DfsmAstDataStructureType data
 
 typedef struct {
 	DfsmAstDataStructure parent;
+	gdouble weight;
 	gboolean is_fuzzy;
 } DfsmAstFuzzyDataStructure;
 
-DfsmAstDataStructure *dfsm_ast_fuzzy_data_structure_new (DfsmAstDataStructure *data_structure, GError **error) DFSM_CONSTRUCTOR;
+DfsmAstDataStructure *dfsm_ast_fuzzy_data_structure_new (DfsmAstDataStructure *data_structure, gdouble weight, GError **error) DFSM_CONSTRUCTOR;
 
 typedef struct {
 	gchar *type_string;

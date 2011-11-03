@@ -54,10 +54,6 @@
 %destructor { dfsm_ast_node_unref ($$); } <ast_object> <ast_data_structure> <ast_expression> <ast_transition> <ast_statement> <ast_variable>
 %destructor { dfsm_parser_block_list_free ($$); } <block_list>
 
-/* TODO:
- * Priorities for fuzzing
- */
-
 %token <str> DBUS_OBJECT_PATH
 %token <str> DBUS_INTERFACE_NAME
 %token <str> DBUS_TYPE_SIGNATURE
@@ -318,8 +314,9 @@ Variable: VariableName								{ $$ = dfsm_ast_variable_new (DFSM_AST_SCOPE_LOCAL
 ;
 
 /* Returns a new DfsmAstDataStructure or DfsmAstFuzzyDataStructure (which is a subclass). */
-FuzzyDataStructure: DataStructure						{ $$ = $1; }
-                  | DataStructure FUZZY						{ $$ = dfsm_ast_fuzzy_data_structure_new ($1, &ERROR); ABORT_ON_ERROR; }
+FuzzyDataStructure: DataStructure					{ $$ = $1; }
+                  | DataStructure FUZZY					{ $$ = dfsm_ast_fuzzy_data_structure_new ($1, NAN, &ERROR); ABORT_ON_ERROR; }
+                  | DataStructure FUZZY DOUBLE				{ $$ = dfsm_ast_fuzzy_data_structure_new ($1, $3, &ERROR); ABORT_ON_ERROR; }
 ;
 
 /* Returns a new DfsmAstDataStructure or DfsmAstVariable. */

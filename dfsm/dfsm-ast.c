@@ -613,14 +613,16 @@ dfsm_ast_data_structure_new (DfsmAstDataStructureType data_structure_type, gpoin
 /**
  * dfsm_ast_fuzzy_data_structure_new:
  * @data_structure: (transfer full): a data structure to wrap
+ * @weight: weight of the structure for fuzzing, or %NAN
  * @error: (allow-none): a #GError, or %NULL
  *
- * Create a new #DfsmAstFuzzyDataStructure wrapping (and taking ownership of) the given @data_structure.
+ * Create a new #DfsmAstFuzzyDataStructure wrapping (and taking ownership of) the given @data_structure. The @weight determines how “important” the
+ * @data_structure is for fuzzing. %NAN indicates no preference as to the structure's weight.
  *
  * Return value: (transfer full): a new AST node
  */
 DfsmAstDataStructure *
-dfsm_ast_fuzzy_data_structure_new (DfsmAstDataStructure *data_structure, GError **error)
+dfsm_ast_fuzzy_data_structure_new (DfsmAstDataStructure *data_structure, gdouble weight, GError **error)
 {
 	DfsmAstFuzzyDataStructure *fuzzy_data_structure;
 
@@ -630,6 +632,7 @@ dfsm_ast_fuzzy_data_structure_new (DfsmAstDataStructure *data_structure, GError 
 	fuzzy_data_structure = g_slice_new (DfsmAstFuzzyDataStructure);
 
 	fuzzy_data_structure->parent = *data_structure;
+	fuzzy_data_structure->weight = weight;
 	fuzzy_data_structure->is_fuzzy = TRUE;
 
 	return (DfsmAstDataStructure*) fuzzy_data_structure;
