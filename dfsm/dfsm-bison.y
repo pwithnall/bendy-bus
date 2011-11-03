@@ -42,6 +42,7 @@
 	DfsmAstDataStructure *ast_data_structure;
 	DfsmAstExpression *ast_expression;
 	DfsmAstTransition *ast_transition;
+	DfsmAstPrecondition *ast_precondition;
 	DfsmAstStatement *ast_statement;
 	DfsmAstVariable *ast_variable;
 	DfsmParserBlockList *block_list;
@@ -51,7 +52,8 @@
 %destructor {} <integer> <unsigned_integer> <flt>
 %destructor { if ($$ != NULL) { g_ptr_array_unref ($$); } } <ptr_array>
 %destructor { if ($$ != NULL) { g_hash_table_unref ($$); } } <hash_table>
-%destructor { dfsm_ast_node_unref ($$); } <ast_object> <ast_data_structure> <ast_expression> <ast_transition> <ast_statement> <ast_variable>
+%destructor { dfsm_ast_node_unref ($$); } <ast_object> <ast_data_structure> <ast_expression> <ast_transition>
+	<ast_precondition> <ast_statement> <ast_variable>
 %destructor { dfsm_parser_block_list_free ($$); } <block_list>
 
 %token <str> DBUS_OBJECT_PATH
@@ -123,6 +125,7 @@
 %type <ast_transition> TransitionBlock
 %type <str> TransitionType
 %type <ptr_array> PreconditionList
+%type <ast_precondition> Precondition
 %type <str> PreconditionThrow
 %type <ptr_array> StatementList
 %type <ast_statement> Statement
@@ -240,25 +243,32 @@ TransitionBlock:
 	R_BRACE									{ $$ = NULL; YYABORT; }
 ;
 
+/* Returns a new string containing the method name. */
+DBusMethodName: IDENTIFIER							{ $$ = $1; /* steal ownership from flex */ }
+;
+
 /* Returns a string representing the transition type. We hackily mix "*" in with method names, since it can never be a valid method name. */
-TransitionType: METHOD IDENTIFIER						{ $$ = $2; /* steal ownership from flex */ }
+TransitionType: METHOD DBusMethodName						{ $$ = $2; /* steal ownership from flex */ }
               | '*'								{ $$ = g_strdup ("*"); }
 ;
 
 /* Returns a new GPtrArray containing DfsmAstPreconditions. */
 PreconditionList: /* empty */							{ $$ = g_ptr_array_new_with_free_func (dfsm_ast_node_unref); }
-                | PreconditionList PRECONDITION PreconditionThrow L_BRACE Expression R_BRACE
-			{
-				$$ = $1;
-				g_ptr_array_add ($$, dfsm_ast_precondition_new ($3, $5, &ERROR));
-				ABORT_ON_ERROR;
-			}
-                | PreconditionList PRECONDITION PreconditionThrow L_BRACE error R_BRACE
+                | PreconditionList Precondition					{ $$ = $1; g_ptr_array_add ($$, $2); }
+;
+
+/* Returns a new DfsmAstPrecondition. */
+Precondition: PRECONDITION PreconditionThrow L_BRACE Expression R_BRACE		{ $$ = dfsm_ast_precondition_new ($2, $4, &ERROR)); ABORT_ON_ERROR; }
+            | PRECONDITION PreconditionThrow L_BRACE error R_BRACE		{ $$ = NULL; YYABORT; }
+;
+
+/* Returns a new string containing the error name. */
+DBusErrorName: IDENTIFIER							{ $$ = $1; /* steal ownership from flex */ }
 ;
 
 /* Returns a string containing the error name, or NULL for no error. */
 PreconditionThrow: /* empty */							{ $$ = NULL; }
-                 | THROWING IDENTIFIER						{ $$ = $2; /* steal ownership from flex */ }
+                 | THROWING DBusErrorName					{ $$ = $2; /* steal ownership from flex */ }
 ;
 
 /* Returns a new GPtrArray of DfsmAstStatements. */
@@ -270,10 +280,14 @@ StatementList: Statement ';'							{
              | StatementList error ';'						{ $$ = $1; YYABORT; }
 ;
 
+/* Returns a new string containing the signal name. */
+DBusSignalName: IDENTIFIER							{ $$ = $1; /* steal ownership from flex */ }
+;
+
 /* Returns a new DfsmAstStatement (or subclass). */
 Statement: DataStructure '=' Expression					{ $$ = dfsm_ast_statement_assignment_new ($1, $3, &ERROR); ABORT_ON_ERROR; }
-         | THROW IDENTIFIER						{ $$ = dfsm_ast_statement_throw_new ($2, &ERROR); ABORT_ON_ERROR; }
-         | EMIT IDENTIFIER Expression					{ $$ = dfsm_ast_statement_emit_new ($2, $3, &ERROR); ABORT_ON_ERROR; }
+         | THROW DBusErrorName						{ $$ = dfsm_ast_statement_throw_new ($2, &ERROR); ABORT_ON_ERROR; }
+         | EMIT DBusSignalName Expression				{ $$ = dfsm_ast_statement_emit_new ($2, $3, &ERROR); ABORT_ON_ERROR; }
          | REPLY Expression						{ $$ = dfsm_ast_statement_reply_new ($2, &ERROR); ABORT_ON_ERROR; }
 ;
 
