@@ -132,8 +132,8 @@
 %type <ast_variable> Variable
 %type <ast_data_structure> FuzzyDataStructure
 %type <ast_data_structure> DataStructure
-%type <ptr_array> ArrayList
-%type <ptr_array> DictionaryList
+%type <ptr_array> ArrayList ArrayListInner
+%type <ptr_array> DictionaryList DictionaryListInner
 %type <ptr_array> StructureList StructureListInner
 
 %%
@@ -346,15 +346,24 @@ DataStructure: BYTE					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BYTE, 
 ;
 
 /* Returns a new GPtrArray of DfsmAstExpressions */
-ArrayList: /* empty */								{ $$ = g_ptr_array_new_with_free_func (dfsm_ast_node_unref); }
-         | ArrayList Expression ','						{ $$ = $1; g_ptr_array_add ($$, $2); }
+ArrayList: ArrayListInner							{ $$ = $1; }
+         | ArrayListInner Expression						{ $$ = $1; g_ptr_array_add ($$, $2); }
+;
+ArrayListInner: /* empty */							{ $$ = g_ptr_array_new_with_free_func (dfsm_ast_node_unref); }
+              | ArrayListInner Expression ','					{ $$ = $1; g_ptr_array_add ($$, $2); }
 ;
 
 /* Returns a new GPtrArray of DfsmAstDictionaryEntrys */
-DictionaryList: /* empty */				{
+DictionaryList: DictionaryListInner						{ $$ = $1; }
+              | DictionaryListInner Expression ':' Expression			{
+											$$ = $1;
+											g_ptr_array_add ($$, dfsm_ast_dictionary_entry_new ($2, $4));
+										}
+;
+DictionaryListInner: /* empty */			{
 								$$ = g_ptr_array_new_with_free_func ((GDestroyNotify) dfsm_ast_dictionary_entry_free);
 							}
-              | DictionaryList Expression ':' Expression ','			{
+                   | DictionaryListInner Expression ':' Expression ','		{
 											$$ = $1;
 											g_ptr_array_add ($$, dfsm_ast_dictionary_entry_new ($2, $4));
 										}
