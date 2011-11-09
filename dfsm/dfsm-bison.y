@@ -11,6 +11,7 @@
 
 %code top {
 	#include <stdio.h>
+	#include <math.h>
 	#include <glib.h>
 }
 
@@ -123,11 +124,14 @@
 %type <ptr_array> StateList
 %type <str> StateName
 %type <ast_transition> TransitionBlock
+%type <str> DBusMethodName
 %type <str> TransitionType
 %type <ptr_array> PreconditionList
 %type <ast_precondition> Precondition
+%type <str> DBusErrorName
 %type <str> PreconditionThrow
 %type <ptr_array> StatementList
+%type <str> DBusSignalName
 %type <ast_statement> Statement
 %type <ast_expression> Expression
 %type <str> FunctionName
@@ -258,7 +262,7 @@ PreconditionList: /* empty */							{ $$ = g_ptr_array_new_with_free_func (dfsm_
 ;
 
 /* Returns a new DfsmAstPrecondition. */
-Precondition: PRECONDITION PreconditionThrow L_BRACE Expression R_BRACE		{ $$ = dfsm_ast_precondition_new ($2, $4, &ERROR)); ABORT_ON_ERROR; }
+Precondition: PRECONDITION PreconditionThrow L_BRACE Expression R_BRACE		{ $$ = dfsm_ast_precondition_new ($2, $4, &ERROR); ABORT_ON_ERROR; }
             | PRECONDITION PreconditionThrow L_BRACE error R_BRACE		{ $$ = NULL; YYABORT; }
 ;
 
