@@ -5,7 +5,7 @@ m4_define(version_micro, 0)
 
 # autofoo
 AC_INIT([D-Bus simulator],[version_major.version_minor.version_micro],[],[dbus-simulator],[])
-AM_INIT_AUTOMAKE([check-news dist-bzip2 no-dist-gzip subdir-objects])
+AM_INIT_AUTOMAKE([check-news dist-bzip2 no-dist-gzip])
 
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS([config.h])

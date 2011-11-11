@@ -81,10 +81,20 @@ dfsm_libdfsm_la_LDFLAGS = \
 EXTRA_DIST += dfsm/dfsm.symbols
 
 CLEANFILES += \
-	dfsm/dfsm-flex.c \
-	dfsm/dfsm_libdfsm_la-dfsm-bison.c \
-	dfsm/dfsm_libdfsm_la-dfsm-bison.h \
-	dfsm/dfsm_libdfsm_la-dfsm-bison.output \
+	dfsm-flex.c \
+	dfsm_libdfsm_la-dfsm-bison.c \
+	dfsm_libdfsm_la-dfsm-bison.h \
+	dfsm_libdfsm_la-dfsm-bison.output \
+	$(NULL)
+
+DISTCLEANFILES += \
+	ylwrap \
+	$(NULL)
+
+# git.mk can't handle non-recursive automake so well
+GITIGNOREFILES += \
+	dfsm/.dirstamp \
+	dfsm/.libs/ \
 	$(NULL)
 
 # libdfsm tests
@@ -111,6 +121,10 @@ dfsm_tests_ast_SOURCES = dfsm/tests/ast.c
 dfsm_tests_ast_CPPFLAGS = $(test_cppflags)
 dfsm_tests_ast_CFLAGS = $(test_cflags)
 dfsm_tests_ast_LDADD = $(test_ldadd)
+
+GITIGNOREFILES += \
+	dfsm/tests/.dirstamp \
+	$(NULL)
 
 # Gubbins
 ACLOCAL_AMFLAGS = -I m4
