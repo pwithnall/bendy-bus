@@ -150,7 +150,8 @@ _dfsm_ast_object_check (DfsmAstNode *node, GError **error)
 
 	/* Conditions which may not hold as a result of invalid user input. */
 	if (g_variant_is_object_path (object->object_path) == FALSE) {
-		/* TODO: Error */
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus object path: %s", object->object_path);
+		return;
 	}
 
 	for (i = 0; i < object->interface_names->len; i++) {
@@ -161,13 +162,16 @@ _dfsm_ast_object_check (DfsmAstNode *node, GError **error)
 
 		/* Valid interface name? */
 		if (g_dbus_is_interface_name (interface_name) == FALSE) {
-			/* TODO: Error */
+			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus interface name: %s", interface_name);
+			return;
 		}
 
 		/* Duplicates? */
 		for (f = i + 1; f < object->interface_names->len; f++) {
 			if (strcmp (interface_name, g_ptr_array_index (object->interface_names, f)) == 0) {
-				/* TODO: Error */
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Duplicate D-Bus interface name: %s",
+				             interface_name);
+				return;
 			}
 		}
 	}
@@ -182,7 +186,8 @@ _dfsm_ast_object_check (DfsmAstNode *node, GError **error)
 		data_item = (DfsmAstDataItem*) value;
 
 		if (dfsm_is_variable_name (variable_name) == FALSE) {
-			/* TODO: Error */
+			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid variable name: %s", variable_name);
+			return;
 		}
 
 		dfsm_ast_data_item_check (data_item, error);
@@ -195,7 +200,8 @@ _dfsm_ast_object_check (DfsmAstNode *node, GError **error)
 	/* TODO: Assert that object explicitly lists data items for each of the properties of its interfaces. */
 
 	if (object->states->len == 0) {
-		/* TODO: Error: must be at least one state */
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "A default state is required.");
+		return;
 	}
 
 	for (i = 0; i < object->states->len; i++) {
@@ -206,13 +212,15 @@ _dfsm_ast_object_check (DfsmAstNode *node, GError **error)
 
 		/* Valid state name? */
 		if (dfsm_is_state_name (state_name) == FALSE) {
-			/* TODO: Error */
+			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid state name: %s", state_name);
+			return;
 		}
 
 		/* Duplicates? */
 		for (f = i + 1; f < object->states->len; f++) {
 			if (strcmp (state_name, g_ptr_array_index (object->states, f)) == 0) {
-				/* TODO: Error */
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Duplicate state name: %s", state_name);
+				return;
 			}
 		}
 	}
@@ -296,7 +304,8 @@ dfsm_ast_object_new (const gchar *object_path, GPtrArray/*<string>*/ *interface_
 		while (g_hash_table_iter_next (&iter, (gpointer*) &key, (gpointer*) &value) == TRUE) {
 			/* Check for duplicates */
 			if (g_hash_table_lookup (object->data_items, key) != NULL) {
-				/* TODO: Error */
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Duplicate variable name: %s", key);
+				return NULL; /* TODO: memory leak */
 			}
 
 			g_hash_table_insert (object->data_items, g_strdup (key), dfsm_ast_data_item_new (value->type_string, value->value_expression));
@@ -319,7 +328,8 @@ dfsm_ast_object_new (const gchar *object_path, GPtrArray/*<string>*/ *interface_
 			/* Check for duplicates */
 			for (g = 0; g < object->states->len; g++) {
 				if (strcmp (state_name, g_ptr_array_index (object->states, g)) == 0) {
-					/* TODO: Error */
+					g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Duplicate state name: %s", state_name);
+					return NULL; /* TODO: memory leak */
 				}
 			}
 
@@ -439,7 +449,8 @@ _dfsm_ast_expression_function_call_check (DfsmAstNode *node, GError **error)
 	function_info = dfsm_environment_get_function_info (function_call->function_name);
 
 	if (function_info == NULL || dfsm_is_function_name (function_call->function_name) == FALSE) {
-		/* TODO: Error */
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid function name: %s", function_call->function_name);
+		return;
 	}
 
 	dfsm_ast_node_check ((DfsmAstNode*) function_call->parameters, error);
@@ -451,7 +462,17 @@ _dfsm_ast_expression_function_call_check (DfsmAstNode *node, GError **error)
 	parameters_type = dfsm_ast_expression_calculate_type (function_call->parameters);
 
 	if (g_variant_type_is_subtype_of (parameters_type, function_info->parameters_type) == FALSE) {
-		/* TODO: Error */
+		gchar *formal, *actual;
+
+		formal = g_variant_type_dup_string (function_info->parameters_type);
+		actual = g_variant_type_dup_string (parameters_type);
+
+		g_variant_type_free (parameters_type);
+
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+		             "Type mismatch between formal and actual parameters to function ‘%s’: expects type %s but received type %s.",
+		             function_call->function_name, formal, actual);
+		return;
 	}
 
 	g_variant_type_free (parameters_type);
@@ -716,7 +737,17 @@ _dfsm_ast_expression_unary_check (DfsmAstNode *node, GError **error)
 	}
 
 	if (g_variant_type_is_subtype_of (child_type, desired_supertype) == FALSE) {
-		/* TODO: Error */
+		gchar *formal, *actual;
+
+		formal = g_variant_type_dup_string (desired_supertype);
+		actual = g_variant_type_dup_string (child_type);
+
+		g_variant_type_free (child_type);
+
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+		             "Type mismatch between the formal and actual parameter to unary operator %u: expects type %s but received type %s.",
+		             unary->parent.expression_type, formal, actual);
+		return;
 	}
 
 	g_variant_type_free (child_type);
@@ -847,7 +878,6 @@ dfsm_ast_expression_unary_new (DfsmAstExpressionType expression_type, DfsmAstExp
 		case DFSM_AST_EXPRESSION_AND:
 		case DFSM_AST_EXPRESSION_OR:
 		default:
-			/* TODO: Error */
 			g_assert_not_reached ();
 	}
 
@@ -959,7 +989,18 @@ _dfsm_ast_expression_binary_check (DfsmAstNode *node, GError **error)
 	}
 
 	if (typechecks == FALSE) {
-		/* TODO: Error */
+		gchar *left, *right;
+
+		left = g_variant_type_dup_string (lvalue_type);
+		right = g_variant_type_dup_string (rvalue_type);
+
+		g_variant_type_free (rvalue_type);
+		g_variant_type_free (lvalue_type);
+
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+		             "Type mismatch between parameters to binary operator %u: received left type %s and right type %s.",
+		             binary->parent.expression_type, left, right);
+		return;
 	}
 
 	g_variant_type_free (rvalue_type);
@@ -1191,7 +1232,6 @@ dfsm_ast_expression_binary_new (DfsmAstExpressionType expression_type, DfsmAstEx
 		case DFSM_AST_EXPRESSION_DATA_STRUCTURE:
 		case DFSM_AST_EXPRESSION_NOT:
 		default:
-			/* TODO: Error */
 			g_assert_not_reached ();
 	}
 
@@ -1337,21 +1377,27 @@ _dfsm_ast_data_structure_check (DfsmAstNode *node, GError **error)
 		case DFSM_AST_DATA_STRING:
 			/* Valid UTF-8? */
 			if (g_utf8_validate (data_structure->string_val, -1, NULL) == FALSE) {
-				/* TODO: Error */
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+				             "Invalid UTF-8 in string: %s", data_structure->string_val);
+				return;
 			}
 
 			break;
 		case DFSM_AST_DATA_OBJECT_PATH:
 			/* Valid object path? */
 			if (g_variant_is_object_path (data_structure->object_path_val) == FALSE) {
-				/* TODO: Error */
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+				             "Invalid D-Bus object path: %s", data_structure->object_path_val);
+				return;
 			}
 
 			break;
 		case DFSM_AST_DATA_SIGNATURE:
 			/* Valid signature? */
 			if (g_variant_type_string_is_valid ((gchar*) data_structure->signature_val) == FALSE) {
-				/* TODO: Error */
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+				             "Invalid D-Bus type signature: %s", data_structure->signature_val);
+				return;
 			}
 
 			break;
@@ -1379,7 +1425,18 @@ _dfsm_ast_data_structure_check (DfsmAstNode *node, GError **error)
 					/* First iteration */
 					expected_type = g_variant_type_copy (child_type);
 				} else if (g_variant_type_equal (expected_type, child_type) == FALSE) {
-					/* TODO: Error */
+					gchar *expected, *received;
+
+					expected = g_variant_type_dup_string (expected_type);
+					received = g_variant_type_dup_string (child_type);
+
+					g_variant_type_free (child_type);
+
+					g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+					             "Type mismatch between elements in array: expected type %s but received type %s.",
+					             expected, received);
+
+					goto array_error;
 				}
 
 				g_variant_type_free (child_type);
@@ -1408,7 +1465,8 @@ _dfsm_ast_data_structure_check (DfsmAstNode *node, GError **error)
 		}
 		case DFSM_AST_DATA_VARIANT:
 			if (g_variant_is_normal_form (data_structure->variant_val) == FALSE) {
-				/* TODO: Error */
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid variant: not in normal form");
+				return;
 			}
 
 			break;
@@ -1446,9 +1504,33 @@ _dfsm_ast_data_structure_check (DfsmAstNode *node, GError **error)
 					expected_key_type = g_variant_type_copy (key_type);
 					expected_value_type = g_variant_type_copy (value_type);
 				} else if (g_variant_type_equal (expected_key_type, key_type) == FALSE) {
-					/* TODO: Error */
+					gchar *expected, *received;
+
+					expected = g_variant_type_dup_string (expected_key_type);
+					received = g_variant_type_dup_string (key_type);
+
+					g_variant_type_free (key_type);
+					g_variant_type_free (value_type);
+
+					g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+					             "Type mismatch between keys in dictionary: expected type %s but received type %s.",
+					             expected, received);
+
+					goto dict_error;
 				} else if (g_variant_type_equal (expected_value_type, value_type) == FALSE) {
-					/* TODO: Error */
+					gchar *expected, *received;
+
+					expected = g_variant_type_dup_string (expected_value_type);
+					received = g_variant_type_dup_string (value_type);
+
+					g_variant_type_free (key_type);
+					g_variant_type_free (value_type);
+
+					g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+					             "Type mismatch between values in dictionary: expected type %s but received type %s.",
+					             expected, received);
+
+					goto dict_error;
 				}
 
 				g_variant_type_free (key_type);
@@ -1948,7 +2030,7 @@ dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *data_structure, 
 		case DFSM_AST_DATA_VARIANT:
 		case DFSM_AST_DATA_UNIX_FD:
 		case DFSM_AST_DATA_REGEXP:
-			/* TODO: Error */
+			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid assignment to a basic data structure.");
 			break;
 		case DFSM_AST_DATA_ARRAY: {
 			guint i;
@@ -2196,7 +2278,8 @@ dfsm_ast_data_item_check (DfsmAstDataItem *data_item, GError **error)
 
 	/* Valid signature? */
 	if (g_variant_type_string_is_valid (data_item->type_string) == FALSE) {
-		/* TODO: Error */
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus type signature: %s", data_item->type_string);
+		return;
 	}
 
 	/* Valid expression? */
@@ -2211,7 +2294,19 @@ dfsm_ast_data_item_check (DfsmAstDataItem *data_item, GError **error)
 	value_type = dfsm_ast_data_structure_calculate_type (data_item->value_expression, NULL /* TODO: Split all *_check() functions up */);
 
 	if (g_variant_type_equal (expected_type, value_type) == FALSE) {
-		/* TODO: Error */
+		gchar *expected, *received;
+
+		expected = g_variant_type_dup_string (expected_type);
+		received = g_variant_type_dup_string (value_type);
+
+		g_variant_type_free (value_type);
+		g_variant_type_free (expected_type);
+
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+		             "Type mismatch between signature and value of data item: expected type %s but received type %s.",
+		             expected, received);
+
+		return;
 	}
 
 	g_variant_type_free (value_type);
@@ -2256,8 +2351,12 @@ _dfsm_ast_transition_check (DfsmAstNode *node, GError **error)
 	}
 
 	/* Conditions which may not hold as a result of invalid user input. */
-	if (dfsm_is_state_name (transition->from_state_name) == FALSE || dfsm_is_state_name (transition->to_state_name) == FALSE) {
-		/* TODO: Error */
+	if (dfsm_is_state_name (transition->from_state_name) == FALSE) {
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid state name: %s", transition->from_state_name);
+		return;
+	} else if (dfsm_is_state_name (transition->to_state_name) == FALSE) {
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid state name: %s", transition->to_state_name);
+		return;
 	}
 
 	/* TODO: Check two state names exist */
@@ -2265,7 +2364,9 @@ _dfsm_ast_transition_check (DfsmAstNode *node, GError **error)
 	switch (transition->trigger) {
 		case DFSM_AST_TRANSITION_METHOD_CALL:
 			if (g_dbus_is_member_name (transition->trigger_params.method_name) == FALSE) {
-				/* TODO: Error */
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus method name: %s",
+				             transition->trigger_params.method_name);
+				return;
 			}
 
 			break;
@@ -2472,7 +2573,8 @@ _dfsm_ast_precondition_check (DfsmAstNode *node, GError **error)
 
 	/* Conditions which may not hold as a result of invalid user input. */
 	if (precondition->error_name != NULL && g_dbus_is_member_name (precondition->error_name) == FALSE) {
-		/* TODO: Error */
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus error name: %s", precondition->error_name);
+		return;
 	}
 
 	dfsm_ast_node_check ((DfsmAstNode*) precondition->condition, error);
@@ -2645,7 +2747,18 @@ _dfsm_ast_statement_assignment_check (DfsmAstNode *node, GError **error)
 	rvalue_type = dfsm_ast_expression_calculate_type (assignment->expression);
 
 	if (g_variant_type_is_subtype_of (rvalue_type, lvalue_type) == FALSE) {
-		/* TODO: Error */
+		gchar *expected, *received;
+
+		expected = g_variant_type_dup_string (lvalue_type);
+		received = g_variant_type_dup_string (rvalue_type);
+
+		g_variant_type_free (lvalue_type);
+		g_variant_type_free (rvalue_type);
+
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+		             "Type mismatch for assignment: expected l-value type %s but received r-value type %s.", expected, received);
+
+		return;
 	}
 
 	g_variant_type_free (lvalue_type);
@@ -2741,7 +2854,8 @@ _dfsm_ast_statement_throw_check (DfsmAstNode *node, GError **error)
 
 	/* Conditions which may not hold as a result of invalid user input. */
 	if (g_dbus_is_member_name (throw->error_name) == FALSE) {
-		/* TODO: Error */
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus error name: %s", throw->error_name);
+		return;
 	}
 
 	/* TODO: Check we're actually allowed to throw. */
@@ -2817,7 +2931,8 @@ _dfsm_ast_statement_emit_check (DfsmAstNode *node, GError **error)
 
 	/* Conditions which may not hold as a result of invalid user input. */
 	if (g_dbus_is_member_name (emit->signal_name) == FALSE) {
-		/* TODO: Error */
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus signal name: %s", emit->signal_name);
+		return;
 	}
 
 	dfsm_ast_node_check ((DfsmAstNode*) emit->expression, error);
@@ -3008,7 +3123,8 @@ _dfsm_ast_variable_check (DfsmAstNode *node, GError **error)
 
 	/* Conditions which may not hold as a result of invalid user input. */
 	if (dfsm_is_variable_name (variable->variable_name) == FALSE) {
-		/* TODO: Error */
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid variable name: %s", variable->variable_name);
+		return;
 	}
 
 	/* TODO: Check variable exists, is in scope, etc. */

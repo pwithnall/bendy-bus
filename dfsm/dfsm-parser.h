@@ -29,6 +29,7 @@ G_BEGIN_DECLS
 typedef enum {
 	DFSM_PARSE_ERROR_SYNTAX,
 	DFSM_PARSE_ERROR_OOM,
+	DFSM_PARSE_ERROR_AST_INVALID,
 } DfsmParseError;
 
 #define DFSM_PARSE_ERROR dfsm_parse_error_quark ()
