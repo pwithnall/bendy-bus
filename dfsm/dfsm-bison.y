@@ -30,9 +30,6 @@
 	if (*ERROR != NULL) { \
 		YYABORT; \
 	}
-
-	#define YYDEBUG 1
-	yydebug = 1;
 }
 
 %union {
@@ -201,15 +198,15 @@ DataList: /* empty */
 		{
 			$$ = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) dfsm_ast_data_item_free);
 		}
-        | VariableName ':' DBUS_TYPE_SIGNATURE '=' FuzzyDataStructure
+        | VariableName DBUS_TYPE_SIGNATURE '=' FuzzyDataStructure
 		{
 			$$ = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) dfsm_ast_data_item_free);
-			g_hash_table_insert ($$, $1 /* steal ownership from flex */, dfsm_ast_data_item_new ($3, $5));
+			g_hash_table_insert ($$, $1 /* steal ownership from flex */, dfsm_ast_data_item_new ($2, $4));
 		}
-        | VariableName ':' DBUS_TYPE_SIGNATURE '=' FuzzyDataStructure ';' DataList
+        | VariableName DBUS_TYPE_SIGNATURE '=' FuzzyDataStructure ';' DataList
 		{
-			$$ = $7;
-			g_hash_table_insert ($$, $1 /* steal ownership from flex */, dfsm_ast_data_item_new ($3, $5));
+			$$ = $6;
+			g_hash_table_insert ($$, $1 /* steal ownership from flex */, dfsm_ast_data_item_new ($2, $4));
 		}
         | error ';' DataList
 		{ $$ = $3; YYABORT; }

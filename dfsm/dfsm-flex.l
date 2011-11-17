@@ -6,6 +6,7 @@
 %option extra-type="DfsmParserData*"
 
 %{
+	#include <ctype.h>
 	#include <glib.h>
 
 	#include "dfsm-ast.h"
@@ -56,8 +57,10 @@ DBUS_WELL_KNOWN_BUS_NAME		{DBUS_WELL_KNOWN_BUS_NAME_ELEMENT}\.{DBUS_WELL_KNOWN_B
  *  • Must be well-formed and encode a complete type.
  *  • Must not exceed 255 characters in length.
  *  • Must be nul-terminated.
+ *
+ * Note that we prefix it with a colon so that it doesn't look like an identifier or get confused with opening braces.
  */
-DBUS_TYPE_SIGNATURE			[\(\)\{\}ybnqiuxtdsogarvehm\*\?@&^]+
+DBUS_TYPE_SIGNATURE			:[ \t\n\r\v\f]*[\(\)\{\}ybnqiuxtdsogarvehm\*\?@&^]+
 
 /* Includes variable names, state names, function names, D-Bus member names, D-Bus error names.
  *
@@ -183,7 +186,15 @@ DOUBLE					(\+-)?[0-9]+\.[0-9]+d
 
 {DBUS_OBJECT_PATH} { yylval->str = strdup (yytext); return DBUS_OBJECT_PATH; }
 {DBUS_INTERFACE_NAME} { yylval->str = strdup (yytext); return DBUS_INTERFACE_NAME; }
-{DBUS_TYPE_SIGNATURE} { yylval->str = strdup (yytext); return DBUS_TYPE_SIGNATURE; }
+{DBUS_TYPE_SIGNATURE} {
+	/* Strip the leading colon and whitespace */
+	do {
+		yytext++;
+	} while (isspace (*yytext));
+
+	yylval->str = strdup (yytext);
+	return DBUS_TYPE_SIGNATURE;
+}
 
 {IDENTIFIER} { yylval->str = strdup (yytext); return IDENTIFIER; }
 
