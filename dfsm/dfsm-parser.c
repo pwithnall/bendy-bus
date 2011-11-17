@@ -22,6 +22,12 @@
 #include "dfsm-ast.h"
 #include "dfsm-parser.h"
 
+GQuark
+dfsm_parse_error_quark (void)
+{
+	return g_quark_from_static_string ("dfsm-parse-error-quark");
+}
+
 DfsmParserBlockList *
 dfsm_parser_block_list_new (void)
 {

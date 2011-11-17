@@ -26,13 +26,20 @@
 
 G_BEGIN_DECLS
 
+typedef enum {
+	DFSM_PARSE_ERROR_SYNTAX,
+	DFSM_PARSE_ERROR_OOM,
+} DfsmParseError;
+
+#define DFSM_PARSE_ERROR dfsm_parse_error_quark ()
+GQuark dfsm_parse_error_quark (void) G_GNUC_PURE;
+
 typedef struct {
 	/* Gubbins */
 	void *yyscanner;
 
 	/* Parser output */
 	GPtrArray *object_array;
-	GError *error;
 
 	/* Source code to parse. */
 	const gchar *source_buf; /* UTF-8 */
