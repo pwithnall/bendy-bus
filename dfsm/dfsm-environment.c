@@ -17,6 +17,7 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <string.h>
 #include <glib.h>
 
 #include "dfsm-environment.h"
@@ -39,7 +40,7 @@ static void dfsm_environment_dispose (GObject *object);
 struct _DfsmEnvironmentPrivate {
 	GHashTable/*<string, VariableInfo>*/ *local_variables; /* string for variable name → variable */
 	GHashTable/*<string, VariableInfo>*/ *object_variables; /* string for variable name → variable */
-	/* TODO: Probably also want to store D-Bus interface XML here, plus function tables (i.e. deprecate dfsm-functions.[ch]) */
+	/* TODO: Probably also want to store D-Bus interface XML here */
 };
 
 G_DEFINE_TYPE (DfsmEnvironment, dfsm_environment, G_TYPE_OBJECT)
@@ -180,6 +181,40 @@ dfsm_environment_set_variable_value (DfsmEnvironment *self, DfsmVariableScope sc
 		variable_info->type = g_variant_type_copy (g_variant_get_type (new_value));
 		variable_info->value = g_variant_ref (new_value);
 	}
+}
+
+static const DfsmFunctionInfo _function_info[] = {
+	/* TODO: Not typesafe, but I'm not sure we want polymorphism */
+	/* Name,	Parameters type,		Return type,			Evaluate func. */
+	{ "keys",	G_VARIANT_TYPE_ARRAY,		G_VARIANT_TYPE_ANY,		NULL /* TODO */ },
+	{ "newObject",	G_VARIANT_TYPE_OBJECT_PATH,	(const GVariantType*) "(os)",	NULL /* TODO */ },
+	{ "pairKeys",	(const GVariantType*) "(a?a*)",	(const GVariantType*) "a{?*}",	NULL /* TODO */ },
+};
+
+/**
+ * dfsm_environment_get_function_info:
+ * @function_name: name of the function to look up
+ *
+ * Look up static information about the given @function_name, such as its parameter and return types. If the function isn't known, %NULL will be
+ * returned.
+ *
+ * Return value: (transfer none): information about the function, or %NULL
+ */
+const DfsmFunctionInfo *
+dfsm_environment_get_function_info (const gchar *function_name)
+{
+	guint i;
+
+	g_return_val_if_fail (function_name != NULL && *function_name != '\0', NULL);
+
+	/* Do a linear search for now, since there aren't many functions at all. */
+	for (i = 0; i < G_N_ELEMENTS (_function_info); i++) {
+		if (strcmp (function_name, _function_info[i].name) == 0) {
+			return &_function_info[i];
+		}
+	}
+
+	return NULL;
 }
 
 /**

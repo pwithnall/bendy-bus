@@ -28,8 +28,6 @@ dfsm_sources = \
 	dfsm/dfsm-ast.c \
 	dfsm/dfsm-parser.c \
 	dfsm/dfsm-parser.h \
-	dfsm/dfsm-functions.c \
-	dfsm/dfsm-functions.h \
 	dfsm/dfsm-machine.c \
 	dfsm/dfsm-environment.c \
 	$(NULL)

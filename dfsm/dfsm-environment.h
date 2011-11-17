@@ -50,11 +50,24 @@ typedef struct {
 	GObjectClass parent;
 } DfsmEnvironmentClass;
 
+typedef struct _DfsmFunctionInfo DfsmFunctionInfo;
+
+typedef GVariant *(*DfsmFunctionEvaluateFunc) (GVariant *parameters, DfsmEnvironment *environment, GError **error);
+
+struct _DfsmFunctionInfo {
+	const gchar *name;
+	const GVariantType *parameters_type;
+	const GVariantType *return_type;
+	const DfsmFunctionEvaluateFunc evaluate_func;
+};
+
 GType dfsm_environment_get_type (void) G_GNUC_CONST;
 
 GVariantType *dfsm_environment_get_variable_type (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name) DFSM_CONSTRUCTOR;
 GVariant *dfsm_environment_get_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name) DFSM_CONSTRUCTOR;
 void dfsm_environment_set_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name, GVariant *new_value);
+
+const DfsmFunctionInfo *dfsm_environment_get_function_info (const gchar *function_name) G_GNUC_PURE;
 
 void dfsm_environment_emit_signal (DfsmEnvironment *self, const gchar *signal_name, GVariant *parameters, GError **error);
 

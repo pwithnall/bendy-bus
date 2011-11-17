@@ -22,7 +22,6 @@
 #include <gio/gio.h>
 
 #include "dfsm-ast.h"
-#include "dfsm-functions.h"
 #include "dfsm-parser.h"
 #include "dfsm-utils.h"
 
@@ -437,7 +436,7 @@ _dfsm_ast_expression_function_call_check (DfsmAstNode *node, GError **error)
 	g_assert (function_call->parameters != NULL);
 
 	/* Conditions which may not hold as a result of invalid user input. */
-	function_info = dfsm_functions_look_up_function_info (function_call->function_name);
+	function_info = dfsm_environment_get_function_info (function_call->function_name);
 
 	if (function_info == NULL || dfsm_is_function_name (function_call->function_name) == FALSE) {
 		/* TODO: Error */
@@ -478,7 +477,7 @@ _dfsm_ast_expression_function_call_calculate_type (DfsmAstExpression *expression
 	DfsmAstExpressionFunctionCall *function_call = (DfsmAstExpressionFunctionCall*) expression;
 
 	/* Type of the function call is just the return type of the function. */
-	function_info = dfsm_functions_look_up_function_info (function_call->function_name);
+	function_info = dfsm_environment_get_function_info (function_call->function_name);
 	g_assert (function_info != NULL);
 
 	return g_variant_type_copy (function_info->return_type);
@@ -493,7 +492,7 @@ _dfsm_ast_expression_function_call_evaluate (DfsmAstExpression *expression, Dfsm
 	GError *child_error = NULL;
 
 	/* Look up the function information. */
-	function_info = dfsm_functions_look_up_function_info (function_call->function_name);
+	function_info = dfsm_environment_get_function_info (function_call->function_name);
 	g_assert (function_info != NULL);
 
 	/* Evaluate the parameters. */
