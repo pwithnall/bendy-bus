@@ -105,8 +105,8 @@ DOUBLE					(\+-)?[0-9]+\.[0-9]+d
 	"\\b" { if (string_buf_ptr - string_buf + 1 > MAX_STRING_CONST_SIZE) { return FLEX_ERROR; } *string_buf_ptr++ = '\b'; }
 	"\\f" { if (string_buf_ptr - string_buf + 1 > MAX_STRING_CONST_SIZE) { return FLEX_ERROR; } *string_buf_ptr++ = '\f'; }
 
-	"\\(.|\n)" { if (string_buf_ptr - string_buf + 1 > MAX_STRING_CONST_SIZE) { return FLEX_ERROR; } *string_buf_ptr++ = yytext[1]; }
-	"[^\\\n\"]+" {
+	\\(.|\n) { if (string_buf_ptr - string_buf + 1 > MAX_STRING_CONST_SIZE) { return FLEX_ERROR; } *string_buf_ptr++ = yytext[1]; }
+	[^\\\n\"]+ {
 		if (string_buf_ptr - string_buf + strlen (yytext) > MAX_STRING_CONST_SIZE) {
 			return FLEX_ERROR;
 		}
@@ -129,8 +129,8 @@ DOUBLE					(\+-)?[0-9]+\.[0-9]+d
 		return FLEX_ERROR;
 	}
 
-	"\\(.|\n)" { if (regexp_buf_ptr - regexp_buf + 1 > MAX_REGEXP_CONST_SIZE) { return FLEX_ERROR; } *regexp_buf_ptr++ = yytext[1]; }
-	"[^\\\n\"]+" {
+	\\(.|\n) { if (regexp_buf_ptr - regexp_buf + 1 > MAX_REGEXP_CONST_SIZE) { return FLEX_ERROR; } *regexp_buf_ptr++ = yytext[1]; }
+	[^\\\n\"]+ {
 		if (regexp_buf_ptr - regexp_buf + strlen (yytext) > MAX_REGEXP_CONST_SIZE) {
 			return FLEX_ERROR;
 		}
