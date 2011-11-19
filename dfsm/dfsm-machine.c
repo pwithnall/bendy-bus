@@ -166,12 +166,26 @@ dfsm_machine_dispose (GObject *object)
 	dfsm_machine_stop_simulation (DFSM_MACHINE (object));
 
 	/* Free things. */
-	g_signal_handler_disconnect (priv->environment, priv->signal_emission_handler);
-	g_object_unref (priv->environment);
+	if (priv->environment != NULL) {
+		g_signal_handler_disconnect (priv->environment, priv->signal_emission_handler);
+		g_object_unref (priv->environment);
+		priv->environment = NULL;
+	}
 
-	g_ptr_array_unref (priv->state_names);
-	g_hash_table_unref (priv->transitions.method_call_triggered);
-	g_ptr_array_unref (priv->transitions.arbitrarily_triggered);
+	if (priv->state_names != NULL) {
+		g_ptr_array_unref (priv->state_names);
+		priv->state_names = NULL;
+	}
+
+	if (priv->transitions.method_call_triggered != NULL) {
+		g_hash_table_unref (priv->transitions.method_call_triggered);
+		priv->transitions.method_call_triggered = NULL;
+	}
+
+	if (priv->transitions.arbitrarily_triggered != NULL) {
+		g_ptr_array_unref (priv->transitions.arbitrarily_triggered);
+		priv->transitions.arbitrarily_triggered = NULL;
+	}
 
 	/* Make sure we're not leaking a callback. */
 	g_assert (priv->timeout_id == 0);
