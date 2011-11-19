@@ -19,6 +19,7 @@
 
 #include <glib.h>
 #include <glib-object.h>
+#include <gio/gio.h>
 
 #include "dfsm-utils.h"
 
@@ -63,6 +64,8 @@ struct _DfsmFunctionInfo {
 
 GType dfsm_environment_get_type (void) G_GNUC_CONST;
 
+DfsmEnvironment *dfsm_environment_new (GDBusNodeInfo *dbus_node_info) DFSM_CONSTRUCTOR;
+
 GVariantType *dfsm_environment_get_variable_type (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name) DFSM_CONSTRUCTOR;
 GVariant *dfsm_environment_get_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name) DFSM_CONSTRUCTOR;
 void dfsm_environment_set_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name, GVariant *new_value);
@@ -70,6 +73,8 @@ void dfsm_environment_set_variable_value (DfsmEnvironment *self, DfsmVariableSco
 const DfsmFunctionInfo *dfsm_environment_get_function_info (const gchar *function_name) G_GNUC_PURE;
 
 void dfsm_environment_emit_signal (DfsmEnvironment *self, const gchar *signal_name, GVariant *parameters, GError **error);
+
+GDBusNodeInfo *dfsm_environment_get_dbus_node_info (DfsmEnvironment *self) G_GNUC_PURE;
 
 G_END_DECLS
 

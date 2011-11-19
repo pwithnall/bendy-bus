@@ -37,11 +37,17 @@ variable_info_free (VariableInfo *data)
 }
 
 static void dfsm_environment_dispose (GObject *object);
+static void dfsm_environment_get_property (GObject *object, guint property_id, GValue *value, GParamSpec *pspec);
+static void dfsm_environment_set_property (GObject *object, guint property_id, const GValue *value, GParamSpec *pspec);
 
 struct _DfsmEnvironmentPrivate {
 	GHashTable/*<string, VariableInfo>*/ *local_variables; /* string for variable name → variable */
 	GHashTable/*<string, VariableInfo>*/ *object_variables; /* string for variable name → variable */
-	/* TODO: Probably also want to store D-Bus interface XML here */
+	GDBusNodeInfo *dbus_node_info;
+};
+
+enum {
+	PROP_DBUS_NODE_INFO = 1,
 };
 
 enum {
@@ -60,7 +66,21 @@ dfsm_environment_class_init (DfsmEnvironmentClass *klass)
 
 	g_type_class_add_private (klass, sizeof (DfsmEnvironmentPrivate));
 
+	gobject_class->get_property = dfsm_environment_get_property;
+	gobject_class->set_property = dfsm_environment_set_property;
 	gobject_class->dispose = dfsm_environment_dispose;
+
+	/**
+	 * DfsmEnvironment:dbus-node-info:
+	 *
+	 * Information about the D-Bus interfaces in use by objects using this environment.
+	 */
+	g_object_class_install_property (gobject_class, PROP_DBUS_NODE_INFO,
+	                                 g_param_spec_boxed ("dbus-node-info",
+	                                                     "D-Bus Node Information",
+	                                                     "Information about the D-Bus interfaces in use by objects using this environment.",
+	                                                     G_TYPE_DBUS_NODE_INFO,
+	                                                     G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
 	/**
 	 * DfsmEnvironment::signal-emission:
@@ -91,11 +111,74 @@ dfsm_environment_dispose (GObject *object)
 {
 	DfsmEnvironmentPrivate *priv = DFSM_ENVIRONMENT (object)->priv;
 
-	g_hash_table_unref (priv->local_variables);
-	g_hash_table_unref (priv->object_variables);
+	if (priv->dbus_node_info != NULL) {
+		g_dbus_node_info_unref (priv->dbus_node_info);
+		priv->dbus_node_info = NULL;
+	}
+
+	if (priv->local_variables != NULL) {
+		g_hash_table_unref (priv->local_variables);
+		priv->local_variables = NULL;
+	}
+
+	if (priv->object_variables != NULL) {
+		g_hash_table_unref (priv->object_variables);
+		priv->object_variables = NULL;
+	}
 
 	/* Chain up to the parent class */
 	G_OBJECT_CLASS (dfsm_environment_parent_class)->dispose (object);
+}
+
+static void
+dfsm_environment_get_property (GObject *object, guint property_id, GValue *value, GParamSpec *pspec)
+{
+	DfsmEnvironmentPrivate *priv = DFSM_ENVIRONMENT (object)->priv;
+
+	switch (property_id) {
+		case PROP_DBUS_NODE_INFO:
+			g_value_set_boxed (value, priv->dbus_node_info);
+			break;
+		default:
+			/* We don't have any other property... */
+			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+			break;
+	}
+}
+
+static void
+dfsm_environment_set_property (GObject *object, guint property_id, const GValue *value, GParamSpec *pspec)
+{
+	DfsmEnvironmentPrivate *priv = DFSM_ENVIRONMENT (object)->priv;
+
+	switch (property_id) {
+		case PROP_DBUS_NODE_INFO:
+			/* Construct-only */
+			priv->dbus_node_info = g_dbus_node_info_ref (g_value_get_boxed (value));
+			break;
+		default:
+			/* We don't have any other property... */
+			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+			break;
+	}
+}
+
+/**
+ * dfsm_environment_new:
+ * @dbus_node_info: a #GDBusNodeInfo structure describing the interfaces used by objects using this environment
+ *
+ * Creates a new #DfsmEnvironment initialised with data from the given @dbus_node_info, the default function table, and no local or object variables.
+ *
+ * Return value: (transfer full): a new #DfsmEnvironment
+ */
+DfsmEnvironment *
+dfsm_environment_new (GDBusNodeInfo *dbus_node_info)
+{
+	g_return_val_if_fail (dbus_node_info != NULL, NULL);
+
+	return g_object_new (DFSM_TYPE_ENVIRONMENT,
+	                     "dbus-node-info", dbus_node_info,
+	                     NULL);
 }
 
 static VariableInfo *
@@ -260,4 +343,20 @@ dfsm_environment_emit_signal (DfsmEnvironment *self, const gchar *signal_name, G
 
 	/* Emit the signal. */
 	g_signal_emit (self, environment_signals[SIGNAL_SIGNAL_EMISSION], g_quark_from_string (signal_name), signal_name, parameters);
+}
+
+/**
+ * dfsm_environment_get_dbus_node_info:
+ * @self: a #DfsmEnvironment
+ *
+ * Gets the value of the #DfsmEnvironment:dbus-node-info property.
+ *
+ * Return value: (transfer none): information about the D-Bus interfaces implemented by DFSMs which use this environment
+ */
+GDBusNodeInfo *
+dfsm_environment_get_dbus_node_info (DfsmEnvironment *self)
+{
+	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (self), NULL);
+
+	return self->priv->dbus_node_info;
 }
