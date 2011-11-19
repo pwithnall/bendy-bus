@@ -57,6 +57,8 @@ static void dfsm_machine_dispose (GObject *object);
 static void dfsm_machine_get_property (GObject *object, guint property_id, GValue *value, GParamSpec *pspec);
 static void dfsm_machine_set_property (GObject *object, guint property_id, const GValue *value, GParamSpec *pspec);
 
+static void environment_signal_emission_cb (DfsmEnvironment *environment, const gchar *signal_name, GVariant *parameters, DfsmMachine *self);
+
 struct _DfsmMachinePrivate {
 	/* Simulation data */
 	DfsmMachineStateNumber machine_state;
@@ -76,6 +78,7 @@ struct _DfsmMachinePrivate {
 enum {
 	PROP_MACHINE_STATE = 1,
 	PROP_SIMULATION_STATUS,
+	PROP_ENVIRONMENT,
 };
 
 enum {
@@ -119,6 +122,17 @@ dfsm_machine_class_init (DfsmMachineClass *klass)
 	                                                    "Simulation status", "The status of the simulation.",
 	                                                    DFSM_TYPE_SIMULATION_STATUS, DFSM_SIMULATION_STATUS_STOPPED,
 	                                                    G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+	/**
+	 * DfsmMachine:environment:
+	 *
+	 * The execution environment this machine simulation is using.
+	 */
+	g_object_class_install_property (gobject_class, PROP_ENVIRONMENT,
+	                                 g_param_spec_object ("environment",
+	                                                      "Environment", "The execution environment this machine simulation is using.",
+	                                                      DFSM_TYPE_ENVIRONMENT,
+	                                                      G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
 	/**
 	 * DfsmMachine::signal-emission:
@@ -178,6 +192,9 @@ dfsm_machine_get_property (GObject *object, guint property_id, GValue *value, GP
 		case PROP_SIMULATION_STATUS:
 			g_value_set_enum (value, priv->simulation_status);
 			break;
+		case PROP_ENVIRONMENT:
+			g_value_set_object (value, priv->environment);
+			break;
 		default:
 			/* We don't have any other property... */
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -188,7 +205,15 @@ dfsm_machine_get_property (GObject *object, guint property_id, GValue *value, GP
 static void
 dfsm_machine_set_property (GObject *object, guint property_id, const GValue *value, GParamSpec *pspec)
 {
+	DfsmMachinePrivate *priv = DFSM_MACHINE (object)->priv;
+
 	switch (property_id) {
+		case PROP_ENVIRONMENT:
+			/* Construct-only */
+			priv->environment = g_value_dup_object (value);
+			priv->signal_emission_handler = g_signal_connect (priv->environment, "signal-emission",
+			                                                  (GCallback) environment_signal_emission_cb, object);
+			break;
 		case PROP_MACHINE_STATE:
 			/* Read-only */
 		case PROP_SIMULATION_STATUS:
@@ -366,11 +391,9 @@ dfsm_machine_new (DfsmEnvironment *environment, GPtrArray/*<string>*/ *state_nam
 
 	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), NULL);
 
-	machine = g_object_new (DFSM_TYPE_MACHINE, NULL);
-
-	/* Add the environment. */
-	machine->priv->environment = g_object_ref (environment);
-	machine->priv->signal_emission_handler = g_signal_connect (environment, "signal-emission", (GCallback) environment_signal_emission_cb, machine);
+	machine = g_object_new (DFSM_TYPE_MACHINE,
+	                        "environment", environment,
+	                        NULL);
 
 	/* States */
 	machine->priv->state_names = g_ptr_array_ref (state_names);
@@ -547,4 +570,20 @@ dfsm_machine_call_method (DfsmMachine *self, const gchar *method_name, GVariant 
 		g_propagate_error (error, child_error);
 		return NULL;
 	}
+}
+
+/**
+ * dfsm_machine_get_environment:
+ * @self: a #DfsmMachine
+ *
+ * Gets the #DfsmEnvironment which the simulation is running/will run inside.
+ *
+ * Return value: (transfer none): the machine's environment
+ */
+DfsmEnvironment *
+dfsm_machine_get_environment (DfsmMachine *self)
+{
+	g_return_val_if_fail (DFSM_IS_MACHINE (self), NULL);
+
+	return self->priv->environment;
 }

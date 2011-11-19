@@ -23,6 +23,7 @@
 #include <glib.h>
 #include <glib-object.h>
 
+#include "dfsm-environment.h"
 #include "dfsm-utils.h"
 
 G_BEGIN_DECLS
@@ -90,6 +91,8 @@ void dfsm_machine_start_simulation (DfsmMachine *self);
 void dfsm_machine_stop_simulation (DfsmMachine *self);
 
 GVariant *dfsm_machine_call_method (DfsmMachine *self, const gchar *method_name, GVariant *parameters, GError **error) DFSM_CONSTRUCTOR;
+
+DfsmEnvironment *dfsm_machine_get_environment (DfsmMachine *self) G_GNUC_PURE;
 
 G_END_DECLS
 
