@@ -39,6 +39,7 @@ dfsminclude_HEADERS = \
 	$(NULL)
 
 dfsm_libdfsm_la_SOURCES = \
+	$(dfsm_marshal_sources) \
 	$(dfsm_sources) \
 	$(NULL)
 
@@ -94,6 +95,20 @@ GITIGNOREFILES += \
 	dfsm/.dirstamp \
 	dfsm/.libs/ \
 	$(NULL)
+
+# Marshalling
+dfsm_marshal_sources = \
+	dfsm/dfsm-marshal.c \
+	dfsm/dfsm-marshal.h \
+	$(NULL)
+
+dfsm/dfsm-marshal.h: $(top_srcdir)/dfsm/dfsm-marshal.list
+	$(AM_V_GEN) $(GLIB_GENMARSHAL) --prefix=dfsm_marshal --header $< > $@
+dfsm/dfsm-marshal.c: $(top_srcdir)/dfsm/dfsm-marshal.list dfsm/dfsm-marshal.h
+	$(AM_V_GEN) $(GLIB_GENMARSHAL) --prefix=dfsm_marshal --header --body $< > $@
+
+EXTRA_DIST += $(top_srcdir)/dfsm/dfsm-marshal.list
+CLEANFILES += $(dfsm_marshal_sources)
 
 # libdfsm tests
 test_cppflags = \

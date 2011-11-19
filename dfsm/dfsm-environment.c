@@ -21,6 +21,7 @@
 #include <glib.h>
 
 #include "dfsm-environment.h"
+#include "dfsm-marshal.h"
 
 typedef struct {
 	GVariantType *type;
@@ -43,6 +44,13 @@ struct _DfsmEnvironmentPrivate {
 	/* TODO: Probably also want to store D-Bus interface XML here */
 };
 
+enum {
+	SIGNAL_SIGNAL_EMISSION,
+	LAST_SIGNAL,
+};
+
+static guint environment_signals[LAST_SIGNAL] = { 0, };
+
 G_DEFINE_TYPE (DfsmEnvironment, dfsm_environment, G_TYPE_OBJECT)
 
 static void
@@ -53,6 +61,20 @@ dfsm_environment_class_init (DfsmEnvironmentClass *klass)
 	g_type_class_add_private (klass, sizeof (DfsmEnvironmentPrivate));
 
 	gobject_class->dispose = dfsm_environment_dispose;
+
+	/**
+	 * DfsmEnvironment::signal-emission:
+	 * @parameters: the parameter (or structure of parameters) passed to the signal emission
+	 *
+	 * Emitted whenever a piece of code in a simulated DFSM emits a D-Bus signal. No code in the simulator or the environment will actually emit
+	 * this D-Bus signal on a bus instance, but (for example) a wrapper which was listening to this signal could do so.
+	 */
+	environment_signals[SIGNAL_SIGNAL_EMISSION] = g_signal_new ("signal-emission",
+	                                                            G_TYPE_FROM_CLASS (klass),
+	                                                            G_SIGNAL_RUN_LAST,
+	                                                            0, NULL, NULL,
+	                                                            dfsm_marshal_VOID__STRING_VARIANT,
+	                                                            G_TYPE_NONE, 2, G_TYPE_STRING, G_TYPE_VARIANT);
 }
 
 static void
@@ -224,7 +246,9 @@ dfsm_environment_get_function_info (const gchar *function_name)
  * @parameters: value of the parameters to the signal
  * @error: (allow-none): a #GError, or %NULL
  *
- * TODO
+ * Emit a signal indicating that the calling code intends for a D-Bus signal to be emitted with name @signal_name and parameters given by @parameters.
+ * Note that this won't actually emit the signal on a bus instance; that's the responsibility of wrapper code listening to the
+ * #DfsmEnvironment::signal-emission signal.
  */
 void
 dfsm_environment_emit_signal (DfsmEnvironment *self, const gchar *signal_name, GVariant *parameters, GError **error)
@@ -234,5 +258,6 @@ dfsm_environment_emit_signal (DfsmEnvironment *self, const gchar *signal_name, G
 	g_return_if_fail (parameters != NULL);
 	g_return_if_fail (error == NULL || *error == NULL);
 
-	/* TODO */
+	/* Emit the signal. */
+	g_signal_emit (self, environment_signals[SIGNAL_SIGNAL_EMISSION], g_quark_from_string (signal_name), signal_name, parameters);
 }

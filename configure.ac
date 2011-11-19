@@ -21,6 +21,8 @@ AM_PROG_LEX
 AC_PROG_YACC
 LT_INIT
 
+AC_PATH_PROG([GLIB_GENMARSHAL],[glib-genmarshal])
+
 # Internationalisation
 GETTEXT_PACKAGE=dbus-simulator
 AC_SUBST(GETTEXT_PACKAGE)
