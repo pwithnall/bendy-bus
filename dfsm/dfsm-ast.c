@@ -3187,7 +3187,7 @@ dfsm_ast_variable_calculate_type (DfsmAstVariable *variable, DfsmEnvironment *en
 	g_return_val_if_fail (variable != NULL, NULL);
 	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), NULL);
 
-	return dfsm_environment_get_variable_type (environment, variable->scope, variable->variable_name);
+	return dfsm_environment_dup_variable_type (environment, variable->scope, variable->variable_name);
 }
 
 /**
@@ -3209,7 +3209,7 @@ dfsm_ast_variable_to_variant (DfsmAstVariable *variable, DfsmEnvironment *enviro
 	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), NULL);
 	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
-	return dfsm_environment_get_variable_value (environment, variable->scope, variable->variable_name);
+	return dfsm_environment_dup_variable_value (environment, variable->scope, variable->variable_name);
 }
 
 /**

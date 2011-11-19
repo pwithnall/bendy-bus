@@ -213,7 +213,7 @@ look_up_variable_info (DfsmEnvironment *self, DfsmVariableScope scope, const gch
 }
 
 /**
- * dfsm_environment_get_variable_type:
+ * dfsm_environment_dup_variable_type:
  * @self: a #DfsmEnvironment
  * @scope: the scope of the variable
  * @variable_name: the name of the variable in the given @scope
@@ -223,7 +223,7 @@ look_up_variable_info (DfsmEnvironment *self, DfsmVariableScope scope, const gch
  * Return value: (transfer full): type of the variable
  */
 GVariantType *
-dfsm_environment_get_variable_type (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name)
+dfsm_environment_dup_variable_type (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name)
 {
 	VariableInfo *variable_info;
 
@@ -236,7 +236,7 @@ dfsm_environment_get_variable_type (DfsmEnvironment *self, DfsmVariableScope sco
 }
 
 /**
- * dfsm_environment_get_variable_value:
+ * dfsm_environment_dup_variable_value:
  * @self: a #DfsmEnvironment
  * @scope: the scope of the variable
  * @variable_name: the name of the variable in the given @scope
@@ -246,7 +246,7 @@ dfsm_environment_get_variable_type (DfsmEnvironment *self, DfsmVariableScope sco
  * Return value: (transfer full): value of the variable
  */
 GVariant *
-dfsm_environment_get_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name)
+dfsm_environment_dup_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name)
 {
 	VariableInfo *variable_info;
 
