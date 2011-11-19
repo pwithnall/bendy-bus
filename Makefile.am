@@ -20,6 +20,7 @@ dfsm_public_headers = \
 	dfsm/dfsm-ast.h \
 	dfsm/dfsm-environment.h \
 	dfsm/dfsm-machine.h \
+	dfsm/dfsm-object.h \
 	dfsm/dfsm-utils.h \
 	$(NULL)
 dfsm_sources = \
@@ -29,6 +30,7 @@ dfsm_sources = \
 	dfsm/dfsm-parser.c \
 	dfsm/dfsm-parser.h \
 	dfsm/dfsm-machine.c \
+	dfsm/dfsm-object.c \
 	dfsm/dfsm-environment.c \
 	$(NULL)
 

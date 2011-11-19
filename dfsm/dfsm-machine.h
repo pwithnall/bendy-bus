@@ -30,6 +30,7 @@ G_BEGIN_DECLS
 
 typedef enum {
 	DFSM_SIMULATION_ERROR_INVALID_STATUS,
+	DFSM_SIMULATION_ERROR_UNKNOWN_INTERFACE,
 } DfsmSimulationError;
 
 #define DFSM_SIMULATION_ERROR dfsm_simulation_error_quark ()
