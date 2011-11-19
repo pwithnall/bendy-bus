@@ -2,8 +2,13 @@
 %option bison-bridge
 %option bison-locations
 %option noyywrap
+%option nounput
+%option noinput
 %option yylineno
 %option extra-type="DfsmParserData*"
+
+/* Flex erroneously redeclares isatty() otherwise. */
+%option nounistd
 
 %{
 	#include <ctype.h>
@@ -27,6 +32,11 @@
 
 	#define YY_INPUT(buf, result, max_size) result = yy_input_proc (buf, max_size, yyscanner)
 	static int yy_input_proc (gchar *out_buf, gint size, yyscan_t yyscanner);
+
+	/* Flex is a bit lax about including default cases in switch statements, so we ignore such errors in this file. */
+	#ifdef __GNUC__
+		#pragma GCC diagnostic ignored "-Wswitch-default"
+	#endif
 %}
 
 %x comment

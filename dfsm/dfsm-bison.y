@@ -21,6 +21,13 @@
 }
 
 %code {
+	/* We can't use flex's nice --header-file option because ylwrap sucks and doesn't copy it out.
+	 * Consequently, we have to declare the various lexer functions manually. */
+	extern int yylex_init (void **scanner);
+	extern int yylex_destroy (void *yyscanner);
+	extern int yylex (YYSTYPE *yylval_param, YYLTYPE *yylloc_param, void *yyscanner);
+	extern void yyset_extra (DfsmParserData *user_defined, void *yyscanner);
+
 	static void yyerror (YYLTYPE *yylloc, DfsmParserData *parser_data, GError **error, const char *message);
 
 	#define YYLEX_PARAM parser_data->yyscanner
