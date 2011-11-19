@@ -106,8 +106,6 @@ _dfsm_ast_object_check (DfsmAstNode *node, GError **error)
 {
 	DfsmAstObject *object = (DfsmAstObject*) node;
 	guint i;
-	GHashTableIter iter;
-	gpointer key, value;
 
 	g_return_if_fail (node != NULL);
 	g_return_if_fail (error != NULL && *error == NULL);
@@ -117,7 +115,7 @@ _dfsm_ast_object_check (DfsmAstNode *node, GError **error)
 
 	g_assert (object->object_path != NULL);
 	g_assert (object->interface_names != NULL);
-	g_assert (object->data_items != NULL);
+	g_assert (DFSM_IS_ENVIRONMENT (object->environment));
 	g_assert (object->states != NULL);
 
 	for (i = 0; i < object->interface_names->len; i++) {
@@ -127,12 +125,7 @@ _dfsm_ast_object_check (DfsmAstNode *node, GError **error)
 		g_assert (interface_name != NULL);
 	}
 
-	g_hash_table_iter_init (&iter, object->data_items);
-
-	while (g_hash_table_iter_next (&iter, &key, &value) == TRUE) {
-		g_assert (key != NULL);
-		g_assert (value != NULL);
-	}
+	/* TODO: Check all variable names and values in ->environment are non-NULL */
 
 	for (i = 0; i < object->states->len; i++) {
 		const gchar *state_name;
@@ -176,27 +169,7 @@ _dfsm_ast_object_check (DfsmAstNode *node, GError **error)
 		}
 	}
 
-	g_hash_table_iter_init (&iter, object->data_items);
-
-	while (g_hash_table_iter_next (&iter, &key, &value) == TRUE) {
-		const gchar *variable_name;
-		DfsmAstDataItem *data_item;
-
-		variable_name = (const gchar*) key;
-		data_item = (DfsmAstDataItem*) value;
-
-		if (dfsm_is_variable_name (variable_name) == FALSE) {
-			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid variable name: %s", variable_name);
-			return;
-		}
-
-		dfsm_ast_data_item_check (data_item, error);
-
-		if (*error != NULL) {
-			return;
-		}
-	}
-
+	/* TODO: Check all variable names in ->environment are valid names, and recursively check their values are acceptable */
 	/* TODO: Assert that object explicitly lists data items for each of the properties of its interfaces. */
 
 	if (object->states->len == 0) {
@@ -246,7 +219,7 @@ _dfsm_ast_object_free (DfsmAstNode *node)
 	if (object != NULL) {
 		g_ptr_array_unref (object->transitions);
 		g_ptr_array_unref (object->states);
-		g_hash_table_unref (object->data_items);
+		g_object_unref (object->environment);
 		g_ptr_array_unref (object->interface_names);
 		g_free (object->object_path);
 
@@ -256,6 +229,7 @@ _dfsm_ast_object_free (DfsmAstNode *node)
 
 /**
  * dfsm_ast_object_new:
+ * @dbus_node_info: introspection data about the D-Bus interfaces used by the object
  * @object_path: the object's D-Bus path
  * @interface_names: an array of strings containing the names of the D-Bus interfaces implemented by the object
  * @data_blocks: an array of #GHashTable<!-- -->s containing the object-level variables in the object
@@ -268,12 +242,14 @@ _dfsm_ast_object_free (DfsmAstNode *node)
  * Return value: (transfer full): a new AST node
  */
 DfsmAstObject *
-dfsm_ast_object_new (const gchar *object_path, GPtrArray/*<string>*/ *interface_names, GPtrArray/*<GHashTable>*/ *data_blocks,
-                     GPtrArray/*<GPtrArray>*/ *state_blocks, GPtrArray/*<DfsmAstTransition>*/ *transition_blocks, GError **error)
+dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GPtrArray/*<string>*/ *interface_names,
+                     GPtrArray/*<GHashTable>*/ *data_blocks, GPtrArray/*<GPtrArray>*/ *state_blocks,
+                     GPtrArray/*<DfsmAstTransition>*/ *transition_blocks, GError **error)
 {
 	DfsmAstObject *object;
 	guint i;
 
+	g_return_val_if_fail (dbus_node_info != NULL, NULL);
 	g_return_val_if_fail (object_path != NULL && *object_path != '\0', NULL);
 	g_return_val_if_fail (interface_names != NULL, NULL);
 	g_return_val_if_fail (data_blocks != NULL, NULL);
@@ -287,7 +263,7 @@ dfsm_ast_object_new (const gchar *object_path, GPtrArray/*<string>*/ *interface_
 
 	object->object_path = g_strdup (object_path);
 	object->interface_names = g_ptr_array_ref (interface_names);
-	object->data_items = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) dfsm_ast_data_item_free);
+	object->environment = dfsm_environment_new (dbus_node_info);
 	object->states = g_ptr_array_new_with_free_func (g_free);
 	object->transitions = g_ptr_array_ref (transition_blocks);
 
@@ -296,19 +272,42 @@ dfsm_ast_object_new (const gchar *object_path, GPtrArray/*<string>*/ *interface_
 		GHashTable *data_block;
 		GHashTableIter iter;
 		const gchar *key;
-		const DfsmAstDataItem *value;
+		DfsmAstExpression *value_expression;
 
 		data_block = g_ptr_array_index (data_blocks, i);
 		g_hash_table_iter_init (&iter, data_block);
 
-		while (g_hash_table_iter_next (&iter, (gpointer*) &key, (gpointer*) &value) == TRUE) {
+		while (g_hash_table_iter_next (&iter, (gpointer*) &key, (gpointer*) &value_expression) == TRUE) {
+			GVariant *old_value, *new_value;
+			GError *child_error = NULL;
+
 			/* Check for duplicates */
-			if (g_hash_table_lookup (object->data_items, key) != NULL) {
+			old_value = dfsm_environment_dup_variable_value (object->environment, DFSM_VARIABLE_SCOPE_OBJECT, key);
+
+			if (old_value != NULL) {
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Duplicate variable name: %s", key);
-				return NULL; /* TODO: memory leak */
+				g_variant_unref (old_value);
+
+				goto error;
 			}
 
-			g_hash_table_insert (object->data_items, g_strdup (key), dfsm_ast_data_item_new (value->type_string, value->value_expression));
+			g_variant_unref (old_value);
+
+			/* Evaluate the value expression. */
+			new_value = dfsm_ast_expression_evaluate (value_expression, object->environment, &child_error);
+
+			if (child_error != NULL) {
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+				             "Couldn't evaluate default value for variable ‘%s’: %s", key, child_error->message);
+				g_error_free (child_error);
+
+				goto error;
+			}
+
+			/* Store the value in the environment. */
+			dfsm_environment_set_variable_value (object->environment, DFSM_VARIABLE_SCOPE_OBJECT, key, new_value);
+
+			g_variant_unref (new_value);
 		}
 	}
 
@@ -329,7 +328,8 @@ dfsm_ast_object_new (const gchar *object_path, GPtrArray/*<string>*/ *interface_
 			for (g = 0; g < object->states->len; g++) {
 				if (strcmp (state_name, g_ptr_array_index (object->states, g)) == 0) {
 					g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Duplicate state name: %s", state_name);
-					return NULL; /* TODO: memory leak */
+
+					goto error;
 				}
 			}
 
@@ -338,6 +338,12 @@ dfsm_ast_object_new (const gchar *object_path, GPtrArray/*<string>*/ *interface_
 	}
 
 	return object;
+
+error:
+	/* Free everything and run away. */
+	dfsm_ast_node_unref (object);
+
+	return NULL;
 }
 
 /*
@@ -2211,106 +2217,6 @@ dfsm_ast_fuzzy_data_structure_new (DfsmAstDataStructure *data_structure, gdouble
 	fuzzy_data_structure->is_fuzzy = TRUE;
 
 	return (DfsmAstDataStructure*) fuzzy_data_structure;
-}
-
-/**
- * dfsm_ast_data_item_new:
- * @type_string: a D-Bus–style type string for the data item
- * @value_expression: an expression giving the value of the data item
- *
- * Create a new #DfsmAstDataItem with the given type and value expression.
- *
- * Return value: (transfer full): a new data item
- */
-DfsmAstDataItem *
-dfsm_ast_data_item_new (const gchar *type_string, DfsmAstDataStructure *value_expression)
-{
-	DfsmAstDataItem *data_item;
-
-	g_return_val_if_fail (type_string != NULL && *type_string != '\0', NULL);
-	g_return_val_if_fail (value_expression != NULL, NULL);
-
-	data_item = g_slice_new (DfsmAstDataItem);
-
-	data_item->type_string = g_strdup (type_string);
-	data_item->value_expression = dfsm_ast_node_ref (value_expression);
-
-	return data_item;
-}
-
-/**
- * dfsm_ast_data_item_free:
- * @data_item: the data item to free
- *
- * Free the given @data_item.
- */
-void
-dfsm_ast_data_item_free (DfsmAstDataItem *data_item)
-{
-	if (data_item != NULL) {
-		dfsm_ast_node_unref (data_item->value_expression);
-		g_free (data_item->type_string);
-
-		g_slice_free (DfsmAstDataItem, data_item);
-	}
-}
-
-/**
- * dfsm_ast_data_item_check:
- * @data_item: a #DfsmAstDataItem
- * @error: a #GError
- *
- * Check the given @data_item and its descendents are correct; for example by type checking them.
- */
-void
-dfsm_ast_data_item_check (DfsmAstDataItem *data_item, GError **error)
-{
-	GVariantType *expected_type, *value_type;
-
-	g_return_if_fail (data_item != NULL);
-	g_return_if_fail (error != NULL && *error == NULL);
-
-	/* Conditions which should always hold, regardless of user input. */
-	g_assert (data_item->type_string != NULL);
-	g_assert (data_item->value_expression != NULL);
-
-	/* Conditions which may not hold as a result of invalid user input. */
-
-	/* Valid signature? */
-	if (g_variant_type_string_is_valid (data_item->type_string) == FALSE) {
-		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus type signature: %s", data_item->type_string);
-		return;
-	}
-
-	/* Valid expression? */
-	dfsm_ast_node_check ((DfsmAstNode*) data_item->value_expression, error);
-
-	if (*error != NULL) {
-		return;
-	}
-
-	/* Equal type? */
-	expected_type = g_variant_type_new (data_item->type_string);
-	value_type = dfsm_ast_data_structure_calculate_type (data_item->value_expression, NULL /* TODO: Split all *_check() functions up */);
-
-	if (g_variant_type_equal (expected_type, value_type) == FALSE) {
-		gchar *expected, *received;
-
-		expected = g_variant_type_dup_string (expected_type);
-		received = g_variant_type_dup_string (value_type);
-
-		g_variant_type_free (value_type);
-		g_variant_type_free (expected_type);
-
-		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-		             "Type mismatch between signature and value of data item: expected type %s but received type %s.",
-		             expected, received);
-
-		return;
-	}
-
-	g_variant_type_free (value_type);
-	g_variant_type_free (expected_type);
 }
 
 static void

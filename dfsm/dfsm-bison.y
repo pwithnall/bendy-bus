@@ -163,7 +163,7 @@ ObjectBlock:
 	OBJECT AT DBUS_OBJECT_PATH IMPLEMENTS InterfaceNameList L_BRACE
 		BlockList
 	R_BRACE									{
-											$$ = dfsm_ast_object_new ($3, $5,
+											$$ = dfsm_ast_object_new (parser_data->dbus_node_info, $3, $5,
 											                          g_ptr_array_ref ($7->data_blocks),
 											                          g_ptr_array_ref ($7->state_blocks),
 											                          g_ptr_array_ref ($7->transitions),
@@ -200,20 +200,20 @@ DataBlock:
 	R_BRACE									{ $$ = NULL; YYABORT; }
 ;
 
-/* Returns a new GHashTable mapping variable names (strings) to DfsmAstDataItems. */
+/* Returns a new GHashTable mapping variable names (strings) to DfsmAstExpressions. */
 DataList: /* empty */
 		{
-			$$ = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) dfsm_ast_data_item_free);
+			$$ = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) dfsm_ast_node_unref);
 		}
-        | VariableName DBUS_TYPE_SIGNATURE '=' FuzzyDataStructure
+        | VariableName '=' FuzzyDataStructure
 		{
-			$$ = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) dfsm_ast_data_item_free);
-			g_hash_table_insert ($$, $1 /* steal ownership from flex */, dfsm_ast_data_item_new ($2, $4));
+			$$ = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) dfsm_ast_node_unref);
+			g_hash_table_insert ($$, $1 /* steal ownership from flex */, $3);
 		}
-        | VariableName DBUS_TYPE_SIGNATURE '=' FuzzyDataStructure ';' DataList
+        | VariableName '=' FuzzyDataStructure ';' DataList
 		{
-			$$ = $6;
-			g_hash_table_insert ($$, $1 /* steal ownership from flex */, dfsm_ast_data_item_new ($2, $4));
+			$$ = $5;
+			g_hash_table_insert ($$, $1 /* steal ownership from flex */, $3);
 		}
         | error ';' DataList
 		{ $$ = $3; YYABORT; }
@@ -406,7 +406,7 @@ StructureListInner: /* empty */							{ $$ = g_ptr_array_new_with_free_func (dfs
 %%
 
 GPtrArray *
-dfsm_bison_parse (const gchar *source_buf, GError **error)
+dfsm_bison_parse (GDBusNodeInfo *dbus_node_info, const gchar *source_buf, GError **error)
 {
 	GError *child_error = NULL;
 	DfsmParserData data = { 0, };
@@ -416,6 +416,7 @@ dfsm_bison_parse (const gchar *source_buf, GError **error)
 	/* Set up the parsing environment. */
 	data.yyscanner = NULL;
 	data.object_array = NULL;
+	data.dbus_node_info = dbus_node_info;
 
 	data.source_buf = source_buf;
 	data.source_len = g_utf8_strlen (source_buf, -1);

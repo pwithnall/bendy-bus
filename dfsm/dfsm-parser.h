@@ -21,6 +21,7 @@
 #define DFSM_PARSER_H
 
 #include <glib.h>
+#include <gio/gio.h>
 
 #include "dfsm-utils.h"
 
@@ -38,6 +39,7 @@ GQuark dfsm_parse_error_quark (void) G_GNUC_PURE;
 typedef struct {
 	/* Gubbins */
 	void *yyscanner;
+	GDBusNodeInfo *dbus_node_info;
 
 	/* Parser output */
 	GPtrArray *object_array;
@@ -49,7 +51,7 @@ typedef struct {
 } DfsmParserData;
 
 /* TODO: This should not be exported */
-GPtrArray *dfsm_bison_parse (const gchar *source_buf, GError **error) DFSM_CONSTRUCTOR;
+GPtrArray *dfsm_bison_parse (GDBusNodeInfo *dbus_node_info, const gchar *source_buf, GError **error) DFSM_CONSTRUCTOR;
 
 typedef struct {
 	GPtrArray *data_blocks; /* array of GHashTables */

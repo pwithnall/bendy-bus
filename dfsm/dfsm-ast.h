@@ -57,14 +57,14 @@ typedef struct {
 	DfsmAstNode parent;
 	gchar *object_path;
 	GPtrArray *interface_names; /* array of strings */
-	GHashTable *data_items; /* string for variable name → DfsmAstDataItem; TODO: perhaps separate this out into a reusable environment struct? */
+	DfsmEnvironment *environment;
 	GPtrArray *states; /* array of strings (indexed by DfsmAstStateNumber) */
 	GPtrArray *transitions; /* array of DfsmAstTransitions */
 } DfsmAstObject;
 
-DfsmAstObject *dfsm_ast_object_new (const gchar *object_path, GPtrArray/*<string>*/ *interface_names, GPtrArray/*<GHashTable>*/ *data_blocks,
-                                    GPtrArray/*<GPtrArray>*/ *state_blocks, GPtrArray/*<DfsmAstTransition>*/ *transition_blocks,
-                                    GError **error) DFSM_CONSTRUCTOR;
+DfsmAstObject *dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GPtrArray/*<string>*/ *interface_names,
+                                    GPtrArray/*<GHashTable>*/ *data_blocks, GPtrArray/*<GPtrArray>*/ *state_blocks,
+                                    GPtrArray/*<DfsmAstTransition>*/ *transition_blocks, GError **error) DFSM_CONSTRUCTOR;
 
 typedef enum {
 	/* Function calls */
@@ -212,16 +212,6 @@ typedef struct {
 } DfsmAstFuzzyDataStructure;
 
 DfsmAstDataStructure *dfsm_ast_fuzzy_data_structure_new (DfsmAstDataStructure *data_structure, gdouble weight, GError **error) DFSM_CONSTRUCTOR;
-
-typedef struct {
-	gchar *type_string;
-	DfsmAstDataStructure *value_expression;
-} DfsmAstDataItem;
-
-DfsmAstDataItem *dfsm_ast_data_item_new (const gchar *type_string, DfsmAstDataStructure *value_expression) DFSM_CONSTRUCTOR;
-void dfsm_ast_data_item_free (DfsmAstDataItem *data_item);
-
-void dfsm_ast_data_item_check (DfsmAstDataItem *data_item, GError **error);
 
 typedef enum {
 	DFSM_AST_TRANSITION_METHOD_CALL,

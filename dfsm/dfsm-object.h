@@ -47,8 +47,8 @@ typedef struct {
 
 GType dfsm_object_get_type (void) G_GNUC_CONST;
 
-DfsmObject *dfsm_object_new (GDBusConnection *connection, DfsmMachine *machine, const gchar *object_path,
-                             GPtrArray/*<string>*/ *interface_names) DFSM_CONSTRUCTOR;
+GPtrArray/*<DfsmObject>*/ *dfsm_object_factory_from_files (GDBusConnection *connection, const gchar *simulation_code, const gchar *introspection_xml,
+                                                           GError **error) DFSM_CONSTRUCTOR;
 
 void dfsm_object_register_on_bus (DfsmObject *self, GError **error);
 void dfsm_object_unregister_on_bus (DfsmObject *self);

@@ -20,7 +20,9 @@
 #include <glib.h>
 
 #include "dfsm-object.h"
+#include "dfsm-ast.h"
 #include "dfsm-machine.h"
+#include "dfsm-parser.h"
 
 static void dfsm_object_dispose (GObject *object);
 static void dfsm_object_finalize (GObject *object);
@@ -219,7 +221,7 @@ dfsm_object_set_property (GObject *object, guint property_id, const GValue *valu
 	}
 }
 
-/**
+/*
  * dfsm_object_new:
  * @connection: a connection to a D-Bus bus
  * @machine: a DFSM simulation to provide the object's behaviour
@@ -231,8 +233,8 @@ dfsm_object_set_property (GObject *object, guint property_id, const GValue *valu
  *
  * Return value: (transfer full): a new #DfsmObject
  */
-DfsmObject *
-dfsm_object_new (GDBusConnection *connection, DfsmMachine *machine, const gchar *object_path, GPtrArray/*<string>*/ *interfaces)
+static DfsmObject *
+_dfsm_object_new (GDBusConnection *connection, DfsmMachine *machine, const gchar *object_path, GPtrArray/*<string>*/ *interfaces)
 {
 	g_return_val_if_fail (G_IS_DBUS_CONNECTION (connection), NULL);
 	g_return_val_if_fail (DFSM_IS_MACHINE (machine), NULL);
@@ -245,6 +247,72 @@ dfsm_object_new (GDBusConnection *connection, DfsmMachine *machine, const gchar 
 	                     "object-path", object_path,
 	                     "interfaces", interfaces,
 	                     NULL);
+}
+
+/**
+ * dfsm_object_factory_from_files:
+ * @connection: a connection to a D-Bus bus
+ * @simulation_code: code describing the DFSM of one or more D-Bus objects to be simulated
+ * @introspection_xml: D-Bus introspection XML describing all the interfaces referenced by @simulation_code
+ * @error: (allow-none): a #GError, or %NULL
+ *
+ * Parses the given @simulation_code and constructs one or more #DfsmObject<!-- -->s from it, each of which will simulate a single D-Bus object on the
+ * bus on @connection once started using dfsm_object_register_on_bus(). The given @introspection_xml should be a fully formed introspection XML
+ * document which, at a minimum, describes all the D-Bus interfaces implemented by all the objects defined in @simulation_code.
+ *
+ * Return value: (transfer full): an array of #DfsmObject<!-- -->s, each of which must be freed using g_object_unref()
+ */
+GPtrArray/*<DfsmObject>*/ *
+dfsm_object_factory_from_files (GDBusConnection *connection, const gchar *simulation_code, const gchar *introspection_xml, GError **error)
+{
+	GPtrArray/*<DfsmAstObject>*/ *ast_object_array;
+	GPtrArray/*<DfsmObject>*/ *object_array;
+	guint i;
+	GDBusNodeInfo *dbus_node_info;
+	GError *child_error = NULL;
+
+	g_return_val_if_fail (G_IS_DBUS_CONNECTION (connection), NULL);
+	g_return_val_if_fail (simulation_code != NULL, NULL);
+	g_return_val_if_fail (introspection_xml != NULL, NULL);
+	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
+
+	/* Load the D-Bus interface introspection info. */
+	dbus_node_info = g_dbus_node_info_new_for_xml (introspection_xml, &child_error);
+
+	if (child_error != NULL) {
+		/* Error! */
+		g_propagate_error (error, child_error);
+		return NULL;
+	}
+
+	/* Parse the source code to get an array of ASTs. */
+	ast_object_array = dfsm_bison_parse (dbus_node_info, simulation_code, &child_error);
+
+	g_dbus_node_info_unref (dbus_node_info);
+
+	/* For each of the AST objects, build a proper DfsmObject. */
+	object_array = g_ptr_array_new_with_free_func (g_object_unref);
+
+	for (i = 0; i < ast_object_array->len; i++) {
+		DfsmAstObject *ast_object;
+		DfsmMachine *machine;
+		DfsmObject *object;
+
+		ast_object = g_ptr_array_index (ast_object_array, i);
+
+		/* Build the machine and object wrapper. */
+		machine = dfsm_machine_new (ast_object->environment, ast_object->states, ast_object->transitions);
+		object = _dfsm_object_new (connection, machine, ast_object->object_path, ast_object->interface_names);
+
+		g_ptr_array_add (object_array, g_object_ref (object));
+
+		g_object_unref (object);
+		g_object_unref (machine);
+	}
+
+	g_ptr_array_unref (ast_object_array);
+
+	return object_array;
 }
 
 static void

@@ -25,12 +25,12 @@ test_ast_single_object (void)
 	GPtrArray *object_array;
 	GError *error = NULL;
 
-	object_array = dfsm_bison_parse (
+	object_array = dfsm_bison_parse (NULL,
 		"object at /org/freedesktop/Telepathy/ConnectionManager/gabble implements org.freedesktop.Telepathy.ConnectionManager {\n"
 			"data {\n"
-				"_ConnectionObjectPath : o = \"TODO\";\n"
-				"_ConnectionBusName : s = \"foobar\";\n"
-				"_Params : a(susv) = [\n"
+				"_ConnectionObjectPath = /org/example/Test;\n"
+				"_ConnectionBusName = \"foobar\";\n"
+				"_Params = [\n"
 					"(\"foo\", 15u, \"bar\", \"baz\"),"
 					"(\"foo\", 15u, \"bar\", \"baz\"),"
 				"]\n"
