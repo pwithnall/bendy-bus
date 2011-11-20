@@ -85,9 +85,6 @@ typedef struct {
 
 GType dfsm_machine_get_type (void) G_GNUC_CONST;
 
-DfsmMachine *dfsm_machine_new (DfsmEnvironment *environment, GPtrArray/*<string>*/ *state_names,
-                               GPtrArray/*<DfsmAstTransition>*/ *transitions) DFSM_CONSTRUCTOR;
-
 void dfsm_machine_start_simulation (DfsmMachine *self);
 void dfsm_machine_stop_simulation (DfsmMachine *self);
 

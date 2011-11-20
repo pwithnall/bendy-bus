@@ -23,6 +23,7 @@
 #include <glib.h>
 #include <gio/gio.h>
 
+#include "dfsm-machine.h"
 #include "dfsm-utils.h"
 
 G_BEGIN_DECLS
@@ -52,6 +53,10 @@ typedef struct {
 
 /* TODO: This should not be exported */
 GPtrArray *dfsm_bison_parse (GDBusNodeInfo *dbus_node_info, const gchar *source_buf, GError **error) DFSM_CONSTRUCTOR;
+
+G_GNUC_INTERNAL DfsmEnvironment *_dfsm_environment_new (GDBusNodeInfo *dbus_node_info) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmMachine *_dfsm_machine_new (DfsmEnvironment *environment, GPtrArray/*<string>*/ *state_names,
+                                                GPtrArray/*<DfsmAstTransition>*/ *transitions) DFSM_CONSTRUCTOR;
 
 typedef struct {
 	GPtrArray *data_blocks; /* array of GHashTables */

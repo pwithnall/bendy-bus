@@ -24,6 +24,7 @@
 #include "dfsm-environment.h"
 #include "dfsm-machine.h"
 #include "dfsm-marshal.h"
+#include "dfsm-parser.h"
 
 GQuark
 dfsm_simulation_error_quark (void)
@@ -387,7 +388,7 @@ environment_signal_emission_cb (DfsmEnvironment *environment, const gchar *signa
 	g_signal_emit (self, machine_signals[SIGNAL_SIGNAL_EMISSION], g_quark_from_string (signal_name), signal_name, parameters);
 }
 
-/**
+/*
  * dfsm_machine_new:
  * @environment: a #DfsmEnvironment containing all the variables and functions used by the machine
  * @state_names: an array of strings of all the state names used in the DFSM
@@ -398,7 +399,7 @@ environment_signal_emission_cb (DfsmEnvironment *environment, const gchar *signa
  * Return value: (transfer full): a new #DfsmMachine
  */
 DfsmMachine *
-dfsm_machine_new (DfsmEnvironment *environment, GPtrArray/*<string>*/ *state_names, GPtrArray/*<DfsmAstTransition>*/ *transitions)
+_dfsm_machine_new (DfsmEnvironment *environment, GPtrArray/*<string>*/ *state_names, GPtrArray/*<DfsmAstTransition>*/ *transitions)
 {
 	DfsmMachine *machine;
 	guint i;

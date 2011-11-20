@@ -294,7 +294,7 @@ dfsm_object_factory_from_files (const gchar *simulation_code, const gchar *intro
 		ast_object = g_ptr_array_index (ast_object_array, i);
 
 		/* Build the machine and object wrapper. */
-		machine = dfsm_machine_new (ast_object->environment, ast_object->states, ast_object->transitions);
+		machine = _dfsm_machine_new (ast_object->environment, ast_object->states, ast_object->transitions);
 		object = _dfsm_object_new (machine, ast_object->object_path, ast_object->interface_names);
 
 		g_ptr_array_add (object_array, g_object_ref (object));

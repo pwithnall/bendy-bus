@@ -22,6 +22,7 @@
 
 #include "dfsm-environment.h"
 #include "dfsm-marshal.h"
+#include "dfsm-parser.h"
 
 typedef struct {
 	GVariantType *type;
@@ -163,7 +164,7 @@ dfsm_environment_set_property (GObject *object, guint property_id, const GValue 
 	}
 }
 
-/**
+/*
  * dfsm_environment_new:
  * @dbus_node_info: a #GDBusNodeInfo structure describing the interfaces used by objects using this environment
  *
@@ -172,7 +173,7 @@ dfsm_environment_set_property (GObject *object, guint property_id, const GValue 
  * Return value: (transfer full): a new #DfsmEnvironment
  */
 DfsmEnvironment *
-dfsm_environment_new (GDBusNodeInfo *dbus_node_info)
+_dfsm_environment_new (GDBusNodeInfo *dbus_node_info)
 {
 	g_return_val_if_fail (dbus_node_info != NULL, NULL);
 

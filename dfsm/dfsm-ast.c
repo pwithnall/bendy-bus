@@ -263,7 +263,7 @@ dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GP
 
 	object->object_path = g_strdup (object_path);
 	object->interface_names = g_ptr_array_ref (interface_names);
-	object->environment = dfsm_environment_new (dbus_node_info);
+	object->environment = _dfsm_environment_new (dbus_node_info);
 	object->states = g_ptr_array_new_with_free_func (g_free);
 	object->transitions = g_ptr_array_ref (transition_blocks);
 
