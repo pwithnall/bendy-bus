@@ -47,10 +47,10 @@ typedef struct {
 
 GType dfsm_object_get_type (void) G_GNUC_CONST;
 
-GPtrArray/*<DfsmObject>*/ *dfsm_object_factory_from_files (GDBusConnection *connection, const gchar *simulation_code, const gchar *introspection_xml,
+GPtrArray/*<DfsmObject>*/ *dfsm_object_factory_from_files (const gchar *simulation_code, const gchar *introspection_xml,
                                                            GError **error) DFSM_CONSTRUCTOR;
 
-void dfsm_object_register_on_bus (DfsmObject *self, GError **error);
+void dfsm_object_register_on_bus (DfsmObject *self, GDBusConnection *connection, GError **error);
 void dfsm_object_unregister_on_bus (DfsmObject *self);
 
 GDBusConnection *dfsm_object_get_connection (DfsmObject *self) G_GNUC_PURE;

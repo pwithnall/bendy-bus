@@ -44,7 +44,7 @@ static const GDBusInterfaceVTable dbus_interface_vtable = {
 };
 
 struct _DfsmObjectPrivate {
-	GDBusConnection *connection;
+	GDBusConnection *connection; /* NULL if the object isn't registered on a bus */
 	DfsmMachine *machine;
 	gulong signal_emission_handler;
 	gchar *object_path;
@@ -76,13 +76,13 @@ dfsm_object_class_init (DfsmObjectClass *klass)
 	/**
 	 * DfsmObject:connection:
 	 *
-	 * A connection to a D-Bus bus.
+	 * A connection to a D-Bus bus. This will be %NULL if the object isn't currently registered on a bus.
 	 */
 	g_object_class_install_property (gobject_class, PROP_CONNECTION,
 	                                 g_param_spec_object ("connection",
 	                                                      "Connection", "A connection to a D-Bus bus.",
 	                                                      G_TYPE_DBUS_CONNECTION,
-	                                                      G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+	                                                      G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
 	/**
 	 * DfsmObject:machine:
@@ -196,10 +196,6 @@ dfsm_object_set_property (GObject *object, guint property_id, const GValue *valu
 	DfsmObjectPrivate *priv = DFSM_OBJECT (object)->priv;
 
 	switch (property_id) {
-		case PROP_CONNECTION:
-			/* Construct-only */
-			priv->connection = g_value_dup_object (value);
-			break;
 		case PROP_MACHINE:
 			/* Construct-only */
 			priv->machine = g_value_dup_object (value);
@@ -214,6 +210,8 @@ dfsm_object_set_property (GObject *object, guint property_id, const GValue *valu
 			/* Construct-only */
 			priv->interfaces = g_ptr_array_ref (g_value_get_boxed (value));
 			break;
+		case PROP_CONNECTION:
+			/* Read-only */
 		default:
 			/* We don't have any other property... */
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -223,26 +221,23 @@ dfsm_object_set_property (GObject *object, guint property_id, const GValue *valu
 
 /*
  * dfsm_object_new:
- * @connection: a connection to a D-Bus bus
  * @machine: a DFSM simulation to provide the object's behaviour
  * @object_path: the object's path on the bus
  * @interfaces: the interfaces to export the object as
  *
  * Creates a new #DfsmObject with behaviour given by @machine, which will be exported as @object_path (implementing all the interfaces in @interfaces)
- * on the D-Bus connection given by @connection when dfsm_object_register_on_bus() is called.
+ * on the D-Bus connection given when dfsm_object_register_on_bus() is called.
  *
  * Return value: (transfer full): a new #DfsmObject
  */
 static DfsmObject *
-_dfsm_object_new (GDBusConnection *connection, DfsmMachine *machine, const gchar *object_path, GPtrArray/*<string>*/ *interfaces)
+_dfsm_object_new (DfsmMachine *machine, const gchar *object_path, GPtrArray/*<string>*/ *interfaces)
 {
-	g_return_val_if_fail (G_IS_DBUS_CONNECTION (connection), NULL);
 	g_return_val_if_fail (DFSM_IS_MACHINE (machine), NULL);
 	g_return_val_if_fail (object_path != NULL, NULL);
 	g_return_val_if_fail (interfaces != NULL, NULL);
 
 	return g_object_new (DFSM_TYPE_OBJECT,
-	                     "connection", connection,
 	                     "machine", machine,
 	                     "object-path", object_path,
 	                     "interfaces", interfaces,
@@ -251,19 +246,18 @@ _dfsm_object_new (GDBusConnection *connection, DfsmMachine *machine, const gchar
 
 /**
  * dfsm_object_factory_from_files:
- * @connection: a connection to a D-Bus bus
  * @simulation_code: code describing the DFSM of one or more D-Bus objects to be simulated
  * @introspection_xml: D-Bus introspection XML describing all the interfaces referenced by @simulation_code
  * @error: (allow-none): a #GError, or %NULL
  *
  * Parses the given @simulation_code and constructs one or more #DfsmObject<!-- -->s from it, each of which will simulate a single D-Bus object on the
- * bus on @connection once started using dfsm_object_register_on_bus(). The given @introspection_xml should be a fully formed introspection XML
+ * bus once started using dfsm_object_register_on_bus(). The given @introspection_xml should be a fully formed introspection XML
  * document which, at a minimum, describes all the D-Bus interfaces implemented by all the objects defined in @simulation_code.
  *
  * Return value: (transfer full): an array of #DfsmObject<!-- -->s, each of which must be freed using g_object_unref()
  */
 GPtrArray/*<DfsmObject>*/ *
-dfsm_object_factory_from_files (GDBusConnection *connection, const gchar *simulation_code, const gchar *introspection_xml, GError **error)
+dfsm_object_factory_from_files (const gchar *simulation_code, const gchar *introspection_xml, GError **error)
 {
 	GPtrArray/*<DfsmAstObject>*/ *ast_object_array;
 	GPtrArray/*<DfsmObject>*/ *object_array;
@@ -271,7 +265,6 @@ dfsm_object_factory_from_files (GDBusConnection *connection, const gchar *simula
 	GDBusNodeInfo *dbus_node_info;
 	GError *child_error = NULL;
 
-	g_return_val_if_fail (G_IS_DBUS_CONNECTION (connection), NULL);
 	g_return_val_if_fail (simulation_code != NULL, NULL);
 	g_return_val_if_fail (introspection_xml != NULL, NULL);
 	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
@@ -302,7 +295,7 @@ dfsm_object_factory_from_files (GDBusConnection *connection, const gchar *simula
 
 		/* Build the machine and object wrapper. */
 		machine = dfsm_machine_new (ast_object->environment, ast_object->states, ast_object->transitions);
-		object = _dfsm_object_new (connection, machine, ast_object->object_path, ast_object->interface_names);
+		object = _dfsm_object_new (machine, ast_object->object_path, ast_object->interface_names);
 
 		g_ptr_array_add (object_array, g_object_ref (object));
 
@@ -451,15 +444,17 @@ dfsm_object_dbus_set_property (GDBusConnection *connection, const gchar *sender,
  * @self: a #DfsmObject
  * @error: (allow-none): a #GError, or %NULL
  *
- * Register this simulated D-Bus object on the D-Bus instance at #DfsmObject:connection, and then start the simulation. Once the simulation is started
+ * Register this simulated D-Bus object on the D-Bus instance given by @connection, and then start the simulation. Once the simulation is started
  * successfully, the object will respond to method calls on the bus as directed by its DFSM (#DfsmObject:machine), and will also take arbitrary actions
  * at random intervals (also as directed by its DFSM).
+ *
+ * If the object is successfully registered on the bus, #DfsmObject:connection will be set to @connection.
  *
  * If the object is already registered on the bus, this function will return immediately. The object can be unregistered from the bus by calling
  * dfsm_object_unregister_on_bus().
  */
 void
-dfsm_object_register_on_bus (DfsmObject *self, GError **error)
+dfsm_object_register_on_bus (DfsmObject *self, GDBusConnection *connection, GError **error)
 {
 	DfsmObjectPrivate *priv;
 	guint i;
@@ -468,6 +463,7 @@ dfsm_object_register_on_bus (DfsmObject *self, GError **error)
 	GError *child_error = NULL;
 
 	g_return_if_fail (DFSM_IS_OBJECT (self));
+	g_return_if_fail (G_IS_DBUS_CONNECTION (connection));
 	g_return_if_fail (error == NULL || *error == NULL);
 
 	priv = self->priv;
@@ -499,7 +495,7 @@ dfsm_object_register_on_bus (DfsmObject *self, GError **error)
 		}
 
 		/* Register on the bus. */
-		registration_id = g_dbus_connection_register_object (priv->connection, priv->object_path, interface_info, &dbus_interface_vtable, self,
+		registration_id = g_dbus_connection_register_object (connection, priv->object_path, interface_info, &dbus_interface_vtable, self,
 		                                                     NULL, &child_error);
 
 		if (child_error != NULL) {
@@ -514,6 +510,11 @@ dfsm_object_register_on_bus (DfsmObject *self, GError **error)
 	/* Success! Save the array of registration IDs so that we can unregister later. */
 	priv->registration_ids = registration_ids;
 
+	/* Expose the connection. */
+	g_assert (priv->connection == NULL);
+	priv->connection = g_object_ref (connection);
+	g_object_notify (G_OBJECT (self), "connection");
+
 	/* Start the DFSM. */
 	dfsm_machine_start_simulation (priv->machine);
 
@@ -525,7 +526,7 @@ error:
 	/* Unregister all the interfaces we successfully registered before encountering the error. */
 	while (i-- > 0) {
 		guint registration_id = g_array_index (registration_ids, guint, i);
-		g_dbus_connection_unregister_object (priv->connection, registration_id);
+		g_dbus_connection_unregister_object (connection, registration_id);
 	}
 
 	g_array_free (registration_ids, TRUE);
@@ -541,6 +542,8 @@ error:
  * Unregister this simulated D-Bus object on the D-Bus instance at #DfsmObject:connection, after stopping the simulation. Once the object has been
  * removed from the bus it will no longer respond to method calls on the bus, and will no longer take arbitrary actions at random intervals (as
  * directed by its DFSM).
+ *
+ * If the object is successfully unregistered, #DfsmObject:connection will be set to %NULL.
  *
  * If the object is already unregistered on the bus, this function will return immediately. The object can be registered on the bus by calling
  * dfsm_object_register_on_bus().
@@ -571,15 +574,18 @@ dfsm_object_unregister_on_bus (DfsmObject *self)
 
 	g_array_free (priv->registration_ids, TRUE);
 	priv->registration_ids = NULL;
+
+	g_clear_object (&priv->connection);
+	g_object_notify (G_OBJECT (self), "connection");
 }
 
 /**
  * dfsm_object_get_connection:
  * @self: a #DfsmMachine
  *
- * Gets the value of the #DfsmObject:connection property.
+ * Gets the value of the #DfsmObject:connection property. This will be %NULL if the object isn't currently registered on a bus.
  *
- * Return value: (transfer none): the object's connection to the bus
+ * Return value: (transfer none) (allow-none): the object's connection to the bus, or %NULL
  */
 GDBusConnection *
 dfsm_object_get_connection (DfsmObject *self)
