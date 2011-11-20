@@ -141,6 +141,41 @@ GITIGNOREFILES += \
 	dfsm/tests/.dirstamp \
 	$(NULL)
 
+# dbus-simulator
+bin_PROGRAMS += dbus-simulator/dbus-simulator
+
+dbus_simulator_dbus_simulator_SOURCES = \
+	dbus-simulator/main.c
+	$(NULL)
+
+dbus_simulator_dbus_simulator_CPPFLAGS = \
+	-I$(top_srcdir) \
+	-DPACKAGE_LOCALE_DIR=\""$(datadir)/locale"\" \
+	-DG_LOG_DOMAIN=\"dbus-simulator\" \
+	$(DISABLE_DEPRECATED) \
+	$(AM_CPPFLAGS) \
+	$(NULL)
+
+dbus_simulator_dbus_simulator_CFLAGS = \
+	$(WARN_CFLAGS) \
+	$(GLIB_CFLAGS) \
+	$(GIO_CFLAGS) \
+	$(AM_CFLAGS) \
+	$(NULL)
+
+dbus_simulator_dbus_simulator_LDADD = \
+	$(top_builddir)/dfsm/libdfsm.la \
+	$(GLIB_LIBS) \
+	$(GIO_LIBS) \
+	$(AM_LDADD) \
+	$(NULL)
+
+# git.mk can't handle non-recursive automake so well
+GITIGNOREFILES += \
+	dbus-simulator/.dirstamp \
+	dbus-simulator/.libs/ \
+	$(NULL)
+
 # Gubbins
 ACLOCAL_AMFLAGS = -I m4
 
