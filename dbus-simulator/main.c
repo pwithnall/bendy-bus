@@ -25,12 +25,15 @@
 #include <glib/gi18n.h>
 #include <dfsm/dfsm.h>
 
+#include "dbus-daemon.h"
+
 enum StatusCodes {
 	STATUS_SUCCESS = 0,
 	STATUS_INVALID_OPTIONS = 1,
 	STATUS_UNREADABLE_FILE = 2,
 	STATUS_INVALID_CODE = 3,
 	STATUS_DBUS_ERROR = 4,
+	STATUS_DAEMON_SPAWN_ERROR = 5,
 };
 
 static const GOptionEntry entries[] = {
@@ -53,6 +56,7 @@ typedef struct {
 	int exit_status;
 
 	/* Simulation gubbins */
+	DsimDBusDaemon *dbus_daemon;
 	gchar *dbus_address;
 	GDBusConnection *connection;
 	GPtrArray/*<DfsmObject>*/ *simulated_objects;
@@ -64,6 +68,10 @@ main_data_clear (MainData *data)
 	g_clear_object (&data->connection);
 	g_free (data->dbus_address);
 	g_ptr_array_unref (data->simulated_objects);
+
+	dsim_dbus_daemon_kill (data->dbus_daemon);
+	g_clear_object (&data->dbus_daemon);
+
 	g_main_loop_unref (data->main_loop);
 }
 
@@ -81,6 +89,9 @@ connection_close_cb (GObject *source_object, GAsyncResult *result, MainData *dat
 
 		g_error_free (error);
 	}
+
+	/* Kill the dbus-daemon instance. */
+	dsim_dbus_daemon_kill (data->dbus_daemon);
 
 	/* Quit everything */
 	g_main_loop_quit (data->main_loop);
@@ -155,6 +166,20 @@ connection_created_cb (GObject *source_object, GAsyncResult *result, MainData *d
 	g_timeout_add_seconds (10, (GSourceFunc) simulation_timeout_cb, data);
 }
 
+static void
+dbus_daemon_notify_bus_address_cb (GObject *gobject, GParamSpec *pspec, MainData *data)
+{
+	/* Start building a D-Bus connection with our new bus address. */
+	g_assert (data->dbus_address == NULL);
+	data->dbus_address = g_strdup (dsim_dbus_daemon_get_bus_address (data->dbus_daemon));
+
+	g_dbus_connection_new_for_address (data->dbus_address, G_DBUS_CONNECTION_FLAGS_MESSAGE_BUS_CONNECTION, NULL, NULL,
+	                                   (GAsyncReadyCallback) connection_created_cb, data);
+
+	/* We don't want this to fire again. */
+	g_signal_handlers_disconnect_by_func (gobject, dbus_daemon_notify_bus_address_cb, data);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -164,6 +189,8 @@ main (int argc, char *argv[])
 	gchar *simulation_code, *introspection_xml;
 	MainData data;
 	GPtrArray/*<DfsmObject>*/ *simulated_objects;
+
+	g_type_init ();
 
 	/* Set up localisation. */
 	bindtextdomain (GETTEXT_PACKAGE, PACKAGE_LOCALE_DIR);
@@ -253,12 +280,24 @@ main (int argc, char *argv[])
 
 	g_ptr_array_unref (simulated_objects);
 
-	/* Start building a D-Bus connection. */
-	data.dbus_address = g_strdup ("TODO");
-	g_dbus_connection_new_for_address (data.dbus_address, G_DBUS_CONNECTION_FLAGS_MESSAGE_BUS_CONNECTION, NULL, NULL,
-	                                   (GAsyncReadyCallback) connection_created_cb, &data);
+	/* Start up our own private dbus-daemon instance. */
+	/* TODO */
+	data.dbus_daemon = dsim_dbus_daemon_new (g_file_new_for_path ("/tmp/dbus"), g_file_new_for_path ("/tmp/dbus/config.xml"));
+	dsim_dbus_daemon_spawn (data.dbus_daemon, &error);
 
-	/* Run the main loop; everything happens inside callbacks from now on. */
+	if (error != NULL) {
+		g_printerr (_("Error spawning private dbus-daemon instance: %s"), error->message);
+		g_printerr ("\n");
+
+		g_error_free (error);
+		main_data_clear (&data);
+
+		exit (STATUS_DAEMON_SPAWN_ERROR);
+	}
+
+	g_signal_connect (data.dbus_daemon, "notify::bus-address", (GCallback) dbus_daemon_notify_bus_address_cb, &data);
+
+	/* Start the main loop and wait for the dbus-daemon to send us its address. */
 	g_main_loop_run (data.main_loop);
 
 	/* Free the main data struct. */

@@ -145,7 +145,9 @@ GITIGNOREFILES += \
 bin_PROGRAMS += dbus-simulator/dbus-simulator
 
 dbus_simulator_dbus_simulator_SOURCES = \
-	dbus-simulator/main.c
+	dbus-simulator/main.c \
+	dbus-simulator/dbus-daemon.c \
+	dbus-simulator/dbus-daemon.h \
 	$(NULL)
 
 dbus_simulator_dbus_simulator_CPPFLAGS = \
