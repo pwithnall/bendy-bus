@@ -346,13 +346,15 @@ dsim_program_wrapper_spawn (DsimProgramWrapper *self, GError **error)
 
 	if (klass->build_argv != NULL) {
 		klass->build_argv (self, argv);
-		g_ptr_array_add (argv, NULL); /* NULL terminated */
 	}
+
+	g_ptr_array_add (argv, NULL); /* NULL terminated */
 
 	if (klass->build_envp != NULL) {
 		klass->build_envp (self, envp);
-		g_ptr_array_add (envp, NULL); /* NULL terminated */
 	}
+
+	g_ptr_array_add (envp, NULL); /* NULL terminated */
 
 	command_line = g_strjoinv (" ", (gchar**) argv->pdata);
 	environment = g_strjoinv (" ", (gchar**) envp->pdata);
