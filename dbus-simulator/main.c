@@ -26,6 +26,7 @@
 #include <dfsm/dfsm.h>
 
 #include "dbus-daemon.h"
+#include "test-program.h"
 
 enum StatusCodes {
 	STATUS_SUCCESS = 0,
@@ -34,6 +35,7 @@ enum StatusCodes {
 	STATUS_INVALID_CODE = 3,
 	STATUS_DBUS_ERROR = 4,
 	STATUS_DAEMON_SPAWN_ERROR = 5,
+	STATUS_TEST_PROGRAM_SPAWN_ERROR = 6,
 };
 
 static const GOptionEntry entries[] = {
@@ -56,6 +58,7 @@ typedef struct {
 	int exit_status;
 
 	/* Simulation gubbins */
+	DsimTestProgram *test_program;
 	DsimDBusDaemon *dbus_daemon;
 	gchar *dbus_address;
 	GDBusConnection *connection;
@@ -68,6 +71,9 @@ main_data_clear (MainData *data)
 	g_clear_object (&data->connection);
 	g_free (data->dbus_address);
 	g_ptr_array_unref (data->simulated_objects);
+
+	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program));
+	g_clear_object (&data->test_program);
 
 	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->dbus_daemon));
 	g_clear_object (&data->dbus_daemon);
@@ -102,7 +108,10 @@ simulation_timeout_cb (MainData *data)
 {
 	guint i;
 
-	/* Simulation's finished, so unregister all our DfsmObjects. */
+	/* Simulation's finished, so kill the test program. */
+	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program));
+
+	/* Unregister all our DfsmObjects. */
 	for (i = 0; i < data->simulated_objects->len; i++) {
 		DfsmObject *simulated_object = g_ptr_array_index (data->simulated_objects, i);
 		dfsm_object_unregister_on_bus (simulated_object);
@@ -147,23 +156,40 @@ connection_created_cb (GObject *source_object, GAsyncResult *result, MainData *d
 			g_printerr (_("Error connecting simulated object to D-Bus: %s"), error->message);
 			g_printerr ("\n");
 
-			g_error_free (error);
-
-			/* Unregister objects */
-			while (i-- > 0) {
-				simulated_object = g_ptr_array_index (data->simulated_objects, i);
-				dfsm_object_unregister_on_bus (simulated_object);
-			}
-
-			/* Run away from the bus */
 			data->exit_status = STATUS_DBUS_ERROR;
-			g_dbus_connection_close (data->connection, NULL, (GAsyncReadyCallback) connection_close_cb, data);
-			return;
+
+			goto error;
 		}
+	}
+
+	/* Spawn the program under test. */
+	dsim_program_wrapper_spawn (DSIM_PROGRAM_WRAPPER (data->test_program), &error);
+
+	if (error != NULL) {
+		g_printerr (_("Error spawning test program instance: %s"), error->message);
+		g_printerr ("\n");
+
+		data->exit_status = STATUS_TEST_PROGRAM_SPAWN_ERROR;
+
+		goto error;
 	}
 
 	/* TODO: How do we know when the simulation's finished? */
 	g_timeout_add_seconds (10, (GSourceFunc) simulation_timeout_cb, data);
+
+	return;
+
+error:
+	g_error_free (error);
+
+	/* Unregister objects */
+	while (i-- > 0) {
+		DfsmObject *simulated_object = g_ptr_array_index (data->simulated_objects, i);
+		dfsm_object_unregister_on_bus (simulated_object);
+	}
+
+	/* Run away from the bus */
+	g_dbus_connection_close (data->connection, NULL, (GAsyncReadyCallback) connection_close_cb, data);
 }
 
 static void
@@ -189,6 +215,9 @@ main (int argc, char *argv[])
 	gchar *simulation_code, *introspection_xml;
 	MainData data;
 	GPtrArray/*<DfsmObject>*/ *simulated_objects;
+	const gchar *test_program_name;
+	GPtrArray/*<string>*/ *test_program_argv;
+	guint i;
 
 	g_type_init ();
 
@@ -200,7 +229,7 @@ main (int argc, char *argv[])
 	g_set_application_name (_("D-Bus Simulator"));
 
 	/* Parse command line options */
-	context = g_option_context_new (_("[simulation code file] [introspection XML file]"));
+	context = g_option_context_new (_("[simulation code file] [introspection XML file] -- [executable-file] [arguments]"));
 	g_option_context_set_translation_domain (context, GETTEXT_PACKAGE);
 	g_option_context_set_summary (context, _("Simulates the server in a D-Bus client–server conversation."));
 	g_option_context_add_main_entries (context, entries, GETTEXT_PACKAGE);
@@ -229,10 +258,27 @@ main (int argc, char *argv[])
 		exit (STATUS_INVALID_OPTIONS);
 	}
 
-	g_option_context_free (context);
-
 	simulation_filename = argv[1];
 	introspection_filename = argv[2];
+
+	/* Extract the remaining arguments */
+	if (argc < 4) {
+		g_printerr (_("Error parsing command line options: %s"), _("Test program must be provided"));
+		g_printerr ("\n");
+
+		print_help_text (context);
+
+		exit (STATUS_INVALID_OPTIONS);
+	}
+
+	test_program_name = argv[3];
+	test_program_argv = g_ptr_array_new_with_free_func (g_free);
+
+	for (i = 4; i < (guint) argc; i++) {
+		g_ptr_array_add (test_program_argv, g_strdup (argv[i]));
+	}
+
+	g_option_context_free (context);
 
 	/* Load the files. */
 	g_file_get_contents (simulation_filename, &simulation_code, NULL, &error);
@@ -280,9 +326,15 @@ main (int argc, char *argv[])
 
 	g_ptr_array_unref (simulated_objects);
 
+	/* Set up the test program ready for spawning. */
+	/* TODO */
+	data.test_program = dsim_test_program_new (g_file_new_for_path ("/tmp/test"), test_program_name, test_program_argv, NULL);
+
 	/* Start up our own private dbus-daemon instance. */
 	/* TODO */
 	data.dbus_daemon = dsim_dbus_daemon_new (g_file_new_for_path ("/tmp/dbus"), g_file_new_for_path ("/tmp/dbus/config.xml"));
+	g_signal_connect (data.dbus_daemon, "notify::bus-address", (GCallback) dbus_daemon_notify_bus_address_cb, &data);
+
 	dsim_program_wrapper_spawn (DSIM_PROGRAM_WRAPPER (data.dbus_daemon), &error);
 
 	if (error != NULL) {
@@ -294,8 +346,6 @@ main (int argc, char *argv[])
 
 		exit (STATUS_DAEMON_SPAWN_ERROR);
 	}
-
-	g_signal_connect (data.dbus_daemon, "notify::bus-address", (GCallback) dbus_daemon_notify_bus_address_cb, &data);
 
 	/* Start the main loop and wait for the dbus-daemon to send us its address. */
 	g_main_loop_run (data.main_loop);

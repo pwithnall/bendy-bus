@@ -151,6 +151,8 @@ dbus_simulator_dbus_simulator_SOURCES = \
 	dbus-simulator/program-wrapper.h \
 	dbus-simulator/dbus-daemon.c \
 	dbus-simulator/dbus-daemon.h \
+	dbus-simulator/test-program.c \
+	dbus-simulator/test-program.h \
 	$(NULL)
 
 dbus_simulator_dbus_simulator_CPPFLAGS = \
