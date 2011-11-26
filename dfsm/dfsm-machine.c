@@ -271,6 +271,11 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstTransi
 	g_assert (executed_transition != NULL);
 	*executed_transition = FALSE;
 
+	/* If there are no possible transitions, bail out. */
+	if (possible_transitions->len == 0) {
+		goto done;
+	}
+
 	/* Arbitrarily choose a transition to perform. We do this by taking a random start index into the array of transitions, and then sequentially
 	 * checking preconditions of transitions until we find one which is satisfied. We then execute that transition. */
 	rand_offset = g_random_int_range (0, possible_transitions->len);
@@ -332,6 +337,7 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstTransi
 		precondition_error = NULL;
 	}
 
+done:
 	g_assert ((*executed_transition == TRUE && child_error == NULL) ||
 	          (*executed_transition == FALSE && return_value == NULL));
 
@@ -517,6 +523,7 @@ dfsm_machine_stop_simulation (DfsmMachine *self)
 	/* Cancel any outstanding potential arbitrary transition. */
 	g_debug ("Cancelling outstanding arbitrary transitions.");
 	g_source_remove (priv->timeout_id);
+	priv->timeout_id = 0;
 
 	/* Change simulation status. */
 	priv->simulation_status = DFSM_SIMULATION_STATUS_STOPPED;
