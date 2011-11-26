@@ -283,6 +283,13 @@ dfsm_object_factory_from_files (const gchar *simulation_code, const gchar *intro
 
 	g_dbus_node_info_unref (dbus_node_info);
 
+	if (child_error != NULL) {
+		/* Error! */
+		g_propagate_error (error, child_error);
+
+		return NULL;
+	}
+
 	/* For each of the AST objects, build a proper DfsmObject. */
 	object_array = g_ptr_array_new_with_free_func (g_object_unref);
 
