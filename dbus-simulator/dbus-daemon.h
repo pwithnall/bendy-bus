@@ -20,6 +20,8 @@
 #include <glib.h>
 #include <glib-object.h>
 
+#include "program-wrapper.h"
+
 #ifndef DSIM_DBUS_DAEMON_H
 #define DSIM_DBUS_DAEMON_H
 
@@ -35,20 +37,17 @@ G_BEGIN_DECLS
 typedef struct _DsimDBusDaemonPrivate	DsimDBusDaemonPrivate;
 
 typedef struct {
-	GObject parent;
+	DsimProgramWrapper parent;
 	DsimDBusDaemonPrivate *priv;
 } DsimDBusDaemon;
 
 typedef struct {
-	GObjectClass parent;
+	DsimProgramWrapperClass parent;
 } DsimDBusDaemonClass;
 
 GType dsim_dbus_daemon_get_type (void) G_GNUC_CONST;
 
 DsimDBusDaemon *dsim_dbus_daemon_new (GFile *working_directory, GFile *configuration_file) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
-
-void dsim_dbus_daemon_spawn (DsimDBusDaemon *self, GError **error);
-void dsim_dbus_daemon_kill (DsimDBusDaemon *self);
 
 const gchar *dsim_dbus_daemon_get_bus_address (DsimDBusDaemon *self) G_GNUC_PURE;
 

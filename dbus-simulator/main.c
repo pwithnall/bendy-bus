@@ -69,7 +69,7 @@ main_data_clear (MainData *data)
 	g_free (data->dbus_address);
 	g_ptr_array_unref (data->simulated_objects);
 
-	dsim_dbus_daemon_kill (data->dbus_daemon);
+	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->dbus_daemon));
 	g_clear_object (&data->dbus_daemon);
 
 	g_main_loop_unref (data->main_loop);
@@ -91,7 +91,7 @@ connection_close_cb (GObject *source_object, GAsyncResult *result, MainData *dat
 	}
 
 	/* Kill the dbus-daemon instance. */
-	dsim_dbus_daemon_kill (data->dbus_daemon);
+	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->dbus_daemon));
 
 	/* Quit everything */
 	g_main_loop_quit (data->main_loop);
@@ -283,7 +283,7 @@ main (int argc, char *argv[])
 	/* Start up our own private dbus-daemon instance. */
 	/* TODO */
 	data.dbus_daemon = dsim_dbus_daemon_new (g_file_new_for_path ("/tmp/dbus"), g_file_new_for_path ("/tmp/dbus/config.xml"));
-	dsim_dbus_daemon_spawn (data.dbus_daemon, &error);
+	dsim_program_wrapper_spawn (DSIM_PROGRAM_WRAPPER (data.dbus_daemon), &error);
 
 	if (error != NULL) {
 		g_printerr (_("Error spawning private dbus-daemon instance: %s"), error->message);

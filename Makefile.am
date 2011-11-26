@@ -145,7 +145,10 @@ GITIGNOREFILES += \
 bin_PROGRAMS += dbus-simulator/dbus-simulator
 
 dbus_simulator_dbus_simulator_SOURCES = \
+	$(dbus_simulator_marshal_sources) \
 	dbus-simulator/main.c \
+	dbus-simulator/program-wrapper.c \
+	dbus-simulator/program-wrapper.h \
 	dbus-simulator/dbus-daemon.c \
 	dbus-simulator/dbus-daemon.h \
 	$(NULL)
@@ -177,6 +180,20 @@ GITIGNOREFILES += \
 	dbus-simulator/.dirstamp \
 	dbus-simulator/.libs/ \
 	$(NULL)
+
+# Marshalling
+dbus_simulator_marshal_sources = \
+	dbus-simulator/marshal.c \
+	dbus-simulator/marshal.h \
+	$(NULL)
+
+dbus-simulator/marshal.h: $(top_srcdir)/dbus-simulator/marshal.list
+	$(AM_V_GEN) $(GLIB_GENMARSHAL) --prefix=dsim_marshal --header $< > $@
+dbus-simulator/marshal.c: $(top_srcdir)/dbus-simulator/marshal.list dbus-simulator/marshal.h
+	$(AM_V_GEN) $(GLIB_GENMARSHAL) --prefix=dsim_marshal --header --body $< > $@
+
+EXTRA_DIST += $(top_srcdir)/dbus-simulator/marshal.list
+CLEANFILES += $(dbus_simulator_marshal_sources)
 
 # Gubbins
 ACLOCAL_AMFLAGS = -I m4
