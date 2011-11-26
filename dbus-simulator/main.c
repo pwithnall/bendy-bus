@@ -199,7 +199,8 @@ dbus_daemon_notify_bus_address_cb (GObject *gobject, GParamSpec *pspec, MainData
 	g_assert (data->dbus_address == NULL);
 	data->dbus_address = g_strdup (dsim_dbus_daemon_get_bus_address (data->dbus_daemon));
 
-	g_dbus_connection_new_for_address (data->dbus_address, G_DBUS_CONNECTION_FLAGS_MESSAGE_BUS_CONNECTION, NULL, NULL,
+	g_dbus_connection_new_for_address (data->dbus_address,
+	                                   G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT | G_DBUS_CONNECTION_FLAGS_MESSAGE_BUS_CONNECTION, NULL, NULL,
 	                                   (GAsyncReadyCallback) connection_created_cb, data);
 
 	/* We don't want this to fire again. */
@@ -333,6 +334,7 @@ main (int argc, char *argv[])
 	/* Start up our own private dbus-daemon instance. */
 	/* TODO */
 	data.dbus_daemon = dsim_dbus_daemon_new (g_file_new_for_path ("/tmp/dbus"), g_file_new_for_path ("/tmp/dbus/config.xml"));
+	data.dbus_address = NULL;
 	g_signal_connect (data.dbus_daemon, "notify::bus-address", (GCallback) dbus_daemon_notify_bus_address_cb, &data);
 
 	dsim_program_wrapper_spawn (DSIM_PROGRAM_WRAPPER (data.dbus_daemon), &error);
