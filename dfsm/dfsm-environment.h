@@ -68,6 +68,7 @@ gboolean dfsm_environment_has_variable (DfsmEnvironment *self, DfsmVariableScope
 GVariantType *dfsm_environment_dup_variable_type (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name) DFSM_CONSTRUCTOR;
 GVariant *dfsm_environment_dup_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name) DFSM_CONSTRUCTOR;
 void dfsm_environment_set_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name, GVariant *new_value);
+void dfsm_environment_unset_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name);
 
 const DfsmFunctionInfo *dfsm_environment_get_function_info (const gchar *function_name) G_GNUC_PURE;
 

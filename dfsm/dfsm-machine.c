@@ -534,6 +534,7 @@ dfsm_machine_stop_simulation (DfsmMachine *self)
 /**
  * dfsm_machine_call_method:
  * @self: a #DfsmMachine
+ * @interface_name: the name of the D-Bus interface that @method_name is defined on
  * @method_name: the name of the D-Bus method to call
  * @parameters: parameters for the D-Bus method
  * @error: a #GError
@@ -546,15 +547,20 @@ dfsm_machine_stop_simulation (DfsmMachine *self)
  * Return value: (transfer full): return value from the method call, or %NULL
  */
 GVariant *
-dfsm_machine_call_method (DfsmMachine *self, const gchar *method_name, GVariant *parameters, GError **error)
+dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const gchar *method_name, GVariant *parameters, GError **error)
 {
 	DfsmMachinePrivate *priv;
 	GPtrArray/*<DfsmAstTransition>*/ *possible_transitions;
 	gboolean executed_transition = FALSE;
 	GVariant *return_value = NULL;
+	GDBusNodeInfo *node_info;
+	GDBusInterfaceInfo *interface_info;
+	GDBusMethodInfo *method_info;
+	guint i;
 	GError *child_error = NULL;
 
 	g_return_val_if_fail (DFSM_IS_MACHINE (self), NULL);
+	g_return_val_if_fail (interface_name != NULL && *interface_name != '\0', NULL);
 	g_return_val_if_fail (method_name != NULL && *method_name != '\0', NULL);
 	g_return_val_if_fail (parameters != NULL, NULL);
 	g_return_val_if_fail (error != NULL && *error == NULL, NULL);
@@ -578,8 +584,50 @@ dfsm_machine_call_method (DfsmMachine *self, const gchar *method_name, GVariant 
 		return g_variant_new_tuple (NULL, 0);
 	}
 
+	/* Add the method's in parameters to the environment. */
+	node_info = dfsm_environment_get_dbus_node_info (priv->environment);
+
+	interface_info = g_dbus_node_info_lookup_interface (node_info, interface_name);
+
+	if (interface_info == NULL) {
+		g_warning ("Runtime error in simulation: Couldn't find interface containing method ‘%s’.", method_name);
+		return g_variant_new_tuple (NULL, 0);
+	}
+
+	method_info = g_dbus_interface_info_lookup_method (interface_info, method_name);
+
+	if (method_info == NULL) {
+		g_warning ("Runtime error in simulation: Couldn't find interface containing method ‘%s’.", method_name);
+		return g_variant_new_tuple (NULL, 0);
+	}
+
+	/* Add the parameters to the environment. */
+	if (method_info->in_args != NULL) {
+		for (i = 0; method_info->in_args[i] != NULL && i < g_variant_n_children (parameters); i++) {
+			GVariant *parameter;
+
+			/* Add the (i)th tuple child of the input parameters to the environment with the name given by the (i)th in argument in the
+			 * method info. */
+			parameter = g_variant_get_child_value (parameters, i);
+			dfsm_environment_set_variable_value (priv->environment, DFSM_VARIABLE_SCOPE_LOCAL, method_info->in_args[i]->name, parameter);
+			g_variant_unref (parameter);
+		}
+	}
+
+	if (method_info->in_args[i] != NULL || i < g_variant_n_children (parameters)) {
+		g_warning ("Runtime error in simulation: mismatch between interface and input of in-args for method ‘%s’. Continuing.", method_name);
+	}
+
 	/* Find and potentially execute a transition from the array. */
 	return_value = find_and_execute_random_transition (self, possible_transitions, &executed_transition, &child_error);
+
+	/* Restore the environment. */
+	if (method_info->in_args != NULL) {
+		for (i = 0; method_info->in_args[i] != NULL && i < g_variant_n_children (parameters); i++) {
+			/* Remove the variable with the name given by the (i)th in argument in the method info from the environment. */
+			dfsm_environment_unset_variable_value (priv->environment, DFSM_VARIABLE_SCOPE_LOCAL, method_info->in_args[i]->name);
+		}
+	}
 
 	/* If we failed to execute a transition, warn and return the unit tuple. */
 	if (executed_transition == FALSE && child_error == NULL) {

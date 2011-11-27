@@ -182,25 +182,28 @@ _dfsm_environment_new (GDBusNodeInfo *dbus_node_info)
 	                     NULL);
 }
 
+static GHashTable *
+get_map_for_scope (DfsmEnvironment *self, DfsmVariableScope scope)
+{
+	/* Get the right map to extract the variable from. */
+	switch (scope) {
+		case DFSM_VARIABLE_SCOPE_LOCAL:
+			return self->priv->local_variables;
+		case DFSM_VARIABLE_SCOPE_OBJECT:
+			return self->priv->object_variables;
+		default:
+			g_assert_not_reached ();
+	}
+}
+
 static VariableInfo *
 look_up_variable_info (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name, gboolean create_if_nonexistent)
 {
 	GHashTable *variable_map;
 	VariableInfo *variable_info;
 
-	/* Get the right map to extract the variable from. */
-	switch (scope) {
-		case DFSM_VARIABLE_SCOPE_LOCAL:
-			variable_map = self->priv->local_variables;
-			break;
-		case DFSM_VARIABLE_SCOPE_OBJECT:
-			variable_map = self->priv->object_variables;
-			break;
-		default:
-			g_assert_not_reached ();
-	}
-
 	/* Grab the variable. */
+	variable_map = get_map_for_scope (self, scope);
 	variable_info = g_hash_table_lookup (variable_map, variable_name);
 
 	/* Create the data if it doesn't exist. The members of variable_info will be filled in later by the caller. */
@@ -313,6 +316,27 @@ dfsm_environment_set_variable_value (DfsmEnvironment *self, DfsmVariableScope sc
 		variable_info->type = g_variant_type_copy (g_variant_get_type (new_value));
 		variable_info->value = g_variant_ref (new_value);
 	}
+}
+
+/**
+ * dfsm_environment_unset_variable_value:
+ * @self: a #DfsmEnvironment
+ * @scope: the scope of the variable
+ * @variable_name: the name of the variable in the given @scope
+ *
+ * Unset the value of the variable named @variable_name in @scope.
+ */
+void
+dfsm_environment_unset_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name)
+{
+	GHashTable *variable_map;
+
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (self));
+	g_return_if_fail (variable_name != NULL);
+
+	/* Remove the variable. */
+	variable_map = get_map_for_scope (self, scope);
+	g_hash_table_remove (variable_map, variable_name);
 }
 
 static const DfsmFunctionInfo _function_info[] = {

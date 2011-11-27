@@ -372,7 +372,7 @@ dfsm_object_dbus_method_call (GDBusConnection *connection, const gchar *sender, 
 	g_free (parameters_string);
 
 	/* Pass the method call through to the DFSM. */
-	return_value = dfsm_machine_call_method (priv->machine, method_name, parameters, &child_error);
+	return_value = dfsm_machine_call_method (priv->machine, interface_name, method_name, parameters, &child_error);
 
 	if (child_error != NULL) {
 		/* Debug output. */

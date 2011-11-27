@@ -88,7 +88,8 @@ GType dfsm_machine_get_type (void) G_GNUC_CONST;
 void dfsm_machine_start_simulation (DfsmMachine *self);
 void dfsm_machine_stop_simulation (DfsmMachine *self);
 
-GVariant *dfsm_machine_call_method (DfsmMachine *self, const gchar *method_name, GVariant *parameters, GError **error) DFSM_CONSTRUCTOR;
+GVariant *dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const gchar *method_name, GVariant *parameters,
+                                    GError **error) DFSM_CONSTRUCTOR;
 
 DfsmEnvironment *dfsm_machine_get_environment (DfsmMachine *self) G_GNUC_PURE;
 
