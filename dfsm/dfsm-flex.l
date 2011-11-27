@@ -168,6 +168,7 @@ DOUBLE					(\+-)?[0-9]+\.[0-9]+d
 "to" { return TO; }
 "on" { return ON; }
 "method" { return METHOD; }
+"random" { return RANDOM; }
 "precondition" { return PRECONDITION; }
 "throwing" { return THROWING; }
 "throw" { return THROW; }

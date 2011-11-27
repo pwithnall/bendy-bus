@@ -96,6 +96,7 @@
 %token STATES
 %token TRANSITION
 %token METHOD
+%token RANDOM
 %token ON
 %token THROW
 %token EMIT
@@ -261,7 +262,7 @@ DBusMethodName: IDENTIFIER							{ $$ = $1; /* steal ownership from flex */ }
 
 /* Returns a string representing the transition type. We hackily mix "*" in with method names, since it can never be a valid method name. */
 TransitionType: METHOD DBusMethodName						{ $$ = $2; /* steal ownership from flex */ }
-              | '*'								{ $$ = g_strdup ("*"); }
+              | RANDOM								{ $$ = g_strdup ("*"); }
 ;
 
 /* Returns a new GPtrArray containing DfsmAstPreconditions. */
