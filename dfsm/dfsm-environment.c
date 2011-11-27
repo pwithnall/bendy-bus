@@ -300,9 +300,14 @@ void
 dfsm_environment_set_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name, GVariant *new_value)
 {
 	VariableInfo *variable_info;
+	gchar *new_value_string;
 
 	g_return_if_fail (DFSM_IS_ENVIRONMENT (self));
 	g_return_if_fail (variable_name != NULL);
+
+	new_value_string = g_variant_print (new_value, FALSE);
+	g_debug ("Setting variable ‘%s’ (scope: %u) in environment %p to value: %s", variable_name, scope, self, new_value_string);
+	g_free (new_value_string);
 
 	variable_info = look_up_variable_info (self, scope, variable_name, TRUE);
 	g_assert (variable_info != NULL);
@@ -333,6 +338,8 @@ dfsm_environment_unset_variable_value (DfsmEnvironment *self, DfsmVariableScope 
 
 	g_return_if_fail (DFSM_IS_ENVIRONMENT (self));
 	g_return_if_fail (variable_name != NULL);
+
+	g_debug ("Unsetting variable ‘%s’ (scope: %u) in environment %p.", variable_name, scope, self);
 
 	/* Remove the variable. */
 	variable_map = get_map_for_scope (self, scope);

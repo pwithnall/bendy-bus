@@ -272,8 +272,11 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstTransi
 	g_assert (executed_transition != NULL);
 	*executed_transition = FALSE;
 
+	g_debug ("Finding a transition out of %u possibles.", possible_transitions->len);
+
 	/* If there are no possible transitions, bail out. */
 	if (possible_transitions->len == 0) {
+		g_debug ("…No possible transitions.");
 		goto done;
 	}
 
@@ -287,11 +290,14 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstTransi
 
 		/* Check we're in the right starting state. */
 		if (get_state_number_from_name (self, transition->from_state_name) != priv->machine_state) {
+			g_debug ("…Skipping transition %p due to being in the wrong state.", transition);
 			continue;
 		}
 
 		/* If this transition's preconditions are satisfied, execute it. Otherwise, loop round and try the next transition. */
 		if (dfsm_ast_transition_check_preconditions (transition, priv->environment, &child_error) == FALSE) {
+			g_debug ("…Skipping transition %p due to precondition failures.", transition);
+
 			/* Errors? These will either be runtime errors in evaluating the condition, or (more likely) errors thrown as a result of
 			 * precondition failure. In either case, we store the first occurrence and loop round to try the next transition instead. */
 			if (child_error != NULL) {
@@ -310,11 +316,18 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstTransi
 		g_clear_error (&precondition_error);
 
 		/* Execute the transition. */
+		g_debug ("…Executing transition %p.", transition);
 		return_value = dfsm_ast_transition_execute (transition, priv->environment, &child_error);
 
 		/* Various possibilities for return values. */
 		if (child_error == NULL) {
+			gchar *return_value_string;
+
 			/* Success, with or without a return value. */
+			return_value_string = (return_value != NULL) ? g_variant_print (return_value, TRUE) : g_strdup ("(null)");
+			g_debug ("…(Successful, with return value: %s.)", return_value_string);
+			g_free (return_value_string);
+
 			*executed_transition = TRUE;
 
 			/* Change machine state. */
@@ -322,6 +335,8 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstTransi
 			g_object_notify (G_OBJECT (self), "machine-state");
 		} else if (return_value == NULL && child_error != NULL) {
 			/* Error, either during execution or as a result of a throw statement. Don't change states. */
+			g_debug ("…(Error: %s)", child_error->message);
+
 			g_propagate_error (error, child_error);
 			*executed_transition = FALSE;
 		} else {
