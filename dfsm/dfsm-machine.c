@@ -544,7 +544,7 @@ dfsm_machine_stop_simulation (DfsmMachine *self)
  *
  * Any signal emissions and property changes which occur as a result of the method call will be made while this function is running.
  *
- * Return value: (transfer full): return value from the method call, or %NULL
+ * Return value: (transfer full): non-floating return value from the method call, or %NULL
  */
 GVariant *
 dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const gchar *method_name, GVariant *parameters, GError **error)
@@ -571,7 +571,7 @@ dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const 
 	if (priv->simulation_status != DFSM_SIMULATION_STATUS_STARTED) {
 		g_set_error (error, DFSM_SIMULATION_ERROR, DFSM_SIMULATION_ERROR_INVALID_STATUS,
 		             "Can't call a D-Bus method if the simulation isn't running.");
-		return NULL;
+		goto done;
 	}
 
 	/* Look up the method name in our set of transitions which are triggered by method calls */
@@ -581,7 +581,7 @@ dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const 
 		/* Unknown method call. Spit out a warning and then return the unit tuple. If this is of the wrong type, then tough. We don't want
 		 * to start trying to make up arbitrary data structures to match a given method return type. */
 		g_warning ("Unrecognized method call to ‘%s’ on DFSM. Ignoring method call.", method_name);
-		return g_variant_new_tuple (NULL, 0);
+		goto done;
 	}
 
 	/* Add the method's in parameters to the environment. */
@@ -591,14 +591,14 @@ dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const 
 
 	if (interface_info == NULL) {
 		g_warning ("Runtime error in simulation: Couldn't find interface containing method ‘%s’.", method_name);
-		return g_variant_new_tuple (NULL, 0);
+		goto done;
 	}
 
 	method_info = g_dbus_interface_info_lookup_method (interface_info, method_name);
 
 	if (method_info == NULL) {
 		g_warning ("Runtime error in simulation: Couldn't find interface containing method ‘%s’.", method_name);
-		return g_variant_new_tuple (NULL, 0);
+		goto done;
 	}
 
 	/* Add the parameters to the environment. */
@@ -629,18 +629,20 @@ dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const 
 		}
 	}
 
+done:
 	/* If we failed to execute a transition, warn and return the unit tuple. */
 	if (executed_transition == FALSE && child_error == NULL) {
 		g_warning ("Failed to execute any DFSM transitions as a result of method call ‘%s’. Ignoring method call.", method_name);
-		return g_variant_new_tuple (NULL, 0);
-	} else if (executed_transition == TRUE && return_value != NULL) {
-		/* Success! */
-		return return_value;
-	} else {
+		return_value = g_variant_new_tuple (NULL, 0);
+	} else if (executed_transition == FALSE || return_value == NULL) {
 		/* Error or precondition failure */
 		g_propagate_error (error, child_error);
-		return NULL;
 	}
+
+	g_assert (return_value == NULL || g_variant_is_floating (return_value) == FALSE);
+	g_assert ((return_value != NULL) != (child_error != NULL));
+
+	return return_value;
 }
 
 /**

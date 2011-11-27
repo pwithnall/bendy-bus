@@ -392,15 +392,17 @@ dfsm_object_dbus_method_call (GDBusConnection *connection, const gchar *sender, 
 		g_clear_error (&child_error);
 	} else if (return_value != NULL) {
 		GVariant *tuple_return_value;
-		GVariant *tuple_children[] = { NULL };
 		gchar *tuple_return_value_string;
 
 		/* Success! Return this value as a reply. If it's not a tuple, wrap it in one to satisfy GDBus. */
 		if (g_variant_is_of_type (return_value, G_VARIANT_TYPE_TUPLE) == TRUE) {
 			tuple_return_value = g_variant_ref (return_value);
 		} else {
-			tuple_children[0] = return_value;
-			tuple_return_value = g_variant_new_tuple (tuple_children, 1);
+			GVariantBuilder builder;
+
+			g_variant_builder_init (&builder, G_VARIANT_TYPE_TUPLE);
+			g_variant_builder_add_value (&builder, return_value);
+			tuple_return_value = g_variant_builder_end (&builder);
 		}
 
 		/* Debug output. */

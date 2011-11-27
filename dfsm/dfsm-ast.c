@@ -404,17 +404,22 @@ dfsm_ast_expression_calculate_type (DfsmAstExpression *expression)
  *
  * This assumes that the expression has already been checked, and so this does not perform any type checking of its own.
  *
- * Return value: (transfer full): the type of the expression
+ * Return value: (transfer full): non-floating value of the expression
  */
 GVariant *
 dfsm_ast_expression_evaluate (DfsmAstExpression *expression, DfsmEnvironment *environment, GError **error)
 {
+	GVariant *return_value;
+
 	g_return_val_if_fail (expression != NULL, NULL);
 	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), NULL);
 	g_return_val_if_fail (error != NULL && *error == NULL, NULL);
 
 	g_assert (expression->evaluate_func != NULL);
-	return expression->evaluate_func (expression, environment, error);
+	return_value = expression->evaluate_func (expression, environment, error);
+	g_assert (return_value == NULL || g_variant_is_floating (return_value) == FALSE);
+
+	return return_value;
 }
 
 static void
@@ -848,6 +853,9 @@ _dfsm_ast_expression_unary_evaluate (DfsmAstExpression *expression, DfsmEnvironm
 	/* Tidy up and return */
 	g_variant_unref (child_value);
 
+	g_assert (g_variant_is_floating (unary_value) == TRUE);
+	g_variant_ref_sink (unary_value); /* sink reference */
+
 	return unary_value;
 }
 
@@ -1199,6 +1207,9 @@ _dfsm_ast_expression_binary_evaluate (DfsmAstExpression *expression, DfsmEnviron
 	/* Tidy up and return */
 	g_variant_unref (right_value);
 	g_variant_unref (left_value);
+
+	g_assert (g_variant_is_floating (binary_value) == TRUE);
+	g_variant_ref_sink (binary_value); /* sink reference */
 
 	return binary_value;
 }
@@ -1856,7 +1867,7 @@ dfsm_ast_data_structure_calculate_type (DfsmAstDataStructure *data_structure, Df
  * This assumes that the @data_structure has been successfully checked by dfsm_ast_node_check() beforehand. It is an error to call this function
  * otherwise.
  *
- * Return value: (transfer full): the #GVariant representation of the data structure
+ * Return value: (transfer full): the non-floating #GVariant representation of the data structure
  */
 GVariant *
 dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *data_structure, DfsmEnvironment *environment, GError **error)
@@ -1865,31 +1876,35 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *data_structure, DfsmEn
 	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), NULL);
 	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
+	/* NOTE: We have to sink all floating references from here to guarantee that we always return a value of the same floatiness. The alternative
+	 * is to always return a floating reference, but that would require modifying dfsm_ast_variable_to_variant() to somehow return a floating
+	 * reference, which in turn probably means deep-copying the variable value. Ouch. */
+
 	switch (data_structure->data_structure_type) {
 		case DFSM_AST_DATA_BYTE:
-			return g_variant_new_byte (data_structure->byte_val);
+			return g_variant_ref_sink (g_variant_new_byte (data_structure->byte_val));
 		case DFSM_AST_DATA_BOOLEAN:
-			return g_variant_new_boolean (data_structure->boolean_val);
+			return g_variant_ref_sink (g_variant_new_boolean (data_structure->boolean_val));
 		case DFSM_AST_DATA_INT16:
-			return g_variant_new_int16 (data_structure->int16_val);
+			return g_variant_ref_sink (g_variant_new_int16 (data_structure->int16_val));
 		case DFSM_AST_DATA_UINT16:
-			return g_variant_new_uint16 (data_structure->uint16_val);
+			return g_variant_ref_sink (g_variant_new_uint16 (data_structure->uint16_val));
 		case DFSM_AST_DATA_INT32:
-			return g_variant_new_int32 (data_structure->int32_val);
+			return g_variant_ref_sink (g_variant_new_int32 (data_structure->int32_val));
 		case DFSM_AST_DATA_UINT32:
-			return g_variant_new_uint32 (data_structure->uint32_val);
+			return g_variant_ref_sink (g_variant_new_uint32 (data_structure->uint32_val));
 		case DFSM_AST_DATA_INT64:
-			return g_variant_new_int64 (data_structure->int64_val);
+			return g_variant_ref_sink (g_variant_new_int64 (data_structure->int64_val));
 		case DFSM_AST_DATA_UINT64:
-			return g_variant_new_uint64 (data_structure->uint64_val);
+			return g_variant_ref_sink (g_variant_new_uint64 (data_structure->uint64_val));
 		case DFSM_AST_DATA_DOUBLE:
-			return g_variant_new_double (data_structure->double_val);
+			return g_variant_ref_sink (g_variant_new_double (data_structure->double_val));
 		case DFSM_AST_DATA_STRING:
-			return g_variant_new_string (data_structure->string_val);
+			return g_variant_ref_sink (g_variant_new_string (data_structure->string_val));
 		case DFSM_AST_DATA_OBJECT_PATH:
-			return g_variant_new_object_path (data_structure->object_path_val);
+			return g_variant_ref_sink (g_variant_new_object_path (data_structure->object_path_val));
 		case DFSM_AST_DATA_SIGNATURE:
-			return g_variant_new_signature (data_structure->signature_val);
+			return g_variant_ref_sink (g_variant_new_signature (data_structure->signature_val));
 		case DFSM_AST_DATA_ARRAY: {
 			GVariantBuilder builder;
 			guint i;
@@ -1917,7 +1932,7 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *data_structure, DfsmEn
 				g_variant_unref (child_value);
 			}
 
-			return g_variant_builder_end (&builder);
+			return g_variant_ref_sink (g_variant_builder_end (&builder));
 		}
 		case DFSM_AST_DATA_STRUCT: {
 			GVariantBuilder builder;
@@ -1946,10 +1961,10 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *data_structure, DfsmEn
 				g_variant_unref (child_value);
 			}
 
-			return g_variant_builder_end (&builder);
+			return g_variant_ref_sink (g_variant_builder_end (&builder));
 		}
 		case DFSM_AST_DATA_VARIANT:
-			return g_variant_new_variant (data_structure->variant_val);
+			return g_variant_ref_sink (g_variant_new_variant (data_structure->variant_val));
 		case DFSM_AST_DATA_DICT: {
 			GVariantBuilder builder;
 			guint i;
@@ -1991,12 +2006,12 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *data_structure, DfsmEn
 				g_variant_unref (key_value);
 			}
 
-			return g_variant_builder_end (&builder);
+			return g_variant_ref_sink (g_variant_builder_end (&builder));
 		}
 		case DFSM_AST_DATA_UNIX_FD:
-			return g_variant_new_uint32 (data_structure->unix_fd_val);
+			return g_variant_ref_sink (g_variant_new_uint32 (data_structure->unix_fd_val));
 		case DFSM_AST_DATA_REGEXP:
-			return g_variant_new_string (data_structure->regexp_val);
+			return g_variant_ref_sink (g_variant_new_string (data_structure->regexp_val));
 		case DFSM_AST_DATA_VARIABLE:
 			return dfsm_ast_variable_to_variant (data_structure->variable_val, environment, error);
 		default:
@@ -2467,6 +2482,8 @@ dfsm_ast_transition_execute (DfsmAstTransition *transition, DfsmEnvironment *env
 		}
 	}
 
+	g_assert (return_value == NULL || g_variant_is_floating (return_value) == FALSE);
+
 	return return_value;
 }
 
@@ -2577,6 +2594,8 @@ dfsm_ast_precondition_check (DfsmAstPrecondition *precondition, DfsmEnvironment 
 		g_dbus_error_set_dbus_error (error, precondition->error_name, "Precondition failed.", NULL);
 	}
 
+	g_variant_unref (condition_value);
+
 	return condition_holds;
 }
 
@@ -2618,12 +2637,17 @@ _dfsm_ast_statement_init (DfsmAstStatement *statement, DfsmAstStatementType stat
 GVariant *
 dfsm_ast_statement_execute (DfsmAstStatement *statement, DfsmEnvironment *environment, GError **error)
 {
+	GVariant *return_value;
+
 	g_return_val_if_fail (statement != NULL, NULL);
 	g_return_val_if_fail (environment != NULL, NULL);
 	g_return_val_if_fail (error != NULL && *error == NULL, NULL);
 
 	g_assert (statement->execute_func != NULL);
-	return statement->execute_func (statement, environment, error);
+	return_value = statement->execute_func (statement, environment, error);
+	g_assert (return_value == NULL || g_variant_is_floating (return_value) == FALSE);
+
+	return return_value;
 }
 
 static void
@@ -3118,11 +3142,16 @@ dfsm_ast_variable_calculate_type (DfsmAstVariable *variable, DfsmEnvironment *en
 GVariant *
 dfsm_ast_variable_to_variant (DfsmAstVariable *variable, DfsmEnvironment *environment, GError **error)
 {
+	GVariant *return_value;
+
 	g_return_val_if_fail (variable != NULL, NULL);
 	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), NULL);
 	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
-	return dfsm_environment_dup_variable_value (environment, variable->scope, variable->variable_name);
+	return_value = dfsm_environment_dup_variable_value (environment, variable->scope, variable->variable_name);
+	g_assert (return_value != NULL && g_variant_is_floating (return_value) == FALSE);
+
+	return return_value;
 }
 
 /**
