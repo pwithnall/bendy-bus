@@ -40,7 +40,7 @@ dfsm_simulation_status_get_type (void)
 	if (etype == 0) {
 		static const GEnumValue values[] = {
 			{ DFSM_SIMULATION_STATUS_STOPPED, "DFSM_SIMULATION_STATUS_STOPPED", "stopped" },
-			{ DFSM_SIMULATION_STATUS_STARTED, "DFSM_SIMULATION_STATUS_STATED", "started" },
+			{ DFSM_SIMULATION_STATUS_STARTED, "DFSM_SIMULATION_STATUS_STARTED", "started" },
 			{ 0, NULL, NULL }
 		};
 
