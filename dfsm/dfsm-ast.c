@@ -248,6 +248,7 @@ dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GP
 {
 	DfsmAstObject *object;
 	guint i;
+	GPtrArray *states;
 
 	g_return_val_if_fail (dbus_node_info != NULL, NULL);
 	g_return_val_if_fail (object_path != NULL && *object_path != '\0', NULL);
@@ -306,9 +307,13 @@ dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GP
 		}
 	}
 
-	/* States */
+	/* States. Add the last state of the first state block to the object->states array first, since it's the first state listed in the source
+	 * file (it just appears in a different position due to the way the parser's recursion is implemented). i.e. It's the main state. */
+	/* TODO: We assume we have at least one state block here, containing at least one state name. */
+	states = g_ptr_array_index (state_blocks, 0);
+	g_ptr_array_add (object->states, g_strdup ((gchar*) g_ptr_array_index (states, states->len - 1)));
+
 	for (i = 0; i < state_blocks->len; i++) {
-		GPtrArray *states;
 		guint f;
 
 		states = g_ptr_array_index (state_blocks, i);
@@ -316,6 +321,11 @@ dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GP
 		for (f = 0; f < states->len; f++) {
 			const gchar *state_name;
 			guint g;
+
+			/* Skip the main state. */
+			if (i == 0 && f == states->len - 1) {
+				continue;
+			}
 
 			state_name = g_ptr_array_index (states, f);
 

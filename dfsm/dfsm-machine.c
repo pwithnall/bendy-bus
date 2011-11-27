@@ -156,6 +156,7 @@ static void
 dfsm_machine_init (DfsmMachine *self)
 {
 	self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, DFSM_TYPE_MACHINE, DfsmMachinePrivate);
+	self->priv->machine_state = DFSM_MACHINE_STARTING_STATE;
 }
 
 static void
