@@ -381,8 +381,21 @@ dfsm_object_dbus_method_call (GDBusConnection *connection, const gchar *sender, 
 
 		g_clear_error (&child_error);
 	} else if (return_value != NULL) {
-		/* Success! Return this value as a reply. */
-		g_dbus_method_invocation_return_value (invocation, return_value);
+		GVariant *tuple_return_value;
+		GVariant *tuple_children[] = { NULL };
+
+		/* Success! Return this value as a reply. If it's not a tuple, wrap it in one to satisfy GDBus. */
+		if (g_variant_is_of_type (return_value, G_VARIANT_TYPE_TUPLE) == TRUE) {
+			tuple_return_value = g_variant_ref (return_value);
+		} else {
+			tuple_children[0] = return_value;
+			tuple_return_value = g_variant_new_tuple (tuple_children, 1);
+		}
+
+		/* Return the tuple. */
+		g_dbus_method_invocation_return_value (invocation, tuple_return_value);
+
+		g_variant_unref (tuple_return_value);
 		g_variant_unref (return_value);
 	} else {
 		/* Success, but no value to return. */
