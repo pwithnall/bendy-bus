@@ -301,9 +301,9 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstTransi
 				}
 
 				g_clear_error (&child_error);
-
-				continue;
 			}
+
+			continue;
 		}
 
 		/* We're found a transition whose preconditions pass, so forget about any previous precondition failures. */
@@ -316,18 +316,17 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstTransi
 		if (child_error == NULL) {
 			/* Success, with or without a return value. */
 			*executed_transition = TRUE;
+
+			/* Change machine state. */
+			priv->machine_state = get_state_number_from_name (self, transition->to_state_name);
+			g_object_notify (G_OBJECT (self), "machine-state");
 		} else if (return_value == NULL && child_error != NULL) {
 			/* Error, either during execution or as a result of a throw statement. Don't change states. */
 			g_propagate_error (error, child_error);
 			*executed_transition = FALSE;
-			break;
 		} else {
 			g_assert_not_reached ();
 		}
-
-		/* Change machine state. */
-		priv->machine_state = get_state_number_from_name (self, transition->to_state_name);
-		g_object_notify (G_OBJECT (self), "machine-state");
 
 		break;
 	}
