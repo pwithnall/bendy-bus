@@ -2441,6 +2441,8 @@ dfsm_ast_transition_execute (DfsmAstTransition *transition, DfsmEnvironment *env
 	g_return_val_if_fail (environment != NULL, NULL);
 	g_return_val_if_fail (error != NULL && *error == NULL, NULL);
 
+	g_debug ("Executing transition from state ‘%s’ to ‘%s’.", transition->from_state_name, transition->to_state_name);
+
 	for (i = 0; i < transition->statements->len; i++) {
 		DfsmAstStatement *statement;
 		GVariant *_return_value;

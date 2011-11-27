@@ -362,12 +362,22 @@ dfsm_object_dbus_method_call (GDBusConnection *connection, const gchar *sender, 
 {
 	DfsmObjectPrivate *priv = DFSM_OBJECT (user_data)->priv;
 	GVariant *return_value;
+	gchar *parameters_string;
 	GError *child_error = NULL;
+
+	/* Debug output. */
+	parameters_string = g_variant_print (parameters, FALSE);
+	g_debug ("Method call from ‘%s’ to method ‘%s’ of interface ‘%s’ on object ‘%s’. Parameters: %s", sender, method_name, interface_name,
+	         object_path, parameters_string);
+	g_free (parameters_string);
 
 	/* Pass the method call through to the DFSM. */
 	return_value = dfsm_machine_call_method (priv->machine, method_name, parameters, &child_error);
 
 	if (child_error != NULL) {
+		/* Debug output. */
+		g_debug ("…Unsuccessful, with error: %s", child_error->message);
+
 		/* Error. It's either a runtime error from within the simulator, or a thrown D-Bus error from user code. */
 		if (g_dbus_error_is_remote_error (child_error) == TRUE) {
 			/* Thrown D-Bus error. */
@@ -383,6 +393,7 @@ dfsm_object_dbus_method_call (GDBusConnection *connection, const gchar *sender, 
 	} else if (return_value != NULL) {
 		GVariant *tuple_return_value;
 		GVariant *tuple_children[] = { NULL };
+		gchar *tuple_return_value_string;
 
 		/* Success! Return this value as a reply. If it's not a tuple, wrap it in one to satisfy GDBus. */
 		if (g_variant_is_of_type (return_value, G_VARIANT_TYPE_TUPLE) == TRUE) {
@@ -392,6 +403,11 @@ dfsm_object_dbus_method_call (GDBusConnection *connection, const gchar *sender, 
 			tuple_return_value = g_variant_new_tuple (tuple_children, 1);
 		}
 
+		/* Debug output. */
+		tuple_return_value_string = g_variant_print (tuple_return_value, FALSE);
+		g_debug ("…Successful, with return value: %s", tuple_return_value_string);
+		g_free (tuple_return_value_string);
+
 		/* Return the tuple. */
 		g_dbus_method_invocation_return_value (invocation, tuple_return_value);
 
@@ -399,6 +415,7 @@ dfsm_object_dbus_method_call (GDBusConnection *connection, const gchar *sender, 
 		g_variant_unref (return_value);
 	} else {
 		/* Success, but no value to return. */
+		g_debug ("…Successful, with no return value.");
 		g_dbus_method_invocation_return_value (invocation, NULL);
 	}
 }
