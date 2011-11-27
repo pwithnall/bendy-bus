@@ -103,7 +103,7 @@ DOUBLE					(\+-)?[0-9]+\.[0-9]+d
 	"\"" { /* closing quote */
 		BEGIN(string_caller);
 		*string_buf_ptr = '\0';
-		yylval->str = strdup (string_buf_ptr);
+		yylval->str = strdup (string_buf);
 		return STRING;
 	}
 
@@ -120,11 +120,14 @@ DOUBLE					(\+-)?[0-9]+\.[0-9]+d
 
 	\\(.|\n) { if (string_buf_ptr - string_buf + 1 > MAX_STRING_CONST_SIZE) { return FLEX_ERROR; } *string_buf_ptr++ = yytext[1]; }
 	[^\\\n\"]+ {
-		if (string_buf_ptr - string_buf + strlen (yytext) > MAX_STRING_CONST_SIZE) {
+		size_t yytext_len = strlen (yytext);
+
+		if (string_buf_ptr - string_buf + yytext_len > MAX_STRING_CONST_SIZE) {
 			return FLEX_ERROR;
 		}
 
-		strcpy (string_buf_ptr, yytext);
+		strncpy (string_buf_ptr, yytext, yytext_len);
+		string_buf_ptr += yytext_len;
 	}
 }
 
@@ -133,7 +136,7 @@ DOUBLE					(\+-)?[0-9]+\.[0-9]+d
 	"#" { /* closing delimiter */
 		BEGIN(regexp_caller);
 		*regexp_buf_ptr = '\0';
-		yylval->str = strdup (regexp_buf_ptr);
+		yylval->str = strdup (regexp_buf);
 		return REGEXP;
 	}
 
@@ -144,11 +147,14 @@ DOUBLE					(\+-)?[0-9]+\.[0-9]+d
 
 	\\(.|\n) { if (regexp_buf_ptr - regexp_buf + 1 > MAX_REGEXP_CONST_SIZE) { return FLEX_ERROR; } *regexp_buf_ptr++ = yytext[1]; }
 	[^\\\n\"]+ {
-		if (regexp_buf_ptr - regexp_buf + strlen (yytext) > MAX_REGEXP_CONST_SIZE) {
+		size_t yytext_len = strlen (yytext);
+
+		if (regexp_buf_ptr - regexp_buf + yytext_len > MAX_REGEXP_CONST_SIZE) {
 			return FLEX_ERROR;
 		}
 
-		strcpy (regexp_buf_ptr, yytext);
+		strncpy (regexp_buf_ptr, yytext, yytext_len);
+		regexp_buf_ptr += yytext_len;
 	}
 }
 
