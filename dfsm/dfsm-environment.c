@@ -202,15 +202,38 @@ look_up_variable_info (DfsmEnvironment *self, DfsmVariableScope scope, const gch
 
 	/* Grab the variable. */
 	variable_info = g_hash_table_lookup (variable_map, variable_name);
-	g_assert (create_if_nonexistent == TRUE || variable_info != NULL);
 
 	/* Create the data if it doesn't exist. The members of variable_info will be filled in later by the caller. */
-	if (variable_info == NULL) {
+	if (create_if_nonexistent == TRUE && variable_info == NULL) {
 		variable_info = g_slice_new0 (VariableInfo);
 		g_hash_table_insert (variable_map, g_strdup (variable_name), variable_info);
 	}
 
 	return variable_info;
+}
+
+/**
+ * dfsm_environment_has_variable:
+ * @self: a #DfsmEnvironment
+ * @scope: the scope of the variable
+ * @variable_name: the name of the variable in the given @scope
+ *
+ * Look up the value of the variable with the given @variable_name in @scope and see if it exists. This should only be used during the construction
+ * of abstract syntax trees, since all variables should be guaranteed to exist afterwards.
+ *
+ * Return value: %TRUE if the variable exists in the environment, %FALSE otherwise
+ */
+gboolean
+dfsm_environment_has_variable (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name)
+{
+	VariableInfo *variable_info;
+
+	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (self), FALSE);
+	g_return_val_if_fail (variable_name != NULL, FALSE);
+
+	variable_info = look_up_variable_info (self, scope, variable_name, FALSE);
+
+	return (variable_info != NULL) ? TRUE : FALSE;
 }
 
 /**
@@ -232,6 +255,7 @@ dfsm_environment_dup_variable_type (DfsmEnvironment *self, DfsmVariableScope sco
 	g_return_val_if_fail (variable_name != NULL, NULL);
 
 	variable_info = look_up_variable_info (self, scope, variable_name, FALSE);
+	g_assert (variable_info != NULL);
 
 	return g_variant_type_copy (variable_info->type);
 }
@@ -255,6 +279,7 @@ dfsm_environment_dup_variable_value (DfsmEnvironment *self, DfsmVariableScope sc
 	g_return_val_if_fail (variable_name != NULL, NULL);
 
 	variable_info = look_up_variable_info (self, scope, variable_name, FALSE);
+	g_assert (variable_info != NULL);
 
 	return g_variant_ref (variable_info->value);
 }
@@ -277,6 +302,7 @@ dfsm_environment_set_variable_value (DfsmEnvironment *self, DfsmVariableScope sc
 	g_return_if_fail (variable_name != NULL);
 
 	variable_info = look_up_variable_info (self, scope, variable_name, TRUE);
+	g_assert (variable_info != NULL);
 
 	if (variable_info->value != NULL) {
 		/* Variable already exists */

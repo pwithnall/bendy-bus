@@ -200,7 +200,7 @@ DataBlock:
 	R_BRACE									{ $$ = NULL; YYABORT; }
 ;
 
-/* Returns a new GHashTable mapping variable names (strings) to DfsmAstExpressions. */
+/* Returns a new GHashTable mapping variable names (strings) to DfsmAstDataStructures. */
 DataList: /* empty */
 		{
 			$$ = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) dfsm_ast_node_unref);

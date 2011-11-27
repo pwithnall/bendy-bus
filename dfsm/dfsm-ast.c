@@ -243,7 +243,7 @@ _dfsm_ast_object_free (DfsmAstNode *node)
  */
 DfsmAstObject *
 dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GPtrArray/*<string>*/ *interface_names,
-                     GPtrArray/*<GHashTable>*/ *data_blocks, GPtrArray/*<GPtrArray>*/ *state_blocks,
+                     GPtrArray/*<GHashTable<string,DfsmAstDataStructure>>*/ *data_blocks, GPtrArray/*<GPtrArray>*/ *state_blocks,
                      GPtrArray/*<DfsmAstTransition>*/ *transition_blocks, GError **error)
 {
 	DfsmAstObject *object;
@@ -272,29 +272,24 @@ dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GP
 		GHashTable *data_block;
 		GHashTableIter iter;
 		const gchar *key;
-		DfsmAstExpression *value_expression;
+		DfsmAstDataStructure *value_data_structure;
 
 		data_block = g_ptr_array_index (data_blocks, i);
 		g_hash_table_iter_init (&iter, data_block);
 
-		while (g_hash_table_iter_next (&iter, (gpointer*) &key, (gpointer*) &value_expression) == TRUE) {
-			GVariant *old_value, *new_value;
+		while (g_hash_table_iter_next (&iter, (gpointer*) &key, (gpointer*) &value_data_structure) == TRUE) {
+			GVariant *new_value;
 			GError *child_error = NULL;
 
 			/* Check for duplicates */
-			old_value = dfsm_environment_dup_variable_value (object->environment, DFSM_VARIABLE_SCOPE_OBJECT, key);
-
-			if (old_value != NULL) {
+			if (dfsm_environment_has_variable (object->environment, DFSM_VARIABLE_SCOPE_OBJECT, key) == TRUE) {
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Duplicate variable name: %s", key);
-				g_variant_unref (old_value);
 
 				goto error;
 			}
 
-			g_variant_unref (old_value);
-
 			/* Evaluate the value expression. */
-			new_value = dfsm_ast_expression_evaluate (value_expression, object->environment, &child_error);
+			new_value = dfsm_ast_data_structure_to_variant (value_data_structure, object->environment, &child_error);
 
 			if (child_error != NULL) {
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
