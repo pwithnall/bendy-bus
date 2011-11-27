@@ -359,6 +359,8 @@ done:
 	return return_value;
 }
 
+static void schedule_arbitrary_transition (DfsmMachine *self);
+
 /* This gets called continuously at random intervals while the simulation's running. It checks whether any arbitrary transitions can be taken,
  * and if so, follows one of them. */
 static gboolean
@@ -399,7 +401,24 @@ arbitrary_transition_timeout_cb (DfsmMachine *self)
 		g_error_free (child_error);
 	}
 
+	/* Schedule the next arbitrary transition. */
+	priv->timeout_id = 0;
+	schedule_arbitrary_transition (self);
+
 	return FALSE;
+}
+
+static void
+schedule_arbitrary_transition (DfsmMachine *self)
+{
+	guint32 timeout_period;
+
+	g_assert (self->priv->timeout_id == 0);
+
+	/* Add a random timeout to the next potential arbitrary transition. */
+	timeout_period = g_random_int_range (MIN_TIMEOUT, MAX_TIMEOUT);
+	g_debug ("Scheduling the next arbitrary transition in %u ms.", timeout_period);
+	self->priv->timeout_id = g_timeout_add (timeout_period, (GSourceFunc) arbitrary_transition_timeout_cb, self);
 }
 
 static void
@@ -487,7 +506,6 @@ void
 dfsm_machine_start_simulation (DfsmMachine *self)
 {
 	DfsmMachinePrivate *priv;
-	guint32 timeout_period;
 
 	g_return_if_fail (DFSM_IS_MACHINE (self));
 
@@ -501,9 +519,7 @@ dfsm_machine_start_simulation (DfsmMachine *self)
 	g_debug ("Starting the simulation.");
 
 	/* Add a random timeout to the next potential arbitrary transition. */
-	timeout_period = g_random_int_range (MIN_TIMEOUT, MAX_TIMEOUT);
-	g_debug ("Scheduling the next arbitrary transition in %u ms.", timeout_period);
-	priv->timeout_id = g_timeout_add (timeout_period, (GSourceFunc) arbitrary_transition_timeout_cb, self);
+	schedule_arbitrary_transition (self);
 
 	/* Change simulation status. */
 	priv->simulation_status = DFSM_SIMULATION_STATUS_STARTED;
