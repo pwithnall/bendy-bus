@@ -322,6 +322,7 @@ dfsm_object_dbus_signal_emission_cb (DfsmMachine *machine, const gchar *signal_n
 	GDBusNodeInfo *dbus_node_info;
 	GDBusInterfaceInfo **interfaces;
 	const gchar *interface_name = NULL;
+	GVariant *tuple_parameters;
 	GError *child_error = NULL;
 
 	g_return_if_fail (DFSM_IS_OBJECT (self));
@@ -347,8 +348,20 @@ dfsm_object_dbus_signal_emission_cb (DfsmMachine *machine, const gchar *signal_n
 		return;
 	}
 
-	/* Emit the signal. */
-	g_dbus_connection_emit_signal (priv->connection, NULL, priv->object_path, interface_name, signal_name, parameters, &child_error);
+	/* Emit the signal. If the parameter is not a tuple, wrap it in one to satisfy GDBus. */
+	if (g_variant_is_of_type (parameters, G_VARIANT_TYPE_TUPLE) == TRUE) {
+		tuple_parameters = g_variant_ref (parameters);
+	} else {
+		GVariantBuilder builder;
+
+		g_variant_builder_init (&builder, G_VARIANT_TYPE_TUPLE);
+		g_variant_builder_add_value (&builder, parameters);
+		tuple_parameters = g_variant_ref_sink (g_variant_builder_end (&builder));
+	}
+
+	g_dbus_connection_emit_signal (priv->connection, NULL, priv->object_path, interface_name, signal_name, tuple_parameters, &child_error);
+
+	g_variant_unref (tuple_parameters);
 
 	if (child_error != NULL) {
 		g_warning ("Runtime error in simulation while emitting D-Bus signal ‘%s’: %s", signal_name, child_error->message);
