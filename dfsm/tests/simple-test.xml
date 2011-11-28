@@ -1,0 +1,20 @@
+<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+<node>
+	<interface name="uk.ac.cam.cl.DBusSimulator.SimpleTest">
+		<method name="SingleStateEcho">
+			<arg type="s" name="greeting" direction="in"/>
+			<arg type="s" name="response" direction="out"/>
+		</method>
+		<method name="TwoStateEcho">
+			<arg type="s" name="greeting" direction="in"/>
+			<arg type="s" name="response" direction="out"/>
+		</method>
+		<signal name="SingleStateSignal">
+			<arg type="s" name="message"/>
+		</signal>
+		<signal name="CounterSignal">
+			<arg type="u" name="counter"/>
+		</signal>
+		<property type="s" name="ArbitraryProperty" access="readwrite"/>
+	</interface>
+</node>

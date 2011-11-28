@@ -1,0 +1,30 @@
+object at /uk/ac/cam/cl/DBusSimulator/SimpleTest implements uk.ac.cam.cl.DBusSimulator.SimpleTest {
+	data {
+		stored_greeting = "Initial";
+		counter = 0u;
+	}
+
+	states {
+		Main;
+		Other;
+	}
+
+	transition from Main to Main on method SingleStateEcho {
+		emit SingleStateSignal object->stored_greeting;
+		reply greeting;
+	}
+
+	transition from Main to Other on method TwoStateEcho {
+		object->stored_greeting = greeting;
+		reply "Greeting stored";
+	}
+
+	transition from Other to Main on method TwoStateEcho {
+		reply object->stored_greeting;
+	}
+
+	transition from Main to Main on random {
+		emit CounterSignal object->counter;
+		object->counter = object->counter + 1u;
+	}
+}
