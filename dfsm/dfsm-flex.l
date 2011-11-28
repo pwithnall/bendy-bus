@@ -37,6 +37,13 @@
 	#ifdef __GNUC__
 		#pragma GCC diagnostic ignored "-Wswitch-default"
 	#endif
+
+	/* Locations */
+	#define YY_USER_ACTION \
+		yylloc->first_line = yylloc->last_line = yylineno; \
+		yylloc->first_column = yycolumn; \
+		yylloc->last_column = yycolumn + yyleng - 1; \
+		yycolumn += yyleng;
 %}
 
 %x comment

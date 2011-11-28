@@ -472,5 +472,6 @@ static void
 yyerror (YYLTYPE *yylloc, DfsmParserData *parser_data, GError **error, const char *message)
 {
 	g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_SYNTAX, "Syntax error at %u:%u–%u:%u: %s",
-	             yylloc->first_line, yylloc->first_column, yylloc->last_line, yylloc->last_column, message);
+	             yylloc->first_line, yylloc->first_column + 1 /* zero-based */,
+	             yylloc->last_line, yylloc->last_column + 1 /* zero-based */, message);
 }
