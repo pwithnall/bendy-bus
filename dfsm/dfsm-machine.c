@@ -146,7 +146,7 @@ dfsm_machine_class_init (DfsmMachineClass *klass)
 	 */
 	machine_signals[SIGNAL_SIGNAL_EMISSION] = g_signal_new ("signal-emission",
 	                                                        G_TYPE_FROM_CLASS (klass),
-	                                                        G_SIGNAL_RUN_LAST,
+	                                                        G_SIGNAL_RUN_LAST | G_SIGNAL_DETAILED,
 	                                                        0, NULL, NULL,
 	                                                        dfsm_marshal_VOID__STRING_VARIANT,
 	                                                        G_TYPE_NONE, 2, G_TYPE_STRING, G_TYPE_VARIANT);

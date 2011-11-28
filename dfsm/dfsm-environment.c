@@ -92,7 +92,7 @@ dfsm_environment_class_init (DfsmEnvironmentClass *klass)
 	 */
 	environment_signals[SIGNAL_SIGNAL_EMISSION] = g_signal_new ("signal-emission",
 	                                                            G_TYPE_FROM_CLASS (klass),
-	                                                            G_SIGNAL_RUN_LAST,
+	                                                            G_SIGNAL_RUN_LAST | G_SIGNAL_DETAILED,
 	                                                            0, NULL, NULL,
 	                                                            dfsm_marshal_VOID__STRING_VARIANT,
 	                                                            G_TYPE_NONE, 2, G_TYPE_STRING, G_TYPE_VARIANT);
