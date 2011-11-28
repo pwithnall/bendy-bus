@@ -85,7 +85,7 @@ dfsm_environment_class_init (DfsmEnvironmentClass *klass)
 
 	/**
 	 * DfsmEnvironment::signal-emission:
-	 * @parameters: the parameter (or structure of parameters) passed to the signal emission
+	 * @parameters: the non-floating parameter (or structure of parameters) passed to the signal emission
 	 *
 	 * Emitted whenever a piece of code in a simulated DFSM emits a D-Bus signal. No code in the simulator or the environment will actually emit
 	 * this D-Bus signal on a bus instance, but (for example) a wrapper which was listening to this signal could do so.
@@ -312,15 +312,17 @@ dfsm_environment_set_variable_value (DfsmEnvironment *self, DfsmVariableScope sc
 	variable_info = look_up_variable_info (self, scope, variable_name, TRUE);
 	g_assert (variable_info != NULL);
 
+	g_variant_ref (new_value);
+
 	if (variable_info->value != NULL) {
-		/* Variable already exists */
+		/* Variable already exists; free the old value */
 		g_variant_unref (variable_info->value);
-		variable_info->value = g_variant_ref (new_value);
 	} else {
 		/* New variable */
 		variable_info->type = g_variant_type_copy (g_variant_get_type (new_value));
-		variable_info->value = g_variant_ref (new_value);
 	}
+
+	variable_info->value = new_value;
 }
 
 /**

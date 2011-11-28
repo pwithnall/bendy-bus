@@ -137,7 +137,7 @@ dfsm_machine_class_init (DfsmMachineClass *klass)
 
 	/**
 	 * DfsmMachine::signal-emission:
-	 * @parameters: the parameter (or structure of parameters) passed to the signal emission
+	 * @parameters: the non-floating parameter (or structure of parameters) passed to the signal emission
 	 *
 	 * Emitted whenever a piece of code in a simulated DFSM emits a D-Bus signal. No code in the simulator will actually emit this D-Bus signal on
 	 * a bus instance, but (for example) a wrapper which was listening to this signal could do so.
@@ -425,6 +425,7 @@ static void
 environment_signal_emission_cb (DfsmEnvironment *environment, const gchar *signal_name, GVariant *parameters, DfsmMachine *self)
 {
 	/* Re-emit the signal as a pass-through */
+	g_assert (parameters != NULL && g_variant_is_floating (parameters) == FALSE);
 	g_signal_emit (self, machine_signals[SIGNAL_SIGNAL_EMISSION], g_quark_from_string (signal_name), signal_name, parameters);
 }
 

@@ -415,7 +415,7 @@ dfsm_object_dbus_method_call (GDBusConnection *connection, const gchar *sender, 
 
 			g_variant_builder_init (&builder, G_VARIANT_TYPE_TUPLE);
 			g_variant_builder_add_value (&builder, return_value);
-			tuple_return_value = g_variant_builder_end (&builder);
+			tuple_return_value = g_variant_ref_sink (g_variant_builder_end (&builder));
 		}
 
 		/* Debug output. */
