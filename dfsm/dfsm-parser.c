@@ -60,7 +60,7 @@ _is_member_name (const gchar *member_name)
 	g_return_val_if_fail (member_name != NULL, FALSE);
 
 	/* Characters outside [A-Za-z0-9_]? */
-	for (i = member_name; i != '\0'; i++) {
+	for (i = member_name; *i != '\0'; i++) {
 		if (*i != '_' && g_ascii_isalnum (*i) == FALSE) {
 			return FALSE;
 		}
