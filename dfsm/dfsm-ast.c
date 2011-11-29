@@ -50,19 +50,21 @@ _dfsm_ast_node_init (DfsmAstNode *node, DfsmAstNodeType node_type, DfsmAstNodeCh
 /**
  * dfsm_ast_node_check:
  * @node: a #DfsmAstNode
+ * @environment: environment containing the values of all variables known so far
  * @error: a #GError
  *
  * Check the node and its descendents are correct. This may, for example, involve type checking or checking of constants. If checking finds a problem,
  * @error will be set to a suitable #GError; otherwise, @error will remain unset.
  */
 void
-dfsm_ast_node_check (DfsmAstNode *node, GError **error)
+dfsm_ast_node_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	g_return_if_fail (node != NULL);
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (environment));
 	g_return_if_fail (error != NULL && *error == NULL);
 
 	g_assert (node->check_func != NULL);
-	node->check_func (node, error);
+	node->check_func (node, environment, error);
 }
 
 /**
@@ -102,12 +104,13 @@ dfsm_ast_node_unref (gpointer/*<DfsmAstNode>*/ node)
 }
 
 static void
-_dfsm_ast_object_check (DfsmAstNode *node, GError **error)
+_dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstObject *object = (DfsmAstObject*) node;
 	guint i;
 
 	g_return_if_fail (node != NULL);
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (environment));
 	g_return_if_fail (error != NULL && *error == NULL);
 
 	/* Conditions which should always hold, regardless of user input. */
@@ -203,7 +206,7 @@ _dfsm_ast_object_check (DfsmAstNode *node, GError **error)
 
 		transition = g_ptr_array_index (object->transitions, i);
 
-		dfsm_ast_node_check ((DfsmAstNode*) transition, error);
+		dfsm_ast_node_check ((DfsmAstNode*) transition, environment, error);
 
 		if (*error != NULL) {
 			return;
@@ -379,6 +382,7 @@ _dfsm_ast_expression_init (DfsmAstExpression *expression, DfsmAstExpressionType 
 /**
  * dfsm_ast_expression_calculate_type:
  * @expression: a #DfsmAstExpression
+ * @environment: a #DfsmEnvironment containing all defined variables
  *
  * Calculate the type of the given @expression. In some cases this may not be a definite type, for example if the expression is an empty data
  * structure. In most cases, however, the type will be definite.
@@ -388,12 +392,12 @@ _dfsm_ast_expression_init (DfsmAstExpression *expression, DfsmAstExpressionType 
  * Return value: (transfer full): the type of the expression
  */
 GVariantType *
-dfsm_ast_expression_calculate_type (DfsmAstExpression *expression)
+dfsm_ast_expression_calculate_type (DfsmAstExpression *expression, DfsmEnvironment *environment)
 {
 	g_return_val_if_fail (expression != NULL, NULL);
 
 	g_assert (expression->calculate_type_func != NULL);
-	return expression->calculate_type_func (expression);
+	return expression->calculate_type_func (expression, environment);
 }
 
 /**
@@ -423,13 +427,14 @@ dfsm_ast_expression_evaluate (DfsmAstExpression *expression, DfsmEnvironment *en
 }
 
 static void
-_dfsm_ast_expression_function_call_check (DfsmAstNode *node, GError **error)
+_dfsm_ast_expression_function_call_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstExpressionFunctionCall *function_call = (DfsmAstExpressionFunctionCall*) node;
 	const DfsmFunctionInfo *function_info;
 	GVariantType *parameters_type;
 
 	g_return_if_fail (node != NULL);
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (environment));
 	g_return_if_fail (error != NULL && *error == NULL);
 
 	/* Conditions which should always hold, regardless of user input. */
@@ -469,13 +474,13 @@ _dfsm_ast_expression_function_call_check (DfsmAstNode *node, GError **error)
 		return;
 	}
 
-	dfsm_ast_node_check ((DfsmAstNode*) function_call->parameters, error);
+	dfsm_ast_node_check ((DfsmAstNode*) function_call->parameters, environment, error);
 
 	if (*error != NULL) {
 		return;
 	}
 
-	parameters_type = dfsm_ast_expression_calculate_type (function_call->parameters);
+	parameters_type = dfsm_ast_expression_calculate_type (function_call->parameters, environment);
 
 	if (g_variant_type_is_subtype_of (parameters_type, function_info->parameters_type) == FALSE) {
 		gchar *formal, *actual;
@@ -508,7 +513,7 @@ _dfsm_ast_expression_function_call_free (DfsmAstNode *node)
 }
 
 static GVariantType *
-_dfsm_ast_expression_function_call_calculate_type (DfsmAstExpression *expression)
+_dfsm_ast_expression_function_call_calculate_type (DfsmAstExpression *expression, DfsmEnvironment *environment)
 {
 	const DfsmFunctionInfo *function_info;
 	DfsmAstExpressionFunctionCall *function_call = (DfsmAstExpressionFunctionCall*) expression;
@@ -582,11 +587,12 @@ dfsm_ast_expression_function_call_new (const gchar *function_name, DfsmAstExpres
 }
 
 static void
-_dfsm_ast_expression_data_structure_check (DfsmAstNode *node, GError **error)
+_dfsm_ast_expression_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstExpressionDataStructure *data_structure = (DfsmAstExpressionDataStructure*) node;
 
 	g_return_if_fail (node != NULL);
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (environment));
 	g_return_if_fail (error != NULL && *error == NULL);
 
 	/* Conditions which should always hold, regardless of user input. */
@@ -618,7 +624,7 @@ _dfsm_ast_expression_data_structure_check (DfsmAstNode *node, GError **error)
 	g_assert (data_structure->data_structure != NULL);
 
 	/* Conditions which may not hold as a result of invalid user input. */
-	dfsm_ast_node_check ((DfsmAstNode*) data_structure->data_structure, error);
+	dfsm_ast_node_check ((DfsmAstNode*) data_structure->data_structure, environment, error);
 
 	if (*error != NULL) {
 		return;
@@ -638,12 +644,12 @@ _dfsm_ast_expression_data_structure_free (DfsmAstNode *node)
 }
 
 static GVariantType *
-_dfsm_ast_expression_data_structure_calculate_type (DfsmAstExpression *expression)
+_dfsm_ast_expression_data_structure_calculate_type (DfsmAstExpression *expression, DfsmEnvironment *environment)
 {
 	DfsmAstExpressionDataStructure *data_structure = (DfsmAstExpressionDataStructure*) expression;
 
 	/* Type of the expression is the type of the data structure. */
-	return dfsm_ast_data_structure_calculate_type (data_structure->data_structure, NULL /* TODO */);
+	return dfsm_ast_data_structure_calculate_type (data_structure->data_structure, environment);
 }
 
 static GVariant *
@@ -683,13 +689,14 @@ dfsm_ast_expression_data_structure_new (DfsmAstDataStructure *data_structure, GE
 }
 
 static void
-_dfsm_ast_expression_unary_check (DfsmAstNode *node, GError **error)
+_dfsm_ast_expression_unary_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstExpressionUnary *unary = (DfsmAstExpressionUnary*) node;
 	GVariantType *child_type;
 	const GVariantType *desired_supertype;
 
 	g_return_if_fail (node != NULL);
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (environment));
 	g_return_if_fail (error != NULL && *error == NULL);
 
 	/* Conditions which should always hold, regardless of user input. */
@@ -721,13 +728,13 @@ _dfsm_ast_expression_unary_check (DfsmAstNode *node, GError **error)
 	g_assert (unary->child_node != NULL);
 
 	/* Conditions which may not hold as a result of invalid user input. */
-	dfsm_ast_node_check ((DfsmAstNode*) unary->child_node, error);
+	dfsm_ast_node_check ((DfsmAstNode*) unary->child_node, environment, error);
 
 	if (*error != NULL) {
 		return;
 	}
 
-	child_type = dfsm_ast_expression_calculate_type (unary->child_node);
+	child_type = dfsm_ast_expression_calculate_type (unary->child_node, environment);
 
 	switch (unary->parent.expression_type) {
 		case DFSM_AST_EXPRESSION_NOT:
@@ -782,7 +789,7 @@ _dfsm_ast_expression_unary_free (DfsmAstNode *node)
 }
 
 static GVariantType *
-_dfsm_ast_expression_unary_calculate_type (DfsmAstExpression *expression)
+_dfsm_ast_expression_unary_calculate_type (DfsmAstExpression *expression, DfsmEnvironment *environment)
 {
 	DfsmAstExpressionUnary *unary = (DfsmAstExpressionUnary*) expression;
 
@@ -911,13 +918,14 @@ dfsm_ast_expression_unary_new (DfsmAstExpressionType expression_type, DfsmAstExp
 }
 
 static void
-_dfsm_ast_expression_binary_check (DfsmAstNode *node, GError **error)
+_dfsm_ast_expression_binary_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstExpressionBinary *binary = (DfsmAstExpressionBinary*) node;
 	GVariantType *lvalue_type, *rvalue_type;
 	gboolean typechecks = FALSE;
 
 	g_return_if_fail (node != NULL);
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (environment));
 	g_return_if_fail (error != NULL && *error == NULL);
 
 	/* Conditions which should always hold, regardless of user input. */
@@ -950,20 +958,20 @@ _dfsm_ast_expression_binary_check (DfsmAstNode *node, GError **error)
 	g_assert (binary->right_node != NULL);
 
 	/* Conditions which may not hold as a result of invalid user input. */
-	dfsm_ast_node_check ((DfsmAstNode*) binary->left_node, error);
+	dfsm_ast_node_check ((DfsmAstNode*) binary->left_node, environment, error);
 
 	if (*error != NULL) {
 		return;
 	}
 
-	dfsm_ast_node_check ((DfsmAstNode*) binary->right_node, error);
+	dfsm_ast_node_check ((DfsmAstNode*) binary->right_node, environment, error);
 
 	if (*error != NULL) {
 		return;
 	}
 
-	lvalue_type = dfsm_ast_expression_calculate_type (binary->left_node);
-	rvalue_type = dfsm_ast_expression_calculate_type (binary->right_node);
+	lvalue_type = dfsm_ast_expression_calculate_type (binary->left_node, environment);
+	rvalue_type = dfsm_ast_expression_calculate_type (binary->right_node, environment);
 
 	switch (binary->parent.expression_type) {
 		case DFSM_AST_EXPRESSION_TIMES:
@@ -1040,7 +1048,7 @@ _dfsm_ast_expression_binary_free (DfsmAstNode *node)
 }
 
 static GVariantType *
-_dfsm_ast_expression_binary_calculate_type (DfsmAstExpression *expression)
+_dfsm_ast_expression_binary_calculate_type (DfsmAstExpression *expression, DfsmEnvironment *environment)
 {
 	DfsmAstExpressionBinary *binary = (DfsmAstExpressionBinary*) expression;
 
@@ -1054,7 +1062,7 @@ _dfsm_ast_expression_binary_calculate_type (DfsmAstExpression *expression)
 			/* NOTE: We could come up with some fancy rules for type coercion to make everything safe.
 			 * However, for simplicity's sake we currently just return the type of the left child expression. This can be changed in
 			 * future if necessary. */
-			return dfsm_ast_expression_calculate_type (binary->left_node);
+			return dfsm_ast_expression_calculate_type (binary->left_node, environment);
 		/* Boolean relations */
 		case DFSM_AST_EXPRESSION_LT:
 		case DFSM_AST_EXPRESSION_LTE:
@@ -1311,12 +1319,13 @@ dfsm_ast_dictionary_entry_free (DfsmAstDictionaryEntry *entry)
 }
 
 static void
-_dfsm_ast_data_structure_check (DfsmAstNode *node, GError **error)
+_dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	guint i;
 	DfsmAstDataStructure *data_structure = (DfsmAstDataStructure*) node;
 
 	g_return_if_fail (node != NULL);
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (environment));
 	g_return_if_fail (error != NULL && *error == NULL);
 
 	/* Conditions which should always hold, regardless of user input. */
@@ -1434,14 +1443,14 @@ _dfsm_ast_data_structure_check (DfsmAstNode *node, GError **error)
 				expr = g_ptr_array_index (data_structure->array_val, i);
 
 				/* Valid expression? */
-				dfsm_ast_node_check ((DfsmAstNode*) expr, error);
+				dfsm_ast_node_check ((DfsmAstNode*) expr, environment, error);
 
 				if (*error != NULL) {
 					goto array_error;
 				}
 
 				/* Equal type? */
-				child_type = dfsm_ast_expression_calculate_type (expr);
+				child_type = dfsm_ast_expression_calculate_type (expr, environment);
 
 				if (expected_type == NULL) {
 					/* First iteration */
@@ -1476,7 +1485,7 @@ _dfsm_ast_data_structure_check (DfsmAstNode *node, GError **error)
 
 				expr = g_ptr_array_index (data_structure->struct_val, i);
 
-				dfsm_ast_node_check ((DfsmAstNode*) expr, error);
+				dfsm_ast_node_check ((DfsmAstNode*) expr, environment, error);
 
 				if (*error != NULL) {
 					return;
@@ -1503,21 +1512,21 @@ _dfsm_ast_data_structure_check (DfsmAstNode *node, GError **error)
 				/* Valid expressions? */
 				entry = g_ptr_array_index (data_structure->dict_val, i);
 
-				dfsm_ast_node_check ((DfsmAstNode*) entry->key, error);
+				dfsm_ast_node_check ((DfsmAstNode*) entry->key, environment, error);
 
 				if (*error != NULL) {
 					goto dict_error;
 				}
 
-				dfsm_ast_node_check ((DfsmAstNode*) entry->value, error);
+				dfsm_ast_node_check ((DfsmAstNode*) entry->value, environment, error);
 
 				if (*error != NULL) {
 					goto dict_error;
 				}
 
 				/* Equal types? */
-				key_type = dfsm_ast_expression_calculate_type (entry->key);
-				value_type = dfsm_ast_expression_calculate_type (entry->value);
+				key_type = dfsm_ast_expression_calculate_type (entry->key, environment);
+				value_type = dfsm_ast_expression_calculate_type (entry->value, environment);
 
 				g_assert ((expected_key_type == NULL) == (expected_value_type == NULL));
 
@@ -1584,7 +1593,7 @@ _dfsm_ast_data_structure_check (DfsmAstNode *node, GError **error)
 		}
 		case DFSM_AST_DATA_VARIABLE:
 			/* Valid variable? */
-			dfsm_ast_node_check ((DfsmAstNode*) data_structure->variable_val, error);
+			dfsm_ast_node_check ((DfsmAstNode*) data_structure->variable_val, environment, error);
 
 			if (*error != NULL) {
 				return;
@@ -1795,7 +1804,7 @@ dfsm_ast_data_structure_calculate_type (DfsmAstDataStructure *data_structure, Df
 			}
 
 			/* Having checked the array already, we can assume all elements are of the same type. */
-			child_type = dfsm_ast_expression_calculate_type (g_ptr_array_index (data_structure->array_val, 0));
+			child_type = dfsm_ast_expression_calculate_type (g_ptr_array_index (data_structure->array_val, 0), environment);
 			array_type = g_variant_type_new_array (child_type);
 			g_variant_type_free (child_type);
 
@@ -1815,7 +1824,10 @@ dfsm_ast_data_structure_calculate_type (DfsmAstDataStructure *data_structure, Df
 			child_types = g_ptr_array_new_with_free_func ((GDestroyNotify) g_variant_type_free);
 
 			for (i = 0; i < data_structure->struct_val->len; i++) {
-				g_ptr_array_add (child_types, dfsm_ast_expression_calculate_type (g_ptr_array_index (data_structure->struct_val, i)));
+				GVariantType *element_type;
+
+				element_type = dfsm_ast_expression_calculate_type (g_ptr_array_index (data_structure->struct_val, i), environment);
+				g_ptr_array_add (child_types, element_type);
 			}
 
 			struct_type = g_variant_type_new_tuple ((const GVariantType**) child_types->pdata, child_types->len);
@@ -1837,8 +1849,8 @@ dfsm_ast_data_structure_calculate_type (DfsmAstDataStructure *data_structure, Df
 			/* Otherwise, we assume that all entries have the same type (since we checked this before). */
 			entry = (DfsmAstDictionaryEntry*) g_ptr_array_index (data_structure->dict_val, 0);
 
-			key_type = dfsm_ast_expression_calculate_type (entry->key);
-			value_type = dfsm_ast_expression_calculate_type (entry->value);
+			key_type = dfsm_ast_expression_calculate_type (entry->key, environment);
+			value_type = dfsm_ast_expression_calculate_type (entry->value, environment);
 			entry_type = g_variant_type_new_dict_entry (key_type, value_type);
 			g_variant_type_free (value_type);
 			g_variant_type_free (key_type);
@@ -2244,12 +2256,13 @@ dfsm_ast_fuzzy_data_structure_new (DfsmAstDataStructure *data_structure, gdouble
 }
 
 static void
-_dfsm_ast_transition_check (DfsmAstNode *node, GError **error)
+_dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	guint i;
 	DfsmAstTransition *transition;
 
 	g_return_if_fail (node != NULL);
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (environment));
 	g_return_if_fail (error != NULL && *error == NULL);
 
 	transition = (DfsmAstTransition*) node;
@@ -2312,7 +2325,7 @@ _dfsm_ast_transition_check (DfsmAstNode *node, GError **error)
 
 		precondition = (DfsmAstPrecondition*) g_ptr_array_index (transition->preconditions, i);
 
-		dfsm_ast_node_check ((DfsmAstNode*) precondition, error);
+		dfsm_ast_node_check ((DfsmAstNode*) precondition, environment, error);
 
 		if (*error != NULL) {
 			return;
@@ -2324,7 +2337,7 @@ _dfsm_ast_transition_check (DfsmAstNode *node, GError **error)
 
 		statement = (DfsmAstStatement*) g_ptr_array_index (transition->statements, i);
 
-		dfsm_ast_node_check ((DfsmAstNode*) statement, error);
+		dfsm_ast_node_check ((DfsmAstNode*) statement, environment, error);
 
 		if (*error != NULL) {
 			return;
@@ -2492,11 +2505,12 @@ dfsm_ast_transition_execute (DfsmAstTransition *transition, DfsmEnvironment *env
 }
 
 static void
-_dfsm_ast_precondition_check (DfsmAstNode *node, GError **error)
+_dfsm_ast_precondition_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstPrecondition *precondition;
 
 	g_return_if_fail (node != NULL);
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (environment));
 	g_return_if_fail (error != NULL && *error == NULL);
 
 	precondition = (DfsmAstPrecondition*) node;
@@ -2511,7 +2525,7 @@ _dfsm_ast_precondition_check (DfsmAstNode *node, GError **error)
 		return;
 	}
 
-	dfsm_ast_node_check ((DfsmAstNode*) precondition->condition, error);
+	dfsm_ast_node_check ((DfsmAstNode*) precondition->condition, environment, error);
 
 	if (*error != NULL) {
 		return;
@@ -2655,12 +2669,13 @@ dfsm_ast_statement_execute (DfsmAstStatement *statement, DfsmEnvironment *enviro
 }
 
 static void
-_dfsm_ast_statement_assignment_check (DfsmAstNode *node, GError **error)
+_dfsm_ast_statement_assignment_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	GVariantType *lvalue_type, *rvalue_type;
 	DfsmAstStatementAssignment *assignment;
 
 	g_return_if_fail (node != NULL);
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (environment));
 	g_return_if_fail (error != NULL && *error == NULL);
 
 	assignment = (DfsmAstStatementAssignment*) node;
@@ -2672,20 +2687,20 @@ _dfsm_ast_statement_assignment_check (DfsmAstNode *node, GError **error)
 	g_assert (assignment->expression != NULL);
 
 	/* Conditions which may not hold as a result of invalid user input. */
-	dfsm_ast_node_check ((DfsmAstNode*) assignment->data_structure, error);
+	dfsm_ast_node_check ((DfsmAstNode*) assignment->data_structure, environment, error);
 
 	if (*error != NULL) {
 		return;
 	}
 
-	dfsm_ast_node_check ((DfsmAstNode*) assignment->expression, error);
+	dfsm_ast_node_check ((DfsmAstNode*) assignment->expression, environment, error);
 
 	if (*error != NULL) {
 		return;
 	}
 
-	lvalue_type = dfsm_ast_data_structure_calculate_type (assignment->data_structure, NULL /* TODO */);
-	rvalue_type = dfsm_ast_expression_calculate_type (assignment->expression);
+	lvalue_type = dfsm_ast_data_structure_calculate_type (assignment->data_structure, environment);
+	rvalue_type = dfsm_ast_expression_calculate_type (assignment->expression, environment);
 
 	if (g_variant_type_is_subtype_of (rvalue_type, lvalue_type) == FALSE) {
 		gchar *expected, *received;
@@ -2779,11 +2794,12 @@ dfsm_ast_statement_assignment_new (DfsmAstDataStructure *data_structure, DfsmAst
 }
 
 static void
-_dfsm_ast_statement_throw_check (DfsmAstNode *node, GError **error)
+_dfsm_ast_statement_throw_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstStatementThrow *throw;
 
 	g_return_if_fail (node != NULL);
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (environment));
 	g_return_if_fail (error != NULL && *error == NULL);
 
 	throw = (DfsmAstStatementThrow*) node;
@@ -2855,7 +2871,7 @@ dfsm_ast_statement_throw_new (const gchar *error_name, GError **error)
 }
 
 static void
-_dfsm_ast_statement_emit_check (DfsmAstNode *node, GError **error)
+_dfsm_ast_statement_emit_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstStatementEmit *emit;
 
@@ -2876,7 +2892,7 @@ _dfsm_ast_statement_emit_check (DfsmAstNode *node, GError **error)
 		return;
 	}
 
-	dfsm_ast_node_check ((DfsmAstNode*) emit->expression, error);
+	dfsm_ast_node_check ((DfsmAstNode*) emit->expression, environment, error);
 
 	if (*error != NULL) {
 		return;
@@ -2957,11 +2973,12 @@ dfsm_ast_statement_emit_new (const gchar *signal_name, DfsmAstExpression *expres
 }
 
 static void
-_dfsm_ast_statement_reply_check (DfsmAstNode *node, GError **error)
+_dfsm_ast_statement_reply_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstStatementReply *reply;
 
 	g_return_if_fail (node != NULL);
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (environment));
 	g_return_if_fail (error != NULL && *error == NULL);
 
 	reply = (DfsmAstStatementReply*) node;
@@ -2972,7 +2989,7 @@ _dfsm_ast_statement_reply_check (DfsmAstNode *node, GError **error)
 	g_assert (reply->expression != NULL);
 
 	/* Conditions which may not hold as a result of invalid user input. */
-	dfsm_ast_node_check ((DfsmAstNode*) reply->expression, error);
+	dfsm_ast_node_check ((DfsmAstNode*) reply->expression, environment, error);
 
 	if (*error != NULL) {
 		return;
@@ -3040,11 +3057,12 @@ dfsm_ast_statement_reply_new (DfsmAstExpression *expression, GError **error)
 }
 
 static void
-_dfsm_ast_variable_check (DfsmAstNode *node, GError **error)
+_dfsm_ast_variable_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstVariable *variable;
 
 	g_return_if_fail (node != NULL);
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (environment));
 	g_return_if_fail (error != NULL && *error == NULL);
 
 	variable = (DfsmAstVariable*) node;

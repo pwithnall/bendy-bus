@@ -39,7 +39,7 @@ typedef enum {
 
 typedef struct _DfsmAstNode DfsmAstNode;
 
-typedef void (*DfsmAstNodeCheckFunc) (DfsmAstNode *node, GError **error);
+typedef void (*DfsmAstNodeCheckFunc) (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 typedef void (*DfsmAstNodeFreeFunc) (DfsmAstNode *node);
 
 struct _DfsmAstNode {
@@ -49,7 +49,7 @@ struct _DfsmAstNode {
 	gint ref_count;
 };
 
-void dfsm_ast_node_check (DfsmAstNode *node, GError **error);
+void dfsm_ast_node_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 gpointer dfsm_ast_node_ref (gpointer/*<DfsmAstNode>*/ node);
 void dfsm_ast_node_unref (gpointer/*<DfsmAstNode>*/ node);
 
@@ -94,7 +94,7 @@ typedef enum {
 
 typedef struct _DfsmAstExpression DfsmAstExpression;
 
-typedef GVariantType *(*DfsmAstExpressionCalculateTypeFunc) (DfsmAstExpression *expression);
+typedef GVariantType *(*DfsmAstExpressionCalculateTypeFunc) (DfsmAstExpression *expression, DfsmEnvironment *environment);
 typedef GVariant *(*DfsmAstExpressionEvaluateFunc) (DfsmAstExpression *expression, DfsmEnvironment *environment, GError **error);
 
 /* abstract */
@@ -105,7 +105,7 @@ struct _DfsmAstExpression {
 	DfsmAstExpressionEvaluateFunc evaluate_func;
 };
 
-GVariantType *dfsm_ast_expression_calculate_type (DfsmAstExpression *expression) DFSM_CONSTRUCTOR;
+GVariantType *dfsm_ast_expression_calculate_type (DfsmAstExpression *expression, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
 GVariant *dfsm_ast_expression_evaluate (DfsmAstExpression *expression, DfsmEnvironment *environment, GError **error) DFSM_CONSTRUCTOR;
 
 typedef struct {
