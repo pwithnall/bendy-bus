@@ -153,7 +153,7 @@ DOUBLE					(\+-)?[0-9]+\.[0-9]+d
 	}
 
 	\\(.|\n) { if (regexp_buf_ptr - regexp_buf + 1 > MAX_REGEXP_CONST_SIZE) { return FLEX_ERROR; } *regexp_buf_ptr++ = yytext[1]; }
-	[^\\\n\"]+ {
+	[^\\\n#]+ {
 		size_t yytext_len = strlen (yytext);
 
 		if (regexp_buf_ptr - regexp_buf + yytext_len > MAX_REGEXP_CONST_SIZE) {
