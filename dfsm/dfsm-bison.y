@@ -382,7 +382,7 @@ ArrayListInner: /* empty */							{ $$ = g_ptr_array_new_with_free_func (dfsm_as
 
 /* Returns a new GPtrArray of DfsmAstDictionaryEntrys */
 DictionaryList: DictionaryListInner						{ $$ = $1; }
-              | DictionaryListInner Expression ':' Expression			{
+              | DictionaryListInner Expression '=' Expression			{
 											$$ = $1;
 											g_ptr_array_add ($$, dfsm_ast_dictionary_entry_new ($2, $4));
 										}
@@ -390,7 +390,7 @@ DictionaryList: DictionaryListInner						{ $$ = $1; }
 DictionaryListInner: /* empty */			{
 								$$ = g_ptr_array_new_with_free_func ((GDestroyNotify) dfsm_ast_dictionary_entry_free);
 							}
-                   | DictionaryListInner Expression ':' Expression ','		{
+                   | DictionaryListInner Expression '=' Expression ','		{
 											$$ = $1;
 											g_ptr_array_add ($$, dfsm_ast_dictionary_entry_new ($2, $4));
 										}
