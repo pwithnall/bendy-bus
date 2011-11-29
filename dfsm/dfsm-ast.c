@@ -1579,6 +1579,8 @@ _dfsm_ast_data_structure_check (DfsmAstNode *node, GError **error)
 			if (*error != NULL) {
 				return;
 			}
+
+			break;
 		}
 		case DFSM_AST_DATA_VARIABLE:
 			/* Valid variable? */
@@ -1587,6 +1589,8 @@ _dfsm_ast_data_structure_check (DfsmAstNode *node, GError **error)
 			if (*error != NULL) {
 				return;
 			}
+
+			break;
 		default:
 			g_assert_not_reached ();
 	}
