@@ -35,7 +35,7 @@ dfsm_parser_block_list_new (void)
 
 	block_list->data_blocks = g_ptr_array_new_with_free_func ((GDestroyNotify) g_hash_table_unref);
 	block_list->state_blocks = g_ptr_array_new_with_free_func ((GDestroyNotify) g_ptr_array_unref);
-	block_list->transitions = g_ptr_array_new_with_free_func (dfsm_ast_node_unref);
+	block_list->transitions = g_ptr_array_new_with_free_func (g_object_unref);
 
 	return block_list;
 }

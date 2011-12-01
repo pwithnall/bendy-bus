@@ -289,7 +289,7 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstTransi
 		transition = g_ptr_array_index (possible_transitions, (i + rand_offset) % possible_transitions->len);
 
 		/* Check we're in the right starting state. */
-		if (get_state_number_from_name (self, transition->from_state_name) != priv->machine_state) {
+		if (get_state_number_from_name (self, dfsm_ast_transition_get_from_state_name (transition)) != priv->machine_state) {
 			g_debug ("…Skipping transition %p due to being in the wrong state.", transition);
 			continue;
 		}
@@ -331,7 +331,7 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstTransi
 			*executed_transition = TRUE;
 
 			/* Change machine state. */
-			priv->machine_state = get_state_number_from_name (self, transition->to_state_name);
+			priv->machine_state = get_state_number_from_name (self, dfsm_ast_transition_get_to_state_name (transition));
 			g_object_notify (G_OBJECT (self), "machine-state");
 		} else if (return_value == NULL && child_error != NULL) {
 			/* Error, either during execution or as a result of a throw statement. Don't change states. */
@@ -456,34 +456,34 @@ _dfsm_machine_new (DfsmEnvironment *environment, GPtrArray/*<string>*/ *state_na
 
 	/* Transitions need to be sorted by trigger method */
 	machine->priv->transitions.method_call_triggered = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) g_ptr_array_unref);
-	machine->priv->transitions.arbitrarily_triggered = g_ptr_array_new_with_free_func (dfsm_ast_node_unref);
+	machine->priv->transitions.arbitrarily_triggered = g_ptr_array_new_with_free_func (g_object_unref);
 
 	for (i = 0; i < transitions->len; i++) {
 		DfsmAstTransition *transition;
 
 		transition = g_ptr_array_index (transitions, i);
 
-		switch (transition->trigger) {
+		switch (dfsm_ast_transition_get_trigger (transition)) {
 			case DFSM_AST_TRANSITION_METHOD_CALL: {
 				GPtrArray/*<DfsmAstTransition>*/ *new_transitions;
 
 				/* Add the transition to a new or existing array of transitions for the given method name. */
 				new_transitions = g_hash_table_lookup (machine->priv->transitions.method_call_triggered,
-				                                       transition->trigger_params.method_name);
+				                                       dfsm_ast_transition_get_trigger_method_name (transition));
 
 				if (new_transitions == NULL) {
-					new_transitions = g_ptr_array_new_with_free_func (dfsm_ast_node_unref);
+					new_transitions = g_ptr_array_new_with_free_func (g_object_unref);
 					g_hash_table_insert (machine->priv->transitions.method_call_triggered,
-					                     g_strdup (transition->trigger_params.method_name), new_transitions);
+					                     g_strdup (dfsm_ast_transition_get_trigger_method_name (transition)), new_transitions);
 				}
 
-				g_ptr_array_add (new_transitions, dfsm_ast_node_ref (transition));
+				g_ptr_array_add (new_transitions, g_object_ref (transition));
 
 				break;
 			}
 			case DFSM_AST_TRANSITION_ARBITRARY:
 				/* Arbitrary transition */
-				g_ptr_array_add (machine->priv->transitions.arbitrarily_triggered, dfsm_ast_node_ref (transition));
+				g_ptr_array_add (machine->priv->transitions.arbitrarily_triggered, g_object_ref (transition));
 				break;
 			default:
 				g_assert_not_reached ();

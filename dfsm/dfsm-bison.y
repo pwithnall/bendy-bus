@@ -60,7 +60,7 @@
 %destructor {} <integer> <unsigned_integer> <flt>
 %destructor { if ($$ != NULL) { g_ptr_array_unref ($$); } } <ptr_array>
 %destructor { if ($$ != NULL) { g_hash_table_unref ($$); } } <hash_table>
-%destructor { dfsm_ast_node_unref ($$); } <ast_object> <ast_data_structure> <ast_expression> <ast_transition>
+%destructor { g_object_unref ($$); } <ast_object> <ast_data_structure> <ast_expression> <ast_transition>
 	<ast_precondition> <ast_statement> <ast_variable>
 %destructor { dfsm_parser_block_list_free ($$); } <block_list>
 
@@ -154,7 +154,7 @@
 %%
 
 /* Returns a GPtrArray of DfsmAstObjects. */
-Input: /* empty */			{ $$ = g_ptr_array_new_with_free_func (dfsm_ast_node_unref); parser_data->object_array = g_ptr_array_ref ($$); }
+Input: /* empty */			{ $$ = g_ptr_array_new_with_free_func (g_object_unref); parser_data->object_array = g_ptr_array_ref ($$); }
      | Input ObjectBlock		{ $$ = $1; g_ptr_array_add ($$, $2); }
      | error				{ $$ = NULL; YYABORT; }
 ;
@@ -204,11 +204,11 @@ DataBlock:
 /* Returns a new GHashTable mapping variable names (strings) to DfsmAstDataStructures. */
 DataList: /* empty */
 		{
-			$$ = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) dfsm_ast_node_unref);
+			$$ = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) g_object_unref);
 		}
         | VariableName '=' FuzzyDataStructure
 		{
-			$$ = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) dfsm_ast_node_unref);
+			$$ = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) g_object_unref);
 			g_hash_table_insert ($$, $1 /* steal ownership from flex */, $3);
 		}
         | VariableName '=' FuzzyDataStructure ';' DataList
@@ -266,7 +266,7 @@ TransitionType: METHOD DBusMethodName						{ $$ = $2; /* steal ownership from fl
 ;
 
 /* Returns a new GPtrArray containing DfsmAstPreconditions. */
-PreconditionList: /* empty */							{ $$ = g_ptr_array_new_with_free_func (dfsm_ast_node_unref); }
+PreconditionList: /* empty */							{ $$ = g_ptr_array_new_with_free_func (g_object_unref); }
                 | PreconditionList Precondition					{ $$ = $1; g_ptr_array_add ($$, $2); }
 ;
 
@@ -286,7 +286,7 @@ PreconditionThrow: /* empty */							{ $$ = NULL; }
 
 /* Returns a new GPtrArray of DfsmAstStatements. */
 StatementList: Statement ';'							{
-											$$ = g_ptr_array_new_with_free_func (dfsm_ast_node_unref);
+											$$ = g_ptr_array_new_with_free_func (g_object_unref);
 											g_ptr_array_add ($$, $1 /* steal */);
 										}
              | StatementList Statement ';'					{ $$ = $1; g_ptr_array_add ($$, $2); }
@@ -309,20 +309,25 @@ Expression: L_ANGLE Expression R_ANGLE		{ $$ = $2; }
           | L_ANGLE error R_ANGLE		{ $$ = NULL; YYABORT; }
           | FunctionName Expression		{ $$ = dfsm_ast_expression_function_call_new ($1, $2, ERROR); ABORT_ON_ERROR; }
           | FuzzyDataStructure			{ $$ = dfsm_ast_expression_data_structure_new ($1, ERROR); ABORT_ON_ERROR; }
-          | NOT Expression			{ $$ = dfsm_ast_expression_unary_new (DFSM_AST_EXPRESSION_NOT, $2, ERROR); ABORT_ON_ERROR; }
-          | Expression TIMES Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_TIMES, $1, $3, ERROR); ABORT_ON_ERROR; }
-          | Expression DIVIDE Expression	{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_DIVIDE, $1, $3, ERROR); ABORT_ON_ERROR; }
-          | Expression MODULUS Expression	{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_MODULUS, $1, $3, ERROR); ABORT_ON_ERROR; }
-          | Expression PLUS Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_PLUS, $1, $3, ERROR); ABORT_ON_ERROR; }
-          | Expression MINUS Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_MINUS, $1, $3, ERROR); ABORT_ON_ERROR; }
-          | Expression LT Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_LT, $1, $3, ERROR); ABORT_ON_ERROR; }
-          | Expression LTE Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_LTE, $1, $3, ERROR); ABORT_ON_ERROR; }
-          | Expression GT Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_GT, $1, $3, ERROR); ABORT_ON_ERROR; }
-          | Expression GTE Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_GTE, $1, $3, ERROR); ABORT_ON_ERROR; }
-          | Expression EQ Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_EQ, $1, $3, ERROR); ABORT_ON_ERROR; }
-          | Expression NEQ Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_NEQ, $1, $3, ERROR); ABORT_ON_ERROR; }
-          | Expression AND Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_AND, $1, $3, ERROR); ABORT_ON_ERROR; }
-          | Expression OR Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_OR, $1, $3, ERROR); ABORT_ON_ERROR; }
+          | NOT Expression			{ $$ = dfsm_ast_expression_unary_new (DFSM_AST_EXPRESSION_UNARY_NOT, $2, ERROR); ABORT_ON_ERROR; }
+          | Expression TIMES Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_TIMES, $1, $3, ERROR);
+						  ABORT_ON_ERROR; }
+          | Expression DIVIDE Expression	{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_DIVIDE, $1, $3, ERROR);
+						  ABORT_ON_ERROR; }
+          | Expression MODULUS Expression	{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_MODULUS, $1, $3, ERROR);
+						  ABORT_ON_ERROR; }
+          | Expression PLUS Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_PLUS, $1, $3, ERROR);
+						  ABORT_ON_ERROR; }
+          | Expression MINUS Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_MINUS, $1, $3, ERROR);
+						  ABORT_ON_ERROR; }
+          | Expression LT Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_LT, $1, $3, ERROR); ABORT_ON_ERROR; }
+          | Expression LTE Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_LTE, $1, $3, ERROR); ABORT_ON_ERROR; }
+          | Expression GT Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_GT, $1, $3, ERROR); ABORT_ON_ERROR; }
+          | Expression GTE Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_GTE, $1, $3, ERROR); ABORT_ON_ERROR; }
+          | Expression EQ Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_EQ, $1, $3, ERROR); ABORT_ON_ERROR; }
+          | Expression NEQ Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_NEQ, $1, $3, ERROR); ABORT_ON_ERROR; }
+          | Expression AND Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_AND, $1, $3, ERROR); ABORT_ON_ERROR; }
+          | Expression OR Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_OR, $1, $3, ERROR); ABORT_ON_ERROR; }
 ;
 
 /* Returns the function name as a string. */
@@ -342,8 +347,8 @@ Variable: VariableName								{ $$ = dfsm_ast_variable_new (DFSM_VARIABLE_SCOPE_
 
 /* Returns a new DfsmAstDataStructure or DfsmAstFuzzyDataStructure (which is a subclass). */
 FuzzyDataStructure: DataStructure					{ $$ = $1; }
-                  | DataStructure FUZZY					{ $$ = dfsm_ast_fuzzy_data_structure_new ($1, NAN, ERROR); ABORT_ON_ERROR; }
-                  | DataStructure FUZZY DOUBLE				{ $$ = dfsm_ast_fuzzy_data_structure_new ($1, $3, ERROR); ABORT_ON_ERROR; }
+                  | DataStructure FUZZY					{ $$ = $1; dfsm_ast_data_structure_set_weight ($1, NAN); }
+                  | DataStructure FUZZY DOUBLE				{ $$ = $1; dfsm_ast_data_structure_set_weight ($1, $3); }
 ;
 
 /* Returns a new DfsmAstDataStructure or DfsmAstVariable. */
@@ -376,7 +381,7 @@ DataStructure: BYTE					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BYTE, 
 ArrayList: ArrayListInner							{ $$ = $1; }
          | ArrayListInner Expression						{ $$ = $1; g_ptr_array_add ($$, $2); }
 ;
-ArrayListInner: /* empty */							{ $$ = g_ptr_array_new_with_free_func (dfsm_ast_node_unref); }
+ArrayListInner: /* empty */							{ $$ = g_ptr_array_new_with_free_func (g_object_unref); }
               | ArrayListInner Expression ','					{ $$ = $1; g_ptr_array_add ($$, $2); }
 ;
 
@@ -400,7 +405,7 @@ DictionaryListInner: /* empty */			{
 StructureList: StructureListInner						{ $$ = $1; }
              | StructureListInner Expression					{ $$ = $1; g_ptr_array_add ($$, $2); }
 ;
-StructureListInner: /* empty */							{ $$ = g_ptr_array_new_with_free_func (dfsm_ast_node_unref); }
+StructureListInner: /* empty */							{ $$ = g_ptr_array_new_with_free_func (g_object_unref); }
                   | StructureListInner Expression ','				{ $$ = $1; g_ptr_array_add ($$, $2); }
 ;
 
