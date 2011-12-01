@@ -31,6 +31,7 @@ static void dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *e
 
 struct _DfsmAstDataStructurePrivate {
 	DfsmAstDataStructureType data_structure_type;
+	GVariantType *variant_type; /* gets set by _calculate_type(); NULL beforehand */
 	gdouble weight;
 	union {
 		guchar byte_val;
@@ -82,6 +83,10 @@ static void
 dfsm_ast_data_structure_finalize (GObject *object)
 {
 	DfsmAstDataStructurePrivate *priv = DFSM_AST_DATA_STRUCTURE (object)->priv;
+
+	if (priv->variant_type != NULL) {
+		g_variant_type_free (priv->variant_type);
+	}
 
 	switch (priv->data_structure_type) {
 		case DFSM_AST_DATA_BYTE:
@@ -339,6 +344,165 @@ dfsm_ast_data_structure_pre_check_and_register (DfsmAstNode *node, DfsmEnvironme
 	}
 }
 
+static GVariantType *
+__calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment)
+{
+	DfsmAstDataStructurePrivate *priv = self->priv;
+
+	switch (priv->data_structure_type) {
+		case DFSM_AST_DATA_BYTE:
+			return g_variant_type_copy (G_VARIANT_TYPE_BYTE);
+		case DFSM_AST_DATA_BOOLEAN:
+			return g_variant_type_copy (G_VARIANT_TYPE_BOOLEAN);
+		case DFSM_AST_DATA_INT16:
+			return g_variant_type_copy (G_VARIANT_TYPE_INT16);
+		case DFSM_AST_DATA_UINT16:
+			return g_variant_type_copy (G_VARIANT_TYPE_UINT16);
+		case DFSM_AST_DATA_INT32:
+			return g_variant_type_copy (G_VARIANT_TYPE_INT32);
+		case DFSM_AST_DATA_UINT32:
+			return g_variant_type_copy (G_VARIANT_TYPE_UINT32);
+		case DFSM_AST_DATA_INT64:
+			return g_variant_type_copy (G_VARIANT_TYPE_INT64);
+		case DFSM_AST_DATA_UINT64:
+			return g_variant_type_copy (G_VARIANT_TYPE_UINT64);
+		case DFSM_AST_DATA_DOUBLE:
+			return g_variant_type_copy (G_VARIANT_TYPE_DOUBLE);
+		case DFSM_AST_DATA_STRING:
+			return g_variant_type_copy (G_VARIANT_TYPE_STRING);
+		case DFSM_AST_DATA_OBJECT_PATH:
+			return g_variant_type_copy (G_VARIANT_TYPE_OBJECT_PATH);
+		case DFSM_AST_DATA_SIGNATURE:
+			return g_variant_type_copy (G_VARIANT_TYPE_SIGNATURE);
+		case DFSM_AST_DATA_ARRAY: {
+			GVariantType *array_type, *lg_child_type = NULL;
+			guint i;
+
+			/* We need to find a least general supertype of all the types in the array. */
+			for (i = 0; i < priv->array_val->len; i++) {
+				DfsmAstExpression *expression;
+				GVariantType *child_type;
+
+				expression = DFSM_AST_EXPRESSION (g_ptr_array_index (priv->array_val, i));
+
+				child_type = dfsm_ast_expression_calculate_type (expression, environment);
+
+				if (lg_child_type == NULL) {
+					lg_child_type = g_variant_type_copy (child_type);
+				} else if (g_variant_type_is_subtype_of (child_type, lg_child_type) == FALSE) {
+					/* HACK: Just make the least-general supertype a variant. */
+					g_variant_type_free (lg_child_type);
+					lg_child_type = g_variant_type_copy (G_VARIANT_TYPE_VARIANT);
+				}
+
+				g_variant_type_free (child_type);
+			}
+
+			/* Wrap it in an array. If the array was empty, use the any type for child elements. */
+			array_type = g_variant_type_new_array ((lg_child_type != NULL) ? lg_child_type : G_VARIANT_TYPE_ANY);
+			g_variant_type_free (lg_child_type);
+
+			return array_type;
+		}
+		case DFSM_AST_DATA_STRUCT: {
+			GVariantType *struct_type;
+			GPtrArray/*<GVariantType>*/ *child_types;
+			guint i;
+
+			/* Empty structs need special-casing. */
+			if (priv->struct_val->len == 0) {
+				return g_variant_type_copy (G_VARIANT_TYPE_TUPLE);
+			}
+
+			/* Build an array of the types of the struct elements. */
+			child_types = g_ptr_array_new_with_free_func ((GDestroyNotify) g_variant_type_free);
+
+			for (i = 0; i < priv->struct_val->len; i++) {
+				GVariantType *element_type;
+
+				element_type = dfsm_ast_expression_calculate_type (g_ptr_array_index (priv->struct_val, i), environment);
+				g_ptr_array_add (child_types, element_type);
+			}
+
+			struct_type = g_variant_type_new_tuple ((const GVariantType**) child_types->pdata, child_types->len);
+			g_ptr_array_unref (child_types);
+
+			return struct_type;
+		}
+		case DFSM_AST_DATA_VARIANT:
+			return g_variant_type_copy (G_VARIANT_TYPE_VARIANT);
+		case DFSM_AST_DATA_DICT: {
+			GVariantType *dict_type, *entry_type, *lg_key_type = NULL, *lg_value_type = NULL;
+			guint i;
+
+			/* Empty dictionaries need special-casing. */
+			if (priv->dict_val->len == 0) {
+				return g_variant_type_copy (G_VARIANT_TYPE_DICTIONARY);
+			}
+
+			/* We need to find a least general supertype of all the types of keys and values in the dictionary. */
+			for (i = 0; i < priv->dict_val->len; i++) {
+				DfsmAstDictionaryEntry *entry;
+				GVariantType *key_type, *value_type;
+
+				entry = (DfsmAstDictionaryEntry*) g_ptr_array_index (priv->dict_val, i);
+
+				/* Key */
+				key_type = dfsm_ast_expression_calculate_type (entry->key, environment);
+
+				if (lg_key_type == NULL) {
+					lg_key_type = g_variant_type_copy (key_type);
+				} else if (g_variant_type_is_subtype_of (key_type, lg_key_type) == FALSE) {
+					/* HACK: Just make the least-general supertype a variant. */
+					g_variant_type_free (lg_key_type);
+					lg_key_type = g_variant_type_copy (G_VARIANT_TYPE_VARIANT);
+				}
+
+				g_variant_type_free (key_type);
+
+				/* Value */
+				value_type = dfsm_ast_expression_calculate_type (entry->value, environment);
+
+				if (lg_value_type == NULL) {
+					lg_value_type = g_variant_type_copy (value_type);
+				} else if (g_variant_type_is_subtype_of (value_type, lg_value_type) == FALSE) {
+					/* HACK: Just make the least-general supertype a variant. */
+					g_variant_type_free (lg_value_type);
+					lg_value_type = g_variant_type_copy (G_VARIANT_TYPE_VARIANT);
+				}
+
+				g_variant_type_free (value_type);
+			}
+
+			/* Build the dictionary type. */
+			entry_type = g_variant_type_new_dict_entry (lg_key_type, lg_value_type);
+			dict_type = g_variant_type_new_array (entry_type);
+			g_variant_type_free (entry_type);
+
+			return dict_type;
+		}
+		case DFSM_AST_DATA_UNIX_FD:
+			return g_variant_type_copy (G_VARIANT_TYPE_UINT32);
+		case DFSM_AST_DATA_REGEXP:
+			return g_variant_type_copy (G_VARIANT_TYPE_STRING);
+		case DFSM_AST_DATA_VARIABLE:
+			return dfsm_ast_variable_calculate_type (priv->variable_val, environment);
+		default:
+			g_assert_not_reached ();
+	}
+}
+
+static GVariantType *
+_calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment)
+{
+	/* Cache the type. */
+	if (self->priv->variant_type == NULL) {
+		self->priv->variant_type = __calculate_type (self, environment);
+	}
+
+	return g_variant_type_copy (self->priv->variant_type);
+}
+
 static void
 dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
@@ -364,11 +528,10 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 			/* Nothing to do here */
 			break;
 		case DFSM_AST_DATA_ARRAY: {
-			GVariantType *expected_type = NULL;
+			GVariantType *expected_type;
 
-			/* All entries valid and of the same type? */
+			/* All entries valid? */
 			for (i = 0; i < priv->array_val->len; i++) {
-				GVariantType *child_type;
 				DfsmAstExpression *expr;
 
 				expr = g_ptr_array_index (priv->array_val, i);
@@ -377,34 +540,13 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 				dfsm_ast_node_check (DFSM_AST_NODE (expr), environment, error);
 
 				if (*error != NULL) {
-					goto array_error;
+					return;
 				}
-
-				/* Equal type? */
-				child_type = dfsm_ast_expression_calculate_type (expr, environment);
-
-				if (expected_type == NULL) {
-					/* First iteration */
-					expected_type = g_variant_type_copy (child_type);
-				} else if (g_variant_type_equal (expected_type, child_type) == FALSE) {
-					gchar *expected, *received;
-
-					expected = g_variant_type_dup_string (expected_type);
-					received = g_variant_type_dup_string (child_type);
-
-					g_variant_type_free (child_type);
-
-					g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-					             "Type mismatch between elements in array: expected type %s but received type %s.",
-					             expected, received);
-
-					goto array_error;
-				}
-
-				g_variant_type_free (child_type);
 			}
 
-		array_error:
+			/* All entries subtypes of the array child type? Calculating the type of the overall array will necessarily find any type
+			 * errors with the individual entries. They're currently resolved by taking a variant as a supertype. */
+			expected_type = _calculate_type (DFSM_AST_DATA_STRUCTURE (node), environment);
 			g_variant_type_free (expected_type);
 
 			break;
@@ -426,11 +568,10 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 			break;
 		}
 		case DFSM_AST_DATA_DICT: {
-			GVariantType *expected_key_type = NULL, *expected_value_type = NULL;
+			GVariantType *expected_type = NULL;
 
-			/* All entries valid with no TODO duplicate keys and equal types for all keys and values? */
+			/* All entries valid with no duplicate keys? */
 			for (i = 0; i < priv->dict_val->len; i++) {
-				GVariantType *key_type, *value_type;
 				DfsmAstDictionaryEntry *entry;
 
 				/* Valid expressions? */
@@ -439,62 +580,22 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 				dfsm_ast_node_check (DFSM_AST_NODE (entry->key), environment, error);
 
 				if (*error != NULL) {
-					goto dict_error;
+					return;
 				}
 
 				dfsm_ast_node_check (DFSM_AST_NODE (entry->value), environment, error);
 
 				if (*error != NULL) {
-					goto dict_error;
+					return;
 				}
-
-				/* Equal types? */
-				key_type = dfsm_ast_expression_calculate_type (entry->key, environment);
-				value_type = dfsm_ast_expression_calculate_type (entry->value, environment);
-
-				g_assert ((expected_key_type == NULL) == (expected_value_type == NULL));
-
-				if (expected_key_type == NULL) {
-					/* First iteration */
-					expected_key_type = g_variant_type_copy (key_type);
-					expected_value_type = g_variant_type_copy (value_type);
-				} else if (g_variant_type_equal (expected_key_type, key_type) == FALSE) {
-					gchar *expected, *received;
-
-					expected = g_variant_type_dup_string (expected_key_type);
-					received = g_variant_type_dup_string (key_type);
-
-					g_variant_type_free (key_type);
-					g_variant_type_free (value_type);
-
-					g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-					             "Type mismatch between keys in dictionary: expected type %s but received type %s.",
-					             expected, received);
-
-					goto dict_error;
-				} else if (g_variant_type_equal (expected_value_type, value_type) == FALSE) {
-					gchar *expected, *received;
-
-					expected = g_variant_type_dup_string (expected_value_type);
-					received = g_variant_type_dup_string (value_type);
-
-					g_variant_type_free (key_type);
-					g_variant_type_free (value_type);
-
-					g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-					             "Type mismatch between values in dictionary: expected type %s but received type %s.",
-					             expected, received);
-
-					goto dict_error;
-				}
-
-				g_variant_type_free (key_type);
-				g_variant_type_free (value_type);
 			}
 
-		dict_error:
-			g_variant_type_free (expected_key_type);
-			g_variant_type_free (expected_value_type);
+			/* TODO: Check for duplicate keys. */
+
+			/* All entries subtypes of the dictionary entry type? Calculating the type of the overall dictionary will necessarily find any
+			 * type errors with the individual entries. They're currently resolved by taking a variant as a supertype. */
+			expected_type = _calculate_type (DFSM_AST_DATA_STRUCTURE (node), environment);
+			g_variant_type_free (expected_type);
 
 			break;
 		}
@@ -635,113 +736,10 @@ dfsm_ast_data_structure_set_weight (DfsmAstDataStructure *self, gdouble weight)
 GVariantType *
 dfsm_ast_data_structure_calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment)
 {
-	DfsmAstDataStructurePrivate *priv;
-
 	g_return_val_if_fail (DFSM_IS_AST_DATA_STRUCTURE (self), NULL);
 	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), NULL);
 
-	priv = self->priv;
-
-	switch (priv->data_structure_type) {
-		case DFSM_AST_DATA_BYTE:
-			return g_variant_type_copy (G_VARIANT_TYPE_BYTE);
-		case DFSM_AST_DATA_BOOLEAN:
-			return g_variant_type_copy (G_VARIANT_TYPE_BOOLEAN);
-		case DFSM_AST_DATA_INT16:
-			return g_variant_type_copy (G_VARIANT_TYPE_INT16);
-		case DFSM_AST_DATA_UINT16:
-			return g_variant_type_copy (G_VARIANT_TYPE_UINT16);
-		case DFSM_AST_DATA_INT32:
-			return g_variant_type_copy (G_VARIANT_TYPE_INT32);
-		case DFSM_AST_DATA_UINT32:
-			return g_variant_type_copy (G_VARIANT_TYPE_UINT32);
-		case DFSM_AST_DATA_INT64:
-			return g_variant_type_copy (G_VARIANT_TYPE_INT64);
-		case DFSM_AST_DATA_UINT64:
-			return g_variant_type_copy (G_VARIANT_TYPE_UINT64);
-		case DFSM_AST_DATA_DOUBLE:
-			return g_variant_type_copy (G_VARIANT_TYPE_DOUBLE);
-		case DFSM_AST_DATA_STRING:
-			return g_variant_type_copy (G_VARIANT_TYPE_STRING);
-		case DFSM_AST_DATA_OBJECT_PATH:
-			return g_variant_type_copy (G_VARIANT_TYPE_OBJECT_PATH);
-		case DFSM_AST_DATA_SIGNATURE:
-			return g_variant_type_copy (G_VARIANT_TYPE_SIGNATURE);
-		case DFSM_AST_DATA_ARRAY: {
-			GVariantType *array_type, *child_type;
-
-			/* Empty arrays need special-casing. */
-			if (priv->array_val->len == 0) {
-				return g_variant_type_copy (G_VARIANT_TYPE_ARRAY);
-			}
-
-			/* Having checked the array already, we can assume all elements are of the same type. */
-			child_type = dfsm_ast_expression_calculate_type (g_ptr_array_index (priv->array_val, 0), environment);
-			array_type = g_variant_type_new_array (child_type);
-			g_variant_type_free (child_type);
-
-			return array_type;
-		}
-		case DFSM_AST_DATA_STRUCT: {
-			GVariantType *struct_type;
-			GPtrArray/*<GVariantType>*/ *child_types;
-			guint i;
-
-			/* Empty structs need special-casing. */
-			if (priv->struct_val->len == 0) {
-				return g_variant_type_copy (G_VARIANT_TYPE_TUPLE);
-			}
-
-			/* Build an array of the types of the struct elements. */
-			child_types = g_ptr_array_new_with_free_func ((GDestroyNotify) g_variant_type_free);
-
-			for (i = 0; i < priv->struct_val->len; i++) {
-				GVariantType *element_type;
-
-				element_type = dfsm_ast_expression_calculate_type (g_ptr_array_index (priv->struct_val, i), environment);
-				g_ptr_array_add (child_types, element_type);
-			}
-
-			struct_type = g_variant_type_new_tuple ((const GVariantType**) child_types->pdata, child_types->len);
-			g_ptr_array_unref (child_types);
-
-			return struct_type;
-		}
-		case DFSM_AST_DATA_VARIANT:
-			return g_variant_type_copy (G_VARIANT_TYPE_VARIANT);
-		case DFSM_AST_DATA_DICT: {
-			DfsmAstDictionaryEntry *entry;
-			GVariantType *dict_type, *entry_type, *key_type, *value_type;
-
-			/* Empty dictionaries need special-casing. */
-			if (priv->dict_val->len == 0) {
-				return g_variant_type_copy (G_VARIANT_TYPE_DICTIONARY);
-			}
-
-			/* Otherwise, we assume that all entries have the same type (since we checked this before). */
-			entry = (DfsmAstDictionaryEntry*) g_ptr_array_index (priv->dict_val, 0);
-
-			key_type = dfsm_ast_expression_calculate_type (entry->key, environment);
-			value_type = dfsm_ast_expression_calculate_type (entry->value, environment);
-			entry_type = g_variant_type_new_dict_entry (key_type, value_type);
-			g_variant_type_free (value_type);
-			g_variant_type_free (key_type);
-
-			dict_type = g_variant_type_new_array (entry_type);
-
-			g_variant_type_free (entry_type);
-
-			return dict_type;
-		}
-		case DFSM_AST_DATA_UNIX_FD:
-			return g_variant_type_copy (G_VARIANT_TYPE_UINT32);
-		case DFSM_AST_DATA_REGEXP:
-			return g_variant_type_copy (G_VARIANT_TYPE_STRING);
-		case DFSM_AST_DATA_VARIABLE:
-			return dfsm_ast_variable_calculate_type (priv->variable_val, environment);
-		default:
-			g_assert_not_reached ();
-	}
+	return _calculate_type (self, environment);
 }
 
 /**
