@@ -99,7 +99,11 @@ dfsm_ast_variable_check (DfsmAstNode *node, DfsmEnvironment *environment, GError
 {
 	DfsmAstVariablePrivate *priv = DFSM_AST_VARIABLE (node)->priv;
 
-	/* TODO: Check variable exists, is in scope, etc. */
+	/* Check the variable exists in this scope. */
+	if (dfsm_environment_has_variable (environment, priv->scope, priv->variable_name) == FALSE) {
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Undeclared variable referenced: %s", priv->variable_name);
+		return;
+	}
 }
 
 /**
