@@ -23,6 +23,8 @@
 #include "dfsm-parser.h"
 
 static void dfsm_ast_statement_assignment_dispose (GObject *object);
+static void dfsm_ast_statement_assignment_sanity_check (DfsmAstNode *node);
+static void dfsm_ast_statement_assignment_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static void dfsm_ast_statement_assignment_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static GVariant *dfsm_ast_statement_assignment_execute (DfsmAstStatement *statement, DfsmEnvironment *environment, GError **error);
 
@@ -44,6 +46,8 @@ dfsm_ast_statement_assignment_class_init (DfsmAstStatementAssignmentClass *klass
 
 	gobject_class->dispose = dfsm_ast_statement_assignment_dispose;
 
+	node_class->sanity_check = dfsm_ast_statement_assignment_sanity_check;
+	node_class->pre_check_and_register = dfsm_ast_statement_assignment_pre_check_and_register;
 	node_class->check = dfsm_ast_statement_assignment_check;
 
 	statement_class->execute = dfsm_ast_statement_assignment_execute;
@@ -68,16 +72,38 @@ dfsm_ast_statement_assignment_dispose (GObject *object)
 }
 
 static void
+dfsm_ast_statement_assignment_sanity_check (DfsmAstNode *node)
+{
+	DfsmAstStatementAssignmentPrivate *priv = DFSM_AST_STATEMENT_ASSIGNMENT (node)->priv;
+
+	g_assert (priv->data_structure != NULL);
+	g_assert (priv->expression != NULL);
+}
+
+static void
+dfsm_ast_statement_assignment_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstStatementAssignmentPrivate *priv = DFSM_AST_STATEMENT_ASSIGNMENT (node)->priv;
+
+	dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (priv->data_structure), environment, error);
+
+	if (*error != NULL) {
+		return;
+	}
+
+	dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (priv->expression), environment, error);
+
+	if (*error != NULL) {
+		return;
+	}
+}
+
+static void
 dfsm_ast_statement_assignment_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstStatementAssignmentPrivate *priv = DFSM_AST_STATEMENT_ASSIGNMENT (node)->priv;
 	GVariantType *lvalue_type, *rvalue_type;
 
-	/* Conditions which should always hold, regardless of user input. */
-	g_assert (priv->data_structure != NULL);
-	g_assert (priv->expression != NULL);
-
-	/* Conditions which may not hold as a result of invalid user input. */
 	dfsm_ast_node_check (DFSM_AST_NODE (priv->data_structure), environment, error);
 
 	if (*error != NULL) {

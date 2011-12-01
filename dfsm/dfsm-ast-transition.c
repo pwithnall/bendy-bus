@@ -28,6 +28,8 @@
 
 static void dfsm_ast_transition_dispose (GObject *object);
 static void dfsm_ast_transition_finalize (GObject *object);
+static void dfsm_ast_transition_sanity_check (DfsmAstNode *node);
+static void dfsm_ast_transition_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static void dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 
 struct _DfsmAstTransitionPrivate {
@@ -54,6 +56,8 @@ dfsm_ast_transition_class_init (DfsmAstTransitionClass *klass)
 	gobject_class->dispose = dfsm_ast_transition_dispose;
 	gobject_class->finalize = dfsm_ast_transition_finalize;
 
+	node_class->sanity_check = dfsm_ast_transition_sanity_check;
+	node_class->pre_check_and_register = dfsm_ast_transition_pre_check_and_register;
 	node_class->check = dfsm_ast_transition_check;
 }
 
@@ -106,12 +110,11 @@ dfsm_ast_transition_finalize (GObject *object)
 }
 
 static void
-dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+dfsm_ast_transition_sanity_check (DfsmAstNode *node)
 {
 	DfsmAstTransitionPrivate *priv = DFSM_AST_TRANSITION (node)->priv;
 	guint i;
 
-	/* Conditions which should always hold, regardless of user input. */
 	g_assert (priv->from_state_name != NULL);
 	g_assert (priv->to_state_name != NULL);
 	g_assert (priv->preconditions != NULL);
@@ -135,8 +138,14 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 	for (i = 0; i < priv->statements->len; i++) {
 		g_assert (g_ptr_array_index (priv->statements, i) != NULL);
 	}
+}
 
-	/* Conditions which may not hold as a result of invalid user input. */
+static void
+dfsm_ast_transition_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstTransitionPrivate *priv = DFSM_AST_TRANSITION (node)->priv;
+	guint i;
+
 	if (dfsm_is_state_name (priv->from_state_name) == FALSE) {
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid state name: %s", priv->from_state_name);
 		return;
@@ -144,8 +153,6 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid state name: %s", priv->to_state_name);
 		return;
 	}
-
-	/* TODO: Check two state names exist */
 
 	switch (priv->trigger) {
 		case DFSM_AST_TRANSITION_METHOD_CALL:
@@ -166,9 +173,9 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 	for (i = 0; i < priv->preconditions->len; i++) {
 		DfsmAstPrecondition *precondition;
 
-		precondition = (DfsmAstPrecondition*) g_ptr_array_index (priv->preconditions, i);
+		precondition = DFSM_AST_PRECONDITION (g_ptr_array_index (priv->preconditions, i));
 
-		dfsm_ast_node_check ((DfsmAstNode*) precondition, environment, error);
+		dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (precondition), environment, error);
 
 		if (*error != NULL) {
 			return;
@@ -178,9 +185,54 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 	for (i = 0; i < priv->statements->len; i++) {
 		DfsmAstStatement *statement;
 
-		statement = (DfsmAstStatement*) g_ptr_array_index (priv->statements, i);
+		statement = DFSM_AST_STATEMENT (g_ptr_array_index (priv->statements, i));
 
-		dfsm_ast_node_check ((DfsmAstNode*) statement, environment, error);
+		dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (statement), environment, error);
+
+		if (*error != NULL) {
+			return;
+		}
+	}
+}
+
+static void
+dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstTransitionPrivate *priv = DFSM_AST_TRANSITION (node)->priv;
+	guint i;
+
+	/* TODO: Check two state names exist */
+
+	switch (priv->trigger) {
+		case DFSM_AST_TRANSITION_METHOD_CALL:
+			/* TODO: Check method_name exists. */
+
+			break;
+		case DFSM_AST_TRANSITION_ARBITRARY:
+			/* Nothing to do here */
+			break;
+		default:
+			g_assert_not_reached ();
+	}
+
+	for (i = 0; i < priv->preconditions->len; i++) {
+		DfsmAstPrecondition *precondition;
+
+		precondition = DFSM_AST_PRECONDITION (g_ptr_array_index (priv->preconditions, i));
+
+		dfsm_ast_node_check (DFSM_AST_NODE (precondition), environment, error);
+
+		if (*error != NULL) {
+			return;
+		}
+	}
+
+	for (i = 0; i < priv->statements->len; i++) {
+		DfsmAstStatement *statement;
+
+		statement = DFSM_AST_STATEMENT (g_ptr_array_index (priv->statements, i));
+
+		dfsm_ast_node_check (DFSM_AST_NODE (statement), environment, error);
 
 		if (*error != NULL) {
 			return;

@@ -24,6 +24,8 @@
 
 static void dfsm_ast_precondition_dispose (GObject *object);
 static void dfsm_ast_precondition_finalize (GObject *object);
+static void dfsm_ast_precondition_sanity_check (DfsmAstNode *node);
+static void dfsm_ast_precondition_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static void dfsm_ast_precondition_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 
 struct _DfsmAstPreconditionPrivate {
@@ -44,6 +46,8 @@ dfsm_ast_precondition_class_init (DfsmAstPreconditionClass *klass)
 	gobject_class->dispose = dfsm_ast_precondition_dispose;
 	gobject_class->finalize = dfsm_ast_precondition_finalize;
 
+	node_class->sanity_check = dfsm_ast_precondition_sanity_check;
+	node_class->pre_check_and_register = dfsm_ast_precondition_pre_check_and_register;
 	node_class->check = dfsm_ast_precondition_check;
 }
 
@@ -76,18 +80,34 @@ dfsm_ast_precondition_finalize (GObject *object)
 }
 
 static void
-dfsm_ast_precondition_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+dfsm_ast_precondition_sanity_check (DfsmAstNode *node)
 {
 	DfsmAstPreconditionPrivate *priv = DFSM_AST_PRECONDITION (node)->priv;
 
-	/* Conditions which should always hold, regardless of user input. */
 	g_assert (priv->condition != NULL);
+}
 
-	/* Conditions which may not hold as a result of invalid user input. */
+static void
+dfsm_ast_precondition_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstPreconditionPrivate *priv = DFSM_AST_PRECONDITION (node)->priv;
+
 	if (priv->error_name != NULL && g_dbus_is_member_name (priv->error_name) == FALSE) {
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus error name: %s", priv->error_name);
 		return;
 	}
+
+	dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (priv->condition), environment, error);
+
+	if (*error != NULL) {
+		return;
+	}
+}
+
+static void
+dfsm_ast_precondition_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstPreconditionPrivate *priv = DFSM_AST_PRECONDITION (node)->priv;
 
 	dfsm_ast_node_check (DFSM_AST_NODE (priv->condition), environment, error);
 

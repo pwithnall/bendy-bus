@@ -23,6 +23,8 @@
 #include "dfsm-parser.h"
 
 static void dfsm_ast_expression_unary_dispose (GObject *object);
+static void dfsm_ast_expression_unary_sanity_check (DfsmAstNode *node);
+static void dfsm_ast_expression_unary_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static void dfsm_ast_expression_unary_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static GVariantType *dfsm_ast_expression_unary_calculate_type (DfsmAstExpression *self, DfsmEnvironment *environment);
 static GVariant *dfsm_ast_expression_unary_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment, GError **error);
@@ -45,6 +47,8 @@ dfsm_ast_expression_unary_class_init (DfsmAstExpressionUnaryClass *klass)
 
 	gobject_class->dispose = dfsm_ast_expression_unary_dispose;
 
+	node_class->sanity_check = dfsm_ast_expression_unary_sanity_check;
+	node_class->pre_check_and_register = dfsm_ast_expression_unary_pre_check_and_register;
 	node_class->check = dfsm_ast_expression_unary_check;
 
 	expression_class->calculate_type = dfsm_ast_expression_unary_calculate_type;
@@ -69,13 +73,10 @@ dfsm_ast_expression_unary_dispose (GObject *object)
 }
 
 static void
-dfsm_ast_expression_unary_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+dfsm_ast_expression_unary_sanity_check (DfsmAstNode *node)
 {
 	DfsmAstExpressionUnaryPrivate *priv = DFSM_AST_EXPRESSION_UNARY (node)->priv;
-	GVariantType *child_type;
-	const GVariantType *desired_supertype;
 
-	/* Conditions which should always hold, regardless of user input. */
 	switch (priv->expression_type) {
 		case DFSM_AST_EXPRESSION_UNARY_NOT:
 			/* Valid */
@@ -85,8 +86,27 @@ dfsm_ast_expression_unary_check (DfsmAstNode *node, DfsmEnvironment *environment
 	}
 
 	g_assert (priv->child_node != NULL);
+}
 
-	/* Conditions which may not hold as a result of invalid user input. */
+static void
+dfsm_ast_expression_unary_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstExpressionUnaryPrivate *priv = DFSM_AST_EXPRESSION_UNARY (node)->priv;
+
+	dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (priv->child_node), environment, error);
+
+	if (*error != NULL) {
+		return;
+	}
+}
+
+static void
+dfsm_ast_expression_unary_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstExpressionUnaryPrivate *priv = DFSM_AST_EXPRESSION_UNARY (node)->priv;
+	GVariantType *child_type;
+	const GVariantType *desired_supertype;
+
 	dfsm_ast_node_check (DFSM_AST_NODE (priv->child_node), environment, error);
 
 	if (*error != NULL) {

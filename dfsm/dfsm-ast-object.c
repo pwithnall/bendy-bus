@@ -27,6 +27,8 @@
 
 static void dfsm_ast_object_dispose (GObject *object);
 static void dfsm_ast_object_finalize (GObject *object);
+static void dfsm_ast_object_sanity_check (DfsmAstNode *node);
+static void dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static void dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 
 struct _DfsmAstObjectPrivate {
@@ -50,6 +52,8 @@ dfsm_ast_object_class_init (DfsmAstObjectClass *klass)
 	gobject_class->dispose = dfsm_ast_object_dispose;
 	gobject_class->finalize = dfsm_ast_object_finalize;
 
+	node_class->sanity_check = dfsm_ast_object_sanity_check;
+	node_class->pre_check_and_register = dfsm_ast_object_pre_check_and_register;
 	node_class->check = dfsm_ast_object_check;
 }
 
@@ -97,12 +101,11 @@ dfsm_ast_object_finalize (GObject *object)
 }
 
 static void
-dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+dfsm_ast_object_sanity_check (DfsmAstNode *node)
 {
 	DfsmAstObjectPrivate *priv = DFSM_AST_OBJECT (node)->priv;
 	guint i;
 
-	/* Conditions which should always hold, regardless of user input. */
 	g_assert (priv->object_path != NULL);
 	g_assert (priv->interface_names != NULL);
 	g_assert (DFSM_IS_ENVIRONMENT (priv->environment));
@@ -130,8 +133,14 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
 		transition = g_ptr_array_index (priv->transitions, i);
 		g_assert (transition != NULL);
 	}
+}
 
-	/* Conditions which may not hold as a result of invalid user input. */
+static void
+dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstObjectPrivate *priv = DFSM_AST_OBJECT (node)->priv;
+	guint i;
+
 	if (g_variant_is_object_path (priv->object_path) == FALSE) {
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus object path: %s", priv->object_path);
 		return;
@@ -193,7 +202,29 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
 
 		transition = g_ptr_array_index (priv->transitions, i);
 
-		dfsm_ast_node_check ((DfsmAstNode*) transition, environment, error);
+		dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (transition), environment, error);
+
+		if (*error != NULL) {
+			return;
+		}
+	}
+}
+
+static void
+dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstObjectPrivate *priv = DFSM_AST_OBJECT (node)->priv;
+	guint i;
+
+	/* TODO: Check all variables in ->environment have acceptable values */
+	/* TODO: Assert that object explicitly lists data items for each of the properties of its interfaces. */
+
+	for (i = 0; i < priv->transitions->len; i++) {
+		DfsmAstTransition *transition;
+
+		transition = g_ptr_array_index (priv->transitions, i);
+
+		dfsm_ast_node_check (DFSM_AST_NODE (transition), environment, error);
 
 		if (*error != NULL) {
 			return;

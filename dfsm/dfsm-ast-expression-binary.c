@@ -23,6 +23,8 @@
 #include "dfsm-parser.h"
 
 static void dfsm_ast_expression_binary_dispose (GObject *object);
+static void dfsm_ast_expression_binary_sanity_check (DfsmAstNode *node);
+static void dfsm_ast_expression_binary_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static void dfsm_ast_expression_binary_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static GVariantType *dfsm_ast_expression_binary_calculate_type (DfsmAstExpression *self, DfsmEnvironment *environment);
 static GVariant *dfsm_ast_expression_binary_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment, GError **error);
@@ -46,6 +48,8 @@ dfsm_ast_expression_binary_class_init (DfsmAstExpressionBinaryClass *klass)
 
 	gobject_class->dispose = dfsm_ast_expression_binary_dispose;
 
+	node_class->sanity_check = dfsm_ast_expression_binary_sanity_check;
+	node_class->pre_check_and_register = dfsm_ast_expression_binary_pre_check_and_register;
 	node_class->check = dfsm_ast_expression_binary_check;
 
 	expression_class->calculate_type = dfsm_ast_expression_binary_calculate_type;
@@ -71,13 +75,10 @@ dfsm_ast_expression_binary_dispose (GObject *object)
 }
 
 static void
-dfsm_ast_expression_binary_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+dfsm_ast_expression_binary_sanity_check (DfsmAstNode *node)
 {
 	DfsmAstExpressionBinaryPrivate *priv = DFSM_AST_EXPRESSION_BINARY (node)->priv;
-	GVariantType *lvalue_type, *rvalue_type;
-	gboolean typechecks = FALSE;
 
-	/* Conditions which should always hold, regardless of user input. */
 	switch (priv->expression_type) {
 		case DFSM_AST_EXPRESSION_BINARY_TIMES:
 		case DFSM_AST_EXPRESSION_BINARY_DIVIDE:
@@ -100,8 +101,33 @@ dfsm_ast_expression_binary_check (DfsmAstNode *node, DfsmEnvironment *environmen
 
 	g_assert (priv->left_node != NULL);
 	g_assert (priv->right_node != NULL);
+}
 
-	/* Conditions which may not hold as a result of invalid user input. */
+static void
+dfsm_ast_expression_binary_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstExpressionBinaryPrivate *priv = DFSM_AST_EXPRESSION_BINARY (node)->priv;
+
+	dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (priv->left_node), environment, error);
+
+	if (*error != NULL) {
+		return;
+	}
+
+	dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (priv->right_node), environment, error);
+
+	if (*error != NULL) {
+		return;
+	}
+}
+
+static void
+dfsm_ast_expression_binary_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstExpressionBinaryPrivate *priv = DFSM_AST_EXPRESSION_BINARY (node)->priv;
+	GVariantType *lvalue_type, *rvalue_type;
+	gboolean typechecks = FALSE;
+
 	dfsm_ast_node_check (DFSM_AST_NODE (priv->left_node), environment, error);
 
 	if (*error != NULL) {

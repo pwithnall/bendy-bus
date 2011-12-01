@@ -24,6 +24,8 @@
 
 static void dfsm_ast_statement_emit_dispose (GObject *object);
 static void dfsm_ast_statement_emit_finalize (GObject *object);
+static void dfsm_ast_statement_emit_sanity_check (DfsmAstNode *node);
+static void dfsm_ast_statement_emit_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static void dfsm_ast_statement_emit_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static GVariant *dfsm_ast_statement_emit_execute (DfsmAstStatement *statement, DfsmEnvironment *environment, GError **error);
 
@@ -46,6 +48,8 @@ dfsm_ast_statement_emit_class_init (DfsmAstStatementEmitClass *klass)
 	gobject_class->dispose = dfsm_ast_statement_emit_dispose;
 	gobject_class->finalize = dfsm_ast_statement_emit_finalize;
 
+	node_class->sanity_check = dfsm_ast_statement_emit_sanity_check;
+	node_class->pre_check_and_register = dfsm_ast_statement_emit_pre_check_and_register;
 	node_class->check = dfsm_ast_statement_emit_check;
 
 	statement_class->execute = dfsm_ast_statement_emit_execute;
@@ -80,19 +84,35 @@ dfsm_ast_statement_emit_finalize (GObject *object)
 }
 
 static void
-dfsm_ast_statement_emit_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+dfsm_ast_statement_emit_sanity_check (DfsmAstNode *node)
 {
 	DfsmAstStatementEmitPrivate *priv = DFSM_AST_STATEMENT_EMIT (node)->priv;
 
-	/* Conditions which should always hold, regardless of user input. */
 	g_assert (priv->signal_name != NULL);
 	g_assert (priv->expression != NULL);
+}
 
-	/* Conditions which may not hold as a result of invalid user input. */
+static void
+dfsm_ast_statement_emit_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstStatementEmitPrivate *priv = DFSM_AST_STATEMENT_EMIT (node)->priv;
+
 	if (g_dbus_is_member_name (priv->signal_name) == FALSE) {
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus signal name: %s", priv->signal_name);
 		return;
 	}
+
+	dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (priv->expression), environment, error);
+
+	if (*error != NULL) {
+		return;
+	}
+}
+
+static void
+dfsm_ast_statement_emit_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstStatementEmitPrivate *priv = DFSM_AST_STATEMENT_EMIT (node)->priv;
 
 	dfsm_ast_node_check (DFSM_AST_NODE (priv->expression), environment, error);
 

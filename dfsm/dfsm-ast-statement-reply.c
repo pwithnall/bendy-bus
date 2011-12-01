@@ -22,6 +22,8 @@
 #include "dfsm-ast-statement-reply.h"
 
 static void dfsm_ast_statement_reply_dispose (GObject *object);
+static void dfsm_ast_statement_reply_sanity_check (DfsmAstNode *node);
+static void dfsm_ast_statement_reply_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static void dfsm_ast_statement_reply_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static GVariant *dfsm_ast_statement_reply_execute (DfsmAstStatement *statement, DfsmEnvironment *environment, GError **error);
 
@@ -42,6 +44,8 @@ dfsm_ast_statement_reply_class_init (DfsmAstStatementReplyClass *klass)
 
 	gobject_class->dispose = dfsm_ast_statement_reply_dispose;
 
+	node_class->sanity_check = dfsm_ast_statement_reply_sanity_check;
+	node_class->pre_check_and_register = dfsm_ast_statement_reply_pre_check_and_register;
 	node_class->check = dfsm_ast_statement_reply_check;
 
 	statement_class->execute = dfsm_ast_statement_reply_execute;
@@ -65,21 +69,39 @@ dfsm_ast_statement_reply_dispose (GObject *object)
 }
 
 static void
+dfsm_ast_statement_reply_sanity_check (DfsmAstNode *node)
+{
+	DfsmAstStatementReplyPrivate *priv = DFSM_AST_STATEMENT_REPLY (node)->priv;
+
+	g_assert (priv->expression != NULL);
+}
+
+static void
+dfsm_ast_statement_reply_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstStatementReplyPrivate *priv = DFSM_AST_STATEMENT_REPLY (node)->priv;
+
+	dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (priv->expression), environment, error);
+
+	if (*error != NULL) {
+		return;
+	}
+
+	/* TODO: Check we're actually allowed to reply. */
+}
+
+static void
 dfsm_ast_statement_reply_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstStatementReplyPrivate *priv = DFSM_AST_STATEMENT_REPLY (node)->priv;
 
-	/* Conditions which should always hold, regardless of user input. */
-	g_assert (priv->expression != NULL);
-
-	/* Conditions which may not hold as a result of invalid user input. */
 	dfsm_ast_node_check (DFSM_AST_NODE (priv->expression), environment, error);
 
 	if (*error != NULL) {
 		return;
 	}
 
-	/* TODO: Check expression's type matches the method. Check we're actually allowed to reply. */
+	/* TODO: Check expression's type matches the method. */
 }
 
 static GVariant *

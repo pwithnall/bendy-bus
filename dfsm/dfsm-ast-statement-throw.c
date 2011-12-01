@@ -23,7 +23,8 @@
 #include "dfsm-parser.h"
 
 static void dfsm_ast_statement_throw_finalize (GObject *object);
-static void dfsm_ast_statement_throw_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
+static void dfsm_ast_statement_throw_sanity_check (DfsmAstNode *node);
+static void dfsm_ast_statement_throw_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static GVariant *dfsm_ast_statement_throw_execute (DfsmAstStatement *statement, DfsmEnvironment *environment, GError **error);
 
 struct _DfsmAstStatementThrowPrivate {
@@ -43,7 +44,8 @@ dfsm_ast_statement_throw_class_init (DfsmAstStatementThrowClass *klass)
 
 	gobject_class->finalize = dfsm_ast_statement_throw_finalize;
 
-	node_class->check = dfsm_ast_statement_throw_check;
+	node_class->sanity_check = dfsm_ast_statement_throw_sanity_check;
+	node_class->pre_check_and_register = dfsm_ast_statement_throw_pre_check_and_register;
 
 	statement_class->execute = dfsm_ast_statement_throw_execute;
 }
@@ -66,14 +68,18 @@ dfsm_ast_statement_throw_finalize (GObject *object)
 }
 
 static void
-dfsm_ast_statement_throw_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+dfsm_ast_statement_throw_sanity_check (DfsmAstNode *node)
 {
 	DfsmAstStatementThrowPrivate *priv = DFSM_AST_STATEMENT_THROW (node)->priv;
 
-	/* Conditions which should always hold, regardless of user input. */
 	g_assert (priv->error_name != NULL);
+}
 
-	/* Conditions which may not hold as a result of invalid user input. */
+static void
+dfsm_ast_statement_throw_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstStatementThrowPrivate *priv = DFSM_AST_STATEMENT_THROW (node)->priv;
+
 	if (g_dbus_is_member_name (priv->error_name) == FALSE) {
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus error name: %s", priv->error_name);
 		return;

@@ -22,6 +22,8 @@
 #include "dfsm-ast-expression-data-structure.h"
 
 static void dfsm_ast_expression_data_structure_dispose (GObject *object);
+static void dfsm_ast_expression_data_structure_sanity_check (DfsmAstNode *node);
+static void dfsm_ast_expression_data_structure_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static void dfsm_ast_expression_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static GVariantType *dfsm_ast_expression_data_structure_calculate_type (DfsmAstExpression *self, DfsmEnvironment *environment);
 static GVariant *dfsm_ast_expression_data_structure_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment, GError **error);
@@ -43,6 +45,8 @@ dfsm_ast_expression_data_structure_class_init (DfsmAstExpressionDataStructureCla
 
 	gobject_class->dispose = dfsm_ast_expression_data_structure_dispose;
 
+	node_class->sanity_check = dfsm_ast_expression_data_structure_sanity_check;
+	node_class->pre_check_and_register = dfsm_ast_expression_data_structure_pre_check_and_register;
 	node_class->check = dfsm_ast_expression_data_structure_check;
 
 	expression_class->calculate_type = dfsm_ast_expression_data_structure_calculate_type;
@@ -67,14 +71,30 @@ dfsm_ast_expression_data_structure_dispose (GObject *object)
 }
 
 static void
+dfsm_ast_expression_data_structure_sanity_check (DfsmAstNode *node)
+{
+	DfsmAstExpressionDataStructurePrivate *priv = DFSM_AST_EXPRESSION_DATA_STRUCTURE (node)->priv;
+
+	g_assert (priv->data_structure != NULL);
+}
+
+static void
+dfsm_ast_expression_data_structure_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstExpressionDataStructurePrivate *priv = DFSM_AST_EXPRESSION_DATA_STRUCTURE (node)->priv;
+
+	dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (priv->data_structure), environment, error);
+
+	if (*error != NULL) {
+		return;
+	}
+}
+
+static void
 dfsm_ast_expression_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstExpressionDataStructurePrivate *priv = DFSM_AST_EXPRESSION_DATA_STRUCTURE (node)->priv;
 
-	/* Conditions which should always hold, regardless of user input. */
-	g_assert (priv->data_structure != NULL);
-
-	/* Conditions which may not hold as a result of invalid user input. */
 	dfsm_ast_node_check (DFSM_AST_NODE (priv->data_structure), environment, error);
 
 	if (*error != NULL) {

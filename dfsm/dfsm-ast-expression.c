@@ -22,26 +22,16 @@
 #include "dfsm-ast-expression.h"
 #include "dfsm-ast-object.h"
 
-static void dfsm_ast_expression_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
-
 G_DEFINE_ABSTRACT_TYPE (DfsmAstExpression, dfsm_ast_expression, DFSM_TYPE_AST_NODE)
 
 static void
 dfsm_ast_expression_class_init (DfsmAstExpressionClass *klass)
 {
-	DfsmAstNodeClass *node_class = DFSM_AST_NODE_CLASS (klass);
-
-	node_class->check = dfsm_ast_expression_check;
-}
-
-static void
-dfsm_ast_expression_init (DfsmAstExpression *self)
-{
 	/* Nothing to see here. */
 }
 
 static void
-dfsm_ast_expression_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+dfsm_ast_expression_init (DfsmAstExpression *self)
 {
 	/* Nothing to see here. */
 }

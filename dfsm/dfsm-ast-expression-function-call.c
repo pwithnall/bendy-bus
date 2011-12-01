@@ -24,6 +24,8 @@
 
 static void dfsm_ast_expression_function_call_dispose (GObject *object);
 static void dfsm_ast_expression_function_call_finalize (GObject *object);
+static void dfsm_ast_expression_function_call_sanity_check (DfsmAstNode *node);
+static void dfsm_ast_expression_function_call_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static void dfsm_ast_expression_function_call_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static GVariantType *dfsm_ast_expression_function_call_calculate_type (DfsmAstExpression *self, DfsmEnvironment *environment);
 static GVariant *dfsm_ast_expression_function_call_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment, GError **error);
@@ -47,6 +49,8 @@ dfsm_ast_expression_function_call_class_init (DfsmAstExpressionFunctionCallClass
 	gobject_class->dispose = dfsm_ast_expression_function_call_dispose;
 	gobject_class->finalize = dfsm_ast_expression_function_call_finalize;
 
+	node_class->sanity_check = dfsm_ast_expression_function_call_sanity_check;
+	node_class->pre_check_and_register = dfsm_ast_expression_function_call_pre_check_and_register;
 	node_class->check = dfsm_ast_expression_function_call_check;
 
 	expression_class->calculate_type = dfsm_ast_expression_function_call_calculate_type;
@@ -82,17 +86,20 @@ dfsm_ast_expression_function_call_finalize (GObject *object)
 }
 
 static void
-dfsm_ast_expression_function_call_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+dfsm_ast_expression_function_call_sanity_check (DfsmAstNode *node)
+{
+	DfsmAstExpressionFunctionCallPrivate *priv = DFSM_AST_EXPRESSION_FUNCTION_CALL (node)->priv;
+
+	g_assert (priv->function_name != NULL);
+	g_assert (priv->parameters != NULL);
+}
+
+static void
+dfsm_ast_expression_function_call_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstExpressionFunctionCallPrivate *priv = DFSM_AST_EXPRESSION_FUNCTION_CALL (node)->priv;
 	const DfsmFunctionInfo *function_info;
-	GVariantType *parameters_type;
 
-	/* Conditions which should always hold, regardless of user input. */
-	g_assert (priv->function_name != NULL);
-	g_assert (priv->parameters != NULL);
-
-	/* Conditions which may not hold as a result of invalid user input. */
 	function_info = dfsm_environment_get_function_info (priv->function_name);
 
 	if (function_info == NULL || dfsm_is_function_name (priv->function_name) == FALSE) {
@@ -100,11 +107,28 @@ dfsm_ast_expression_function_call_check (DfsmAstNode *node, DfsmEnvironment *env
 		return;
 	}
 
+	dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (priv->parameters), environment, error);
+
+	if (*error != NULL) {
+		return;
+	}
+}
+
+static void
+dfsm_ast_expression_function_call_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstExpressionFunctionCallPrivate *priv = DFSM_AST_EXPRESSION_FUNCTION_CALL (node)->priv;
+	const DfsmFunctionInfo *function_info;
+	GVariantType *parameters_type;
+
 	dfsm_ast_node_check (DFSM_AST_NODE (priv->parameters), environment, error);
 
 	if (*error != NULL) {
 		return;
 	}
+
+	function_info = dfsm_environment_get_function_info (priv->function_name);
+	g_assert (function_info != NULL);
 
 	parameters_type = dfsm_ast_expression_calculate_type (priv->parameters, environment);
 

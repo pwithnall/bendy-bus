@@ -44,12 +44,16 @@ typedef struct {
 typedef struct {
 	GObjectClass parent;
 
-	/* Virtual functions */
+	/* Virtual methods, all options */
+	void (*sanity_check) (DfsmAstNode *self); /* assertions which should always hold, regardless of the stage of interpretation we're in */
+	void (*pre_check_and_register) (DfsmAstNode *self, DfsmEnvironment *environment, GError **error /* guaranteed to be non-NULL */);
 	void (*check) (DfsmAstNode *self, DfsmEnvironment *environment, GError **error /* guaranteed to be non-NULL */);
 } DfsmAstNodeClass;
 
 GType dfsm_ast_node_get_type (void) G_GNUC_CONST;
 
+void dfsm_ast_node_sanity_check (DfsmAstNode *self);
+void dfsm_ast_node_pre_check_and_register (DfsmAstNode *self, DfsmEnvironment *environment, GError **error);
 void dfsm_ast_node_check (DfsmAstNode *self, DfsmEnvironment *environment, GError **error);
 
 G_END_DECLS

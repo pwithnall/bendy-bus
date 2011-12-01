@@ -25,6 +25,8 @@
 #include "dfsm-parser.h"
 
 static void dfsm_ast_data_structure_finalize (GObject *object);
+static void dfsm_ast_data_structure_sanity_check (DfsmAstNode *node);
+static void dfsm_ast_data_structure_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static void dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 
 struct _DfsmAstDataStructurePrivate {
@@ -65,6 +67,8 @@ dfsm_ast_data_structure_class_init (DfsmAstDataStructureClass *klass)
 
 	gobject_class->finalize = dfsm_ast_data_structure_finalize;
 
+	node_class->sanity_check = dfsm_ast_data_structure_sanity_check;
+	node_class->pre_check_and_register = dfsm_ast_data_structure_pre_check_and_register;
 	node_class->check = dfsm_ast_data_structure_check;
 }
 
@@ -130,12 +134,11 @@ dfsm_ast_data_structure_finalize (GObject *object)
 }
 
 static void
-dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+dfsm_ast_data_structure_sanity_check (DfsmAstNode *node)
 {
 	DfsmAstDataStructurePrivate *priv = DFSM_AST_DATA_STRUCTURE (node)->priv;
 	guint i;
 
-	/* Conditions which should always hold, regardless of user input. */
 	switch (priv->data_structure_type) {
 		case DFSM_AST_DATA_BYTE:
 		case DFSM_AST_DATA_BOOLEAN:
@@ -196,8 +199,14 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 		default:
 			g_assert_not_reached ();
 	}
+}
 
-	/* Conditions which may not hold as a result of invalid user input. */
+static void
+dfsm_ast_data_structure_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstDataStructurePrivate *priv = DFSM_AST_DATA_STRUCTURE (node)->priv;
+	guint i;
+
 	switch (priv->data_structure_type) {
 		case DFSM_AST_DATA_BYTE:
 		case DFSM_AST_DATA_BOOLEAN:
@@ -238,6 +247,123 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 
 			break;
 		case DFSM_AST_DATA_ARRAY: {
+			/* All entries valid? */
+			for (i = 0; i < priv->array_val->len; i++) {
+				DfsmAstExpression *expr;
+
+				expr = g_ptr_array_index (priv->array_val, i);
+
+				dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (expr), environment, error);
+
+				if (*error != NULL) {
+					return;
+				}
+			}
+
+			break;
+		}
+		case DFSM_AST_DATA_STRUCT: {
+			/* All entries valid? */
+			for (i = 0; i < priv->struct_val->len; i++) {
+				DfsmAstExpression *expr;
+
+				expr = g_ptr_array_index (priv->struct_val, i);
+
+				dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (expr), environment, error);
+
+				if (*error != NULL) {
+					return;
+				}
+			}
+
+			break;
+		}
+		case DFSM_AST_DATA_VARIANT:
+			if (g_variant_is_normal_form (priv->variant_val) == FALSE) {
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid variant: not in normal form");
+				return;
+			}
+
+			break;
+		case DFSM_AST_DATA_DICT: {
+			/* All entries valid? */
+			for (i = 0; i < priv->dict_val->len; i++) {
+				DfsmAstDictionaryEntry *entry;
+
+				/* Valid expressions? */
+				entry = g_ptr_array_index (priv->dict_val, i);
+
+				dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (entry->key), environment, error);
+
+				if (*error != NULL) {
+					return;
+				}
+
+				dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (entry->value), environment, error);
+
+				if (*error != NULL) {
+					return;
+				}
+			}
+
+			break;
+		}
+		case DFSM_AST_DATA_UNIX_FD:
+			/* Nothing to do here */
+			break;
+		case DFSM_AST_DATA_REGEXP: {
+			/* Check if the regexp is valid by trying to parse it */
+			GRegex *regex = g_regex_new (priv->regexp_val, 0, 0, error);
+
+			if (regex != NULL) {
+				g_regex_unref (regex);
+			}
+
+			if (*error != NULL) {
+				return;
+			}
+
+			break;
+		}
+		case DFSM_AST_DATA_VARIABLE:
+			/* Valid variable? */
+			dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (priv->variable_val), environment, error);
+
+			if (*error != NULL) {
+				return;
+			}
+
+			break;
+		default:
+			g_assert_not_reached ();
+	}
+}
+
+static void
+dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstDataStructurePrivate *priv = DFSM_AST_DATA_STRUCTURE (node)->priv;
+	guint i;
+
+	switch (priv->data_structure_type) {
+		case DFSM_AST_DATA_BYTE:
+		case DFSM_AST_DATA_BOOLEAN:
+		case DFSM_AST_DATA_INT16:
+		case DFSM_AST_DATA_UINT16:
+		case DFSM_AST_DATA_INT32:
+		case DFSM_AST_DATA_UINT32:
+		case DFSM_AST_DATA_INT64:
+		case DFSM_AST_DATA_UINT64:
+		case DFSM_AST_DATA_DOUBLE:
+		case DFSM_AST_DATA_STRING:
+		case DFSM_AST_DATA_OBJECT_PATH:
+		case DFSM_AST_DATA_SIGNATURE:
+		case DFSM_AST_DATA_VARIANT:
+		case DFSM_AST_DATA_UNIX_FD:
+		case DFSM_AST_DATA_REGEXP:
+			/* Nothing to do here */
+			break;
+		case DFSM_AST_DATA_ARRAY: {
 			GVariantType *expected_type = NULL;
 
 			/* All entries valid and of the same type? */
@@ -248,7 +374,7 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 				expr = g_ptr_array_index (priv->array_val, i);
 
 				/* Valid expression? */
-				dfsm_ast_node_check ((DfsmAstNode*) expr, environment, error);
+				dfsm_ast_node_check (DFSM_AST_NODE (expr), environment, error);
 
 				if (*error != NULL) {
 					goto array_error;
@@ -290,7 +416,7 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 
 				expr = g_ptr_array_index (priv->struct_val, i);
 
-				dfsm_ast_node_check ((DfsmAstNode*) expr, environment, error);
+				dfsm_ast_node_check (DFSM_AST_NODE (expr), environment, error);
 
 				if (*error != NULL) {
 					return;
@@ -299,17 +425,10 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 
 			break;
 		}
-		case DFSM_AST_DATA_VARIANT:
-			if (g_variant_is_normal_form (priv->variant_val) == FALSE) {
-				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid variant: not in normal form");
-				return;
-			}
-
-			break;
 		case DFSM_AST_DATA_DICT: {
 			GVariantType *expected_key_type = NULL, *expected_value_type = NULL;
 
-			/* All entries valid with no duplicate keys and equal types for all keys and values? */
+			/* All entries valid with no TODO duplicate keys and equal types for all keys and values? */
 			for (i = 0; i < priv->dict_val->len; i++) {
 				GVariantType *key_type, *value_type;
 				DfsmAstDictionaryEntry *entry;
@@ -317,13 +436,13 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 				/* Valid expressions? */
 				entry = g_ptr_array_index (priv->dict_val, i);
 
-				dfsm_ast_node_check ((DfsmAstNode*) entry->key, environment, error);
+				dfsm_ast_node_check (DFSM_AST_NODE (entry->key), environment, error);
 
 				if (*error != NULL) {
 					goto dict_error;
 				}
 
-				dfsm_ast_node_check ((DfsmAstNode*) entry->value, environment, error);
+				dfsm_ast_node_check (DFSM_AST_NODE (entry->value), environment, error);
 
 				if (*error != NULL) {
 					goto dict_error;
@@ -379,26 +498,9 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 
 			break;
 		}
-		case DFSM_AST_DATA_UNIX_FD:
-			/* Nothing to do here */
-			break;
-		case DFSM_AST_DATA_REGEXP: {
-			/* Check if the regexp is valid by trying to parse it */
-			GRegex *regex = g_regex_new (priv->regexp_val, 0, 0, error);
-
-			if (regex != NULL) {
-				g_regex_unref (regex);
-			}
-
-			if (*error != NULL) {
-				return;
-			}
-
-			break;
-		}
 		case DFSM_AST_DATA_VARIABLE:
 			/* Valid variable? */
-			dfsm_ast_node_check ((DfsmAstNode*) priv->variable_val, environment, error);
+			dfsm_ast_node_check (DFSM_AST_NODE (priv->variable_val), environment, error);
 
 			if (*error != NULL) {
 				return;

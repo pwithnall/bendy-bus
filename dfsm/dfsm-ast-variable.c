@@ -23,6 +23,8 @@
 #include "dfsm-parser.h"
 
 static void dfsm_ast_variable_finalize (GObject *object);
+static void dfsm_ast_variable_sanity_check (DfsmAstNode *node);
+static void dfsm_ast_variable_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static void dfsm_ast_variable_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 
 struct _DfsmAstVariablePrivate {
@@ -42,6 +44,8 @@ dfsm_ast_variable_class_init (DfsmAstVariableClass *klass)
 
 	gobject_class->finalize = dfsm_ast_variable_finalize;
 
+	node_class->sanity_check = dfsm_ast_variable_sanity_check;
+	node_class->pre_check_and_register = dfsm_ast_variable_pre_check_and_register;
 	node_class->check = dfsm_ast_variable_check;
 }
 
@@ -63,11 +67,10 @@ dfsm_ast_variable_finalize (GObject *object)
 }
 
 static void
-dfsm_ast_variable_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+dfsm_ast_variable_sanity_check (DfsmAstNode *node)
 {
 	DfsmAstVariablePrivate *priv = DFSM_AST_VARIABLE (node)->priv;
 
-	/* Conditions which should always hold, regardless of user input. */
 	g_assert (priv->variable_name != NULL);
 
 	switch (priv->scope) {
@@ -78,12 +81,23 @@ dfsm_ast_variable_check (DfsmAstNode *node, DfsmEnvironment *environment, GError
 		default:
 			g_assert_not_reached ();
 	}
+}
 
-	/* Conditions which may not hold as a result of invalid user input. */
+static void
+dfsm_ast_variable_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstVariablePrivate *priv = DFSM_AST_VARIABLE (node)->priv;
+
 	if (dfsm_is_variable_name (priv->variable_name) == FALSE) {
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid variable name: %s", priv->variable_name);
 		return;
 	}
+}
+
+static void
+dfsm_ast_variable_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
+{
+	DfsmAstVariablePrivate *priv = DFSM_AST_VARIABLE (node)->priv;
 
 	/* TODO: Check variable exists, is in scope, etc. */
 }
