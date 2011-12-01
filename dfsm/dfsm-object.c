@@ -290,6 +290,42 @@ dfsm_object_factory_from_files (const gchar *simulation_code, const gchar *intro
 		return NULL;
 	}
 
+	/* Check all the objects. */
+	for (i = 0; i < ast_object_array->len; i++) {
+		DfsmAstObject *ast_object;
+
+		ast_object = g_ptr_array_index (ast_object_array, i);
+
+		dfsm_ast_node_sanity_check (DFSM_AST_NODE (ast_object));
+		dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (ast_object), dfsm_ast_object_get_environment (ast_object), &child_error);
+
+		if (child_error != NULL) {
+			/* Error! */
+			g_propagate_error (error, child_error);
+
+			g_ptr_array_unref (ast_object_array);
+
+			return NULL;
+		}
+	}
+
+	for (i = 0; i < ast_object_array->len; i++) {
+		DfsmAstObject *ast_object;
+
+		ast_object = g_ptr_array_index (ast_object_array, i);
+
+		dfsm_ast_node_check (DFSM_AST_NODE (ast_object), dfsm_ast_object_get_environment (ast_object), &child_error);
+
+		if (child_error != NULL) {
+			/* Error! */
+			g_propagate_error (error, child_error);
+
+			g_ptr_array_unref (ast_object_array);
+
+			return NULL;
+		}
+	}
+
 	/* For each of the AST objects, build a proper DfsmObject. */
 	object_array = g_ptr_array_new_with_free_func (g_object_unref);
 
