@@ -140,11 +140,14 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 {
 	DfsmAstObjectPrivate *priv = DFSM_AST_OBJECT (node)->priv;
 	guint i;
+	GDBusNodeInfo *node_info;
 
 	if (g_variant_is_object_path (priv->object_path) == FALSE) {
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus object path: %s", priv->object_path);
 		return;
 	}
+
+	node_info = dfsm_environment_get_dbus_node_info (environment);
 
 	for (i = 0; i < priv->interface_names->len; i++) {
 		guint f;
@@ -166,10 +169,15 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 				return;
 			}
 		}
+
+		/* Defined in the node info? */
+		if (g_dbus_node_info_lookup_interface (node_info, interface_name) == NULL) {
+			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Unknown D-Bus interface name: %s", interface_name);
+			return;
+		}
 	}
 
 	/* TODO: Check all variable names in ->environment are valid names, and recursively check their values are acceptable */
-	/* TODO: Assert that object explicitly lists data items for each of the properties of its interfaces. */
 
 	if (priv->states->len == 0) {
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "A default state is required.");
@@ -215,10 +223,61 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
 {
 	DfsmAstObjectPrivate *priv = DFSM_AST_OBJECT (node)->priv;
 	guint i;
+	GDBusNodeInfo *node_info;
 
 	/* TODO: Check all variables in ->environment have acceptable values */
-	/* TODO: Assert that object explicitly lists data items for each of the properties of its interfaces. */
 
+	/* Check the object defines object-level variables for each of the properties of its interfaces. */
+	node_info = dfsm_environment_get_dbus_node_info (environment);
+
+	for (i = 0; i < priv->interface_names->len; i++) {
+		GDBusInterfaceInfo *interface_info;
+		GDBusPropertyInfo **property_infos;
+		const gchar *interface_name;
+
+		interface_name = (const gchar*) g_ptr_array_index (priv->interface_names, i);
+		interface_info = g_dbus_node_info_lookup_interface (node_info, interface_name);
+
+		if (interface_info->properties == NULL) {
+			continue;
+		}
+
+		for (property_infos = interface_info->properties; *property_infos != NULL; property_infos++) {
+			GVariantType *environment_type, *introspected_type;
+
+			/* Variable exists for the property? */
+			if (dfsm_environment_has_variable (environment, DFSM_VARIABLE_SCOPE_OBJECT, (*property_infos)->name) == FALSE) {
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+				             "D-Bus property without corresponding object variable: %s", (*property_infos)->name);
+				return;
+			}
+
+			/* Types match exactly (sub- or super-typing isn't allowed, since the variable has to be got and set)? */
+			environment_type = dfsm_environment_dup_variable_type (environment, DFSM_VARIABLE_SCOPE_OBJECT, (*property_infos)->name);
+			g_assert (g_variant_type_string_is_valid ((*property_infos)->signature));
+			introspected_type = g_variant_type_new ((*property_infos)->signature);
+
+			if (g_variant_type_equal (environment_type, introspected_type) == FALSE) {
+				gchar *expected_type_string;
+
+				expected_type_string = g_variant_type_dup_string (environment_type);
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+				             "Incorrect type for object variable ‘%s’ corresponding to D-Bus property: expected ‘%s’ but got ‘%s’.",
+				             (*property_infos)->name, (*property_infos)->signature, expected_type_string);
+				g_free (expected_type_string);
+
+				g_variant_type_free (introspected_type);
+				g_variant_type_free (environment_type);
+
+				return;
+			}
+
+			g_variant_type_free (introspected_type);
+			g_variant_type_free (environment_type);
+		}
+	}
+
+	/* Check each transition. */
 	for (i = 0; i < priv->transitions->len; i++) {
 		DfsmAstTransition *transition;
 

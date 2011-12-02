@@ -200,14 +200,46 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 {
 	DfsmAstTransitionPrivate *priv = DFSM_AST_TRANSITION (node)->priv;
 	guint i;
+	GDBusMethodInfo *method_info = NULL;
 
 	/* TODO: Check two state names exist */
 
 	switch (priv->trigger) {
-		case DFSM_AST_TRANSITION_METHOD_CALL:
-			/* TODO: Check method_name exists. */
+		case DFSM_AST_TRANSITION_METHOD_CALL: {
+			GDBusNodeInfo *node_info;
+			GDBusInterfaceInfo **interface_infos, *interface_info;
+
+			node_info = dfsm_environment_get_dbus_node_info (environment);
+
+			for (interface_infos = node_info->interfaces; *interface_infos != NULL; interface_infos++) {
+				interface_info = *interface_infos;
+
+				method_info = g_dbus_interface_info_lookup_method (interface_info, priv->trigger_params.method_name);
+
+				if (method_info != NULL) {
+					/* Found the interface defining method_name. */
+					break;
+				}
+			}
+
+			/* Failed to find a suitable interface? */
+			if (interface_info == NULL) {
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+				             "Undeclared D-Bus method referenced as a transition trigger: %s", priv->trigger_params.method_name);
+			}
+
+			/* Add the method's parameters to the environment so they're available when checking sub-nodes. Just set them to void values. */
+			if (method_info->in_args != NULL) {
+				GDBusArgInfo **arg_infos;
+
+				for (arg_infos = method_info->in_args; *arg_infos != NULL; arg_infos++) {
+					dfsm_environment_set_variable_value (environment, DFSM_VARIABLE_SCOPE_LOCAL,
+					                                     (*arg_infos)->name, g_variant_new_tuple (NULL, 0));
+				}
+			}
 
 			break;
+		}
 		case DFSM_AST_TRANSITION_ARBITRARY:
 			/* Nothing to do here */
 			break;
@@ -236,6 +268,15 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 
 		if (*error != NULL) {
 			return;
+		}
+	}
+
+	/* Restore the environment if this is a method-triggered transition. */
+	if (priv->trigger == DFSM_AST_TRANSITION_METHOD_CALL && method_info->in_args != NULL) {
+		GDBusArgInfo **arg_infos;
+
+		for (arg_infos = method_info->in_args; *arg_infos != NULL; arg_infos++) {
+			dfsm_environment_unset_variable_value (environment, DFSM_VARIABLE_SCOPE_LOCAL, (*arg_infos)->name);
 		}
 	}
 }
