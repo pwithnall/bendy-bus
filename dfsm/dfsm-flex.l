@@ -70,15 +70,6 @@ DBUS_UNIQUE_BUS_NAME			:{DBUS_UNIQUE_BUS_NAME_ELEMENT}\.{DBUS_UNIQUE_BUS_NAME_EL
 DBUS_WELL_KNOWN_BUS_NAME_ELEMENT	[A-Za-z_-]+[A-Za-z0-9_-]*
 DBUS_WELL_KNOWN_BUS_NAME		{DBUS_WELL_KNOWN_BUS_NAME_ELEMENT}\.{DBUS_WELL_KNOWN_BUS_NAME_ELEMENT}(\.{DBUS_WELL_KNOWN_BUS_NAME_ELEMENT})*
 
-/* Additional restrictions not encoded here:
- *  • Must be well-formed and encode a complete type.
- *  • Must not exceed 255 characters in length.
- *  • Must be nul-terminated.
- *
- * Note that we prefix it with a colon so that it doesn't look like an identifier or get confused with opening braces.
- */
-DBUS_TYPE_SIGNATURE			:[ \t\n\r\v\f]*[\(\)\{\}ybnqiuxtdsogarvehm\*\?@&^]+
-
 /* Includes variable names, state names, function names, D-Bus member names, D-Bus error names.
  *
  * Additional restrictions on D-Bus member and error names not encoded here:
@@ -210,15 +201,6 @@ DOUBLE					(\+-)?[0-9]+\.[0-9]+d
 
 {DBUS_OBJECT_PATH} { yylval->str = strdup (yytext); return DBUS_OBJECT_PATH; }
 {DBUS_INTERFACE_NAME} { yylval->str = strdup (yytext); return DBUS_INTERFACE_NAME; }
-{DBUS_TYPE_SIGNATURE} {
-	/* Strip the leading colon and whitespace */
-	do {
-		yytext++;
-	} while (isspace (*yytext));
-
-	yylval->str = strdup (yytext);
-	return DBUS_TYPE_SIGNATURE;
-}
 
 {IDENTIFIER} { yylval->str = strdup (yytext); return IDENTIFIER; }
 

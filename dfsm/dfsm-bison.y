@@ -66,7 +66,6 @@
 
 %token <str> DBUS_OBJECT_PATH
 %token <str> DBUS_INTERFACE_NAME
-%token <str> DBUS_TYPE_SIGNATURE
 
 %token <str> IDENTIFIER
 
@@ -365,8 +364,6 @@ DataStructure: BYTE					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BYTE, 
              | UINT64					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_UINT64, &$1, ERROR); ABORT_ON_ERROR; }
              | DOUBLE					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_DOUBLE, &$1, ERROR); ABORT_ON_ERROR; }
              | STRING					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_STRING, $1, ERROR); ABORT_ON_ERROR; }
-             | DBUS_OBJECT_PATH				{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_OBJECT_PATH, $1, ERROR); ABORT_ON_ERROR; }
-             | DBUS_TYPE_SIGNATURE			{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_SIGNATURE, $1, ERROR); ABORT_ON_ERROR; }
              | '<' Expression '>'			{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_VARIANT, $2, ERROR); ABORT_ON_ERROR; }
              | '<' error '>'				{ $$ = NULL; YYABORT; }
              | ARRAY_L_BRACKET ArrayList ARRAY_R_BRACKET	{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_ARRAY, $2, ERROR); ABORT_ON_ERROR; }
