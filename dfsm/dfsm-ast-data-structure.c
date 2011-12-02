@@ -804,10 +804,13 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 		case DFSM_AST_DATA_SIGNATURE:
 			return g_variant_ref_sink (g_variant_new_signature (priv->signature_val));
 		case DFSM_AST_DATA_ARRAY: {
+			GVariantType *data_structure_type;
 			GVariantBuilder builder;
 			guint i;
 
-			g_variant_builder_init (&builder, G_VARIANT_TYPE_ARRAY);
+			data_structure_type = dfsm_ast_data_structure_calculate_type (self, environment);
+			g_variant_builder_init (&builder, data_structure_type);
+			g_variant_type_free (data_structure_type);
 
 			for (i = 0; i < priv->array_val->len; i++) {
 				GVariant *child_value;
@@ -833,10 +836,13 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 			return g_variant_ref_sink (g_variant_builder_end (&builder));
 		}
 		case DFSM_AST_DATA_STRUCT: {
+			GVariantType *data_structure_type;
 			GVariantBuilder builder;
 			guint i;
 
-			g_variant_builder_init (&builder, G_VARIANT_TYPE_TUPLE);
+			data_structure_type = dfsm_ast_data_structure_calculate_type (self, environment);
+			g_variant_builder_init (&builder, data_structure_type);
+			g_variant_type_free (data_structure_type);
 
 			for (i = 0; i < priv->struct_val->len; i++) {
 				GVariant *child_value;
@@ -878,10 +884,12 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 			return variant_value;
 		}
 		case DFSM_AST_DATA_DICT: {
+			GVariantType *data_structure_type;
 			GVariantBuilder builder;
 			guint i;
 
-			g_variant_builder_init (&builder, G_VARIANT_TYPE_DICTIONARY);
+			data_structure_type = dfsm_ast_data_structure_calculate_type (self, environment);
+			g_variant_builder_init (&builder, data_structure_type);
 
 			for (i = 0; i < priv->dict_val->len; i++) {
 				GVariant *key_value, *value_value;
@@ -895,7 +903,10 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 
 				if (child_error != NULL) {
 					/* Error! */
+					g_variant_type_free (data_structure_type);
+
 					g_propagate_error (error, child_error);
+
 					return NULL;
 				}
 
@@ -904,12 +915,15 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 				if (child_error != NULL) {
 					/* Error! */
 					g_variant_unref (key_value);
+					g_variant_type_free (data_structure_type);
+
 					g_propagate_error (error, child_error);
+
 					return NULL;
 				}
 
 				/* Add them to the growing GVariant dict. */
-				g_variant_builder_open (&builder, G_VARIANT_TYPE_DICT_ENTRY);
+				g_variant_builder_open (&builder, g_variant_type_element (data_structure_type));
 				g_variant_builder_add_value (&builder, key_value);
 				g_variant_builder_add_value (&builder, value_value);
 				g_variant_builder_close (&builder);
@@ -917,6 +931,8 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 				g_variant_unref (value_value);
 				g_variant_unref (key_value);
 			}
+
+			g_variant_type_free (data_structure_type);
 
 			return g_variant_ref_sink (g_variant_builder_end (&builder));
 		}
