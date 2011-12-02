@@ -32,7 +32,10 @@ typedef struct {
 static void
 variable_info_free (VariableInfo *data)
 {
-	g_variant_unref (data->value);
+	if (data->value != NULL) {
+		g_variant_unref (data->value);
+	}
+
 	g_variant_type_free (data->type);
 	g_slice_free (VariableInfo, data);
 }
@@ -259,8 +262,43 @@ dfsm_environment_dup_variable_type (DfsmEnvironment *self, DfsmVariableScope sco
 
 	variable_info = look_up_variable_info (self, scope, variable_name, FALSE);
 	g_assert (variable_info != NULL);
+	g_assert (variable_info->type != NULL);
 
 	return g_variant_type_copy (variable_info->type);
+}
+
+/**
+ * dfsm_environment_set_variable_type:
+ * @self: a #DfsmEnvironment
+ * @scope: the scope of the variable
+ * @variable_name: the name of the variable in the given @scope
+ * @new_type: the new type for the variable
+ *
+ * Set the type of the variable named @variable_name in @scope to @new_value. The variable must not exist already, and must not have its value queried
+ * by dfsm_environment_dup_variable_value() until it's set using dfsm_environment_set_variable_value().
+ */
+void
+dfsm_environment_set_variable_type (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name, const GVariantType *new_type)
+{
+	VariableInfo *variable_info;
+	gchar *new_type_string;
+
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (self));
+	g_return_if_fail (variable_name != NULL);
+	g_return_if_fail (new_type != NULL);
+	g_return_if_fail (g_variant_type_is_definite (new_type) == TRUE);
+
+	new_type_string = g_variant_type_dup_string (new_type);
+	g_debug ("Setting type of variable ‘%s’ (scope: %u) in environment %p to type: %s", variable_name, scope, self, new_type_string);
+	g_free (new_type_string);
+
+	variable_info = look_up_variable_info (self, scope, variable_name, TRUE);
+	g_assert (variable_info != NULL);
+	g_assert (variable_info->type == NULL);
+	g_assert (variable_info->value == NULL);
+
+	/* Set the new variable's type. */
+	variable_info->type = g_variant_type_copy (new_type);
 }
 
 /**
@@ -283,6 +321,7 @@ dfsm_environment_dup_variable_value (DfsmEnvironment *self, DfsmVariableScope sc
 
 	variable_info = look_up_variable_info (self, scope, variable_name, FALSE);
 	g_assert (variable_info != NULL);
+	g_assert (variable_info->value != NULL);
 
 	return g_variant_ref (variable_info->value);
 }
@@ -294,7 +333,8 @@ dfsm_environment_dup_variable_value (DfsmEnvironment *self, DfsmVariableScope sc
  * @variable_name: the name of the variable in the given @scope
  * @new_value: the new value for the variable
  *
- * Set the value of the variable named @variable_name in @scope to @new_value. If the variable doesn't exist already, it is created.
+ * Set the value of the variable named @variable_name in @scope to @new_value. The variable must have already been created using
+ * dfsm_environment_set_variable_type() and the type of @new_value must match the type set then.
  */
 void
 dfsm_environment_set_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name, GVariant *new_value)
@@ -310,17 +350,16 @@ dfsm_environment_set_variable_value (DfsmEnvironment *self, DfsmVariableScope sc
 	g_debug ("Setting variable ‘%s’ (scope: %u) in environment %p to value: %s", variable_name, scope, self, new_value_string);
 	g_free (new_value_string);
 
-	variable_info = look_up_variable_info (self, scope, variable_name, TRUE);
+	variable_info = look_up_variable_info (self, scope, variable_name, FALSE);
 	g_assert (variable_info != NULL);
+	g_assert (variable_info->type != NULL);
+	g_assert (g_variant_type_is_subtype_of (g_variant_get_type (new_value), variable_info->type) == TRUE);
 
+	/* Set the variable's value. Don't update its type. */
 	g_variant_ref_sink (new_value);
 
 	if (variable_info->value != NULL) {
-		/* Variable already exists; free the old value */
 		g_variant_unref (variable_info->value);
-	} else {
-		/* New variable */
-		variable_info->type = g_variant_type_copy (g_variant_get_type (new_value));
 	}
 
 	variable_info->value = new_value;

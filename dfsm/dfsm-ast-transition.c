@@ -229,13 +229,16 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 				return;
 			}
 
-			/* Add the method's parameters to the environment so they're available when checking sub-nodes. Just set them to void values. */
+			/* Add the method's parameters to the environment so they're available when checking sub-nodes. */
 			if (method_info->in_args != NULL) {
 				GDBusArgInfo **arg_infos;
 
 				for (arg_infos = method_info->in_args; *arg_infos != NULL; arg_infos++) {
-					dfsm_environment_set_variable_value (environment, DFSM_VARIABLE_SCOPE_LOCAL,
-					                                     (*arg_infos)->name, g_variant_new_tuple (NULL, 0));
+					GVariantType *parameter_type;
+
+					parameter_type = g_variant_type_new ((*arg_infos)->signature);
+					dfsm_environment_set_variable_type (environment, DFSM_VARIABLE_SCOPE_LOCAL, (*arg_infos)->name, parameter_type);
+					g_variant_type_free (parameter_type);
 				}
 			}
 

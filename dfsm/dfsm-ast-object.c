@@ -303,6 +303,7 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
 		g_hash_table_iter_init (&iter, data_block);
 
 		while (g_hash_table_iter_next (&iter, (gpointer*) &key, (gpointer*) &value_data_structure) == TRUE) {
+			GVariantType *new_type;
 			GVariant *new_value;
 			GError *child_error = NULL;
 
@@ -312,6 +313,9 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
 			if (*error != NULL) {
 				return;
 			}
+
+			/* Calculate the data structure's type. */
+			new_type = dfsm_ast_data_structure_calculate_type (value_data_structure, priv->environment);
 
 			/* Evaluate the value expression. */
 			new_value = dfsm_ast_data_structure_to_variant (value_data_structure, priv->environment, &child_error);
@@ -324,10 +328,12 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
 				return;
 			}
 
-			/* Store the real value in the environment. */
+			/* Store the real type and value in the environment. */
+			dfsm_environment_set_variable_type (priv->environment, DFSM_VARIABLE_SCOPE_OBJECT, key, new_type);
 			dfsm_environment_set_variable_value (priv->environment, DFSM_VARIABLE_SCOPE_OBJECT, key, new_value);
 
 			g_variant_unref (new_value);
+			g_variant_type_free (new_type);
 		}
 	}
 
