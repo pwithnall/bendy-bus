@@ -223,9 +223,10 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 			}
 
 			/* Failed to find a suitable interface? */
-			if (interface_info == NULL) {
+			if (method_info == NULL) {
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
 				             "Undeclared D-Bus method referenced as a transition trigger: %s", priv->trigger_params.method_name);
+				return;
 			}
 
 			/* Add the method's parameters to the environment so they're available when checking sub-nodes. Just set them to void values. */
