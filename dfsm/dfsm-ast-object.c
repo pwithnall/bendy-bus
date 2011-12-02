@@ -34,9 +34,13 @@ static void dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environme
 struct _DfsmAstObjectPrivate {
 	gchar *object_path;
 	GPtrArray *interface_names; /* array of strings */
-	DfsmEnvironment *environment;
-	GPtrArray *states; /* array of strings (indexed by DfsmAstStateNumber) */
+	DfsmEnvironment *environment; /* not populated until pre_check_and_register() */
+	GPtrArray *states; /* array of strings (indexed by DfsmAstStateNumber), not populated until pre_check_and_register() */
 	GPtrArray *transitions; /* array of DfsmAstTransitions */
+
+	/* Temporary (only used until pre_check_and_register()) */
+	GPtrArray/*<GHashTable<string,DfsmAstDataStructure>>*/ *data_blocks;
+	GPtrArray/*<GPtrArray<string>>*/ *state_blocks;
 };
 
 G_DEFINE_TYPE (DfsmAstObject, dfsm_ast_object, DFSM_TYPE_AST_NODE)
@@ -67,6 +71,16 @@ static void
 dfsm_ast_object_dispose (GObject *object)
 {
 	DfsmAstObjectPrivate *priv = DFSM_AST_OBJECT (object)->priv;
+
+	if (priv->data_blocks != NULL) {
+		g_ptr_array_unref (priv->data_blocks);
+		priv->data_blocks = NULL;
+	}
+
+	if (priv->state_blocks != NULL) {
+		g_ptr_array_unref (priv->state_blocks);
+		priv->state_blocks = NULL;
+	}
 
 	if (priv->transitions != NULL) {
 		g_ptr_array_unref (priv->transitions);
@@ -140,6 +154,7 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 {
 	DfsmAstObjectPrivate *priv = DFSM_AST_OBJECT (node)->priv;
 	guint i;
+	GPtrArray *states;
 	GDBusNodeInfo *node_info;
 
 	if (g_variant_is_object_path (priv->object_path) == FALSE) {
@@ -177,33 +192,84 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 		}
 	}
 
-	/* TODO: Check all variable names in ->environment are valid names, and recursively check their values are acceptable */
+	/* Check all variable names in ->environment are valid names, and recursively check their values are acceptable. */
+	for (i = 0; i < priv->data_blocks->len; i++) {
+		GHashTable *data_block;
+		GHashTableIter iter;
+		const gchar *key;
+		DfsmAstDataStructure *value_data_structure;
 
-	if (priv->states->len == 0) {
-		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "A default state is required.");
-		return;
-	}
+		data_block = g_ptr_array_index (priv->data_blocks, i);
+		g_hash_table_iter_init (&iter, data_block);
 
-	for (i = 0; i < priv->states->len; i++) {
-		guint f;
-		const gchar *state_name;
+		while (g_hash_table_iter_next (&iter, (gpointer*) &key, (gpointer*) &value_data_structure) == TRUE) {
+			/* Valid variable name? */
+			if (dfsm_is_variable_name (key) == FALSE) {
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid variable name: %s", key);
+				return;
+			}
 
-		state_name = g_ptr_array_index (priv->states, i);
+			/* Check for duplicates */
+			if (dfsm_environment_has_variable (priv->environment, DFSM_VARIABLE_SCOPE_OBJECT, key) == TRUE) {
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Duplicate variable name: %s", key);
+				return;
+			}
 
-		/* Valid state name? */
-		if (dfsm_is_state_name (state_name) == FALSE) {
-			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid state name: %s", state_name);
-			return;
-		}
+			/* Check the value expression. */
+			dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (value_data_structure), priv->environment, error);
 
-		/* Duplicates? */
-		for (f = i + 1; f < priv->states->len; f++) {
-			if (strcmp (state_name, g_ptr_array_index (priv->states, f)) == 0) {
-				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Duplicate state name: %s", state_name);
+			if (*error != NULL) {
 				return;
 			}
 		}
 	}
+
+	/* States. Add the last state of the first state block to the priv->states array first, since it's the first state listed in the source
+	 * file (it just appears in a different position due to the way the parser's recursion is implemented). i.e. It's the main state. */
+	if (priv->state_blocks->len == 0 || ((GPtrArray*) g_ptr_array_index (priv->state_blocks, 0))->len == 0) {
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "A default state is required.");
+		return;
+	}
+
+	states = g_ptr_array_index (priv->state_blocks, 0);
+	g_ptr_array_add (priv->states, g_strdup ((gchar*) g_ptr_array_index (states, states->len - 1)));
+
+	for (i = 0; i < priv->state_blocks->len; i++) {
+		guint f;
+
+		states = g_ptr_array_index (priv->state_blocks, i);
+
+		for (f = 0; f < states->len; f++) {
+			const gchar *state_name;
+			guint g;
+
+			/* Skip the main state. */
+			if (i == 0 && f == states->len - 1) {
+				continue;
+			}
+
+			state_name = g_ptr_array_index (states, f);
+
+			/* Valid state name? */
+			if (dfsm_is_state_name (state_name) == FALSE) {
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid state name: %s", state_name);
+				return;
+			}
+
+			/* Check for duplicates */
+			for (g = 0; g < priv->states->len; g++) {
+				if (strcmp (state_name, g_ptr_array_index (priv->states, g)) == 0) {
+					g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Duplicate state name: %s", state_name);
+					return;
+				}
+			}
+
+			g_ptr_array_add (priv->states, g_strdup (state_name));
+		}
+	}
+
+	g_ptr_array_unref (priv->state_blocks);
+	priv->state_blocks = NULL;
 
 	for (i = 0; i < priv->transitions->len; i++) {
 		DfsmAstTransition *transition;
@@ -225,7 +291,48 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
 	guint i;
 	GDBusNodeInfo *node_info;
 
-	/* TODO: Check all variables in ->environment have acceptable values */
+	/* Check the value expressions for each variable, then evaluate them and set the final values in the environment. Only then can we free
+	 * ->data_blocks. */
+	for (i = 0; i < priv->data_blocks->len; i++) {
+		GHashTable *data_block;
+		GHashTableIter iter;
+		const gchar *key;
+		DfsmAstDataStructure *value_data_structure;
+
+		data_block = g_ptr_array_index (priv->data_blocks, i);
+		g_hash_table_iter_init (&iter, data_block);
+
+		while (g_hash_table_iter_next (&iter, (gpointer*) &key, (gpointer*) &value_data_structure) == TRUE) {
+			GVariant *new_value;
+			GError *child_error = NULL;
+
+			/* Check the value expression. */
+			dfsm_ast_node_check (DFSM_AST_NODE (value_data_structure), priv->environment, error);
+
+			if (*error != NULL) {
+				return;
+			}
+
+			/* Evaluate the value expression. */
+			new_value = dfsm_ast_data_structure_to_variant (value_data_structure, priv->environment, &child_error);
+
+			if (child_error != NULL) {
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+				             "Couldn't evaluate default value for variable ‘%s’: %s", key, child_error->message);
+				g_error_free (child_error);
+
+				return;
+			}
+
+			/* Store the real value in the environment. */
+			dfsm_environment_set_variable_value (priv->environment, DFSM_VARIABLE_SCOPE_OBJECT, key, new_value);
+
+			g_variant_unref (new_value);
+		}
+	}
+
+	g_ptr_array_unref (priv->data_blocks);
+	priv->data_blocks = NULL;
 
 	/* Check the object defines object-level variables for each of the properties of its interfaces. */
 	node_info = dfsm_environment_get_dbus_node_info (environment);
@@ -307,13 +414,11 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
  */
 DfsmAstObject *
 dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GPtrArray/*<string>*/ *interface_names,
-                     GPtrArray/*<GHashTable<string,DfsmAstDataStructure>>*/ *data_blocks, GPtrArray/*<GPtrArray>*/ *state_blocks,
+                     GPtrArray/*<GHashTable<string,DfsmAstDataStructure>>*/ *data_blocks, GPtrArray/*<GPtrArray<string>>*/ *state_blocks,
                      GPtrArray/*<DfsmAstTransition>*/ *transition_blocks, GError **error)
 {
 	DfsmAstObject *object;
 	DfsmAstObjectPrivate *priv;
-	guint i;
-	GPtrArray *states;
 
 	g_return_val_if_fail (dbus_node_info != NULL, NULL);
 	g_return_val_if_fail (object_path != NULL && *object_path != '\0', NULL);
@@ -332,85 +437,10 @@ dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GP
 	priv->states = g_ptr_array_new_with_free_func (g_free);
 	priv->transitions = g_ptr_array_ref (transition_blocks);
 
-	/* Data items */
-	for (i = 0; i < data_blocks->len; i++) {
-		GHashTable *data_block;
-		GHashTableIter iter;
-		const gchar *key;
-		DfsmAstDataStructure *value_data_structure;
-
-		data_block = g_ptr_array_index (data_blocks, i);
-		g_hash_table_iter_init (&iter, data_block);
-
-		while (g_hash_table_iter_next (&iter, (gpointer*) &key, (gpointer*) &value_data_structure) == TRUE) {
-			GVariant *new_value;
-			GError *child_error = NULL;
-
-			/* Check for duplicates */
-			if (dfsm_environment_has_variable (priv->environment, DFSM_VARIABLE_SCOPE_OBJECT, key) == TRUE) {
-				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Duplicate variable name: %s", key);
-
-				goto error;
-			}
-
-			/* Evaluate the value expression. */
-			new_value = dfsm_ast_data_structure_to_variant (value_data_structure, priv->environment, &child_error);
-
-			if (child_error != NULL) {
-				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-				             "Couldn't evaluate default value for variable ‘%s’: %s", key, child_error->message);
-				g_error_free (child_error);
-
-				goto error;
-			}
-
-			/* Store the value in the environment. */
-			dfsm_environment_set_variable_value (priv->environment, DFSM_VARIABLE_SCOPE_OBJECT, key, new_value);
-
-			g_variant_unref (new_value);
-		}
-	}
-
-	/* States. Add the last state of the first state block to the priv->states array first, since it's the first state listed in the source
-	 * file (it just appears in a different position due to the way the parser's recursion is implemented). i.e. It's the main state. */
-	/* TODO: We assume we have at least one state block here, containing at least one state name. */
-	states = g_ptr_array_index (state_blocks, 0);
-	g_ptr_array_add (priv->states, g_strdup ((gchar*) g_ptr_array_index (states, states->len - 1)));
-
-	for (i = 0; i < state_blocks->len; i++) {
-		guint f;
-
-		states = g_ptr_array_index (state_blocks, i);
-
-		for (f = 0; f < states->len; f++) {
-			const gchar *state_name;
-			guint g;
-
-			/* Skip the main state. */
-			if (i == 0 && f == states->len - 1) {
-				continue;
-			}
-
-			state_name = g_ptr_array_index (states, f);
-
-			/* Check for duplicates */
-			for (g = 0; g < priv->states->len; g++) {
-				if (strcmp (state_name, g_ptr_array_index (priv->states, g)) == 0) {
-					g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Duplicate state name: %s", state_name);
-
-					goto error;
-				}
-			}
-
-			g_ptr_array_add (priv->states, g_strdup (state_name));
-		}
-	}
+	priv->data_blocks = g_ptr_array_ref (data_blocks);
+	priv->state_blocks = g_ptr_array_ref (state_blocks);
 
 	return object;
-
-error:
-	/* Free everything and run away. */
-	g_object_unref (object);
 
 	return NULL;
 }
