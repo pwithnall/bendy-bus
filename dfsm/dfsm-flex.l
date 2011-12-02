@@ -87,6 +87,8 @@ INT64					(\+-)?[0-9]+x
 UINT64					[0-9]+t
 DOUBLE					(\+-)?[0-9]+\.[0-9]+d
 
+TYPE_ANNOTATION				@[\(\)\{\}ybnqiuxtdsogarvehm\*\?@&^]+[ \t\n\r\v\f]+
+
 %%
 
 "/*" { comment_caller = YYSTATE; BEGIN(comment); }
@@ -198,6 +200,26 @@ DOUBLE					(\+-)?[0-9]+\.[0-9]+d
 "⟩" { return R_ANGLE; }
 "?" { return FUZZY; }
 "->" { return DOT; }
+
+{TYPE_ANNOTATION} {
+	char *i;
+
+	/* String the leading at-sign and trailing whitespace. */
+	yytext++;
+	yyleng--;
+
+	i = yytext + yyleng;
+	do {
+		i--;
+	} while (isspace (*i));
+
+	*(++i) = '\0';
+
+	/* Store the annotation. */
+	yylval->str = strdup (yytext);
+
+	return TYPE_ANNOTATION;
+}
 
 {DBUS_OBJECT_PATH} { yylval->str = strdup (yytext); return DBUS_OBJECT_PATH; }
 {DBUS_INTERFACE_NAME} { yylval->str = strdup (yytext); return DBUS_INTERFACE_NAME; }

@@ -33,6 +33,7 @@ struct _DfsmAstDataStructurePrivate {
 	DfsmAstDataStructureType data_structure_type;
 	GVariantType *variant_type; /* gets set by _calculate_type(); NULL beforehand */
 	gdouble weight;
+	gchar *type_annotation; /* may not match the actual data in the structure until after dfsm_ast_data_structure_check() is called */
 	union {
 		guchar byte_val;
 		gboolean boolean_val;
@@ -87,6 +88,8 @@ dfsm_ast_data_structure_finalize (GObject *object)
 	if (priv->variant_type != NULL) {
 		g_variant_type_free (priv->variant_type);
 	}
+
+	g_free (priv->type_annotation);
 
 	switch (priv->data_structure_type) {
 		case DFSM_AST_DATA_BYTE:
@@ -143,6 +146,8 @@ dfsm_ast_data_structure_sanity_check (DfsmAstNode *node)
 {
 	DfsmAstDataStructurePrivate *priv = DFSM_AST_DATA_STRUCTURE (node)->priv;
 	guint i;
+
+	g_assert (priv->type_annotation == NULL || *(priv->type_annotation) != '\0');
 
 	switch (priv->data_structure_type) {
 		case DFSM_AST_DATA_BYTE:
@@ -211,6 +216,12 @@ dfsm_ast_data_structure_pre_check_and_register (DfsmAstNode *node, DfsmEnvironme
 {
 	DfsmAstDataStructurePrivate *priv = DFSM_AST_DATA_STRUCTURE (node)->priv;
 	guint i;
+
+	/* See if our type annotation is sane (if we have one). */
+	if (priv->type_annotation != NULL && g_variant_type_string_is_valid (priv->type_annotation) == FALSE) {
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid type annotation: %s", priv->type_annotation);
+		return;
+	}
 
 	switch (priv->data_structure_type) {
 		case DFSM_AST_DATA_BYTE:
@@ -391,9 +402,9 @@ __calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment)
 				if (lg_child_type == NULL) {
 					lg_child_type = g_variant_type_copy (child_type);
 				} else if (g_variant_type_is_subtype_of (child_type, lg_child_type) == FALSE) {
-					/* HACK: Just make the least-general supertype a variant. */
+					/* HACK: Just make the least-general supertype an any type. */
 					g_variant_type_free (lg_child_type);
-					lg_child_type = g_variant_type_copy (G_VARIANT_TYPE_VARIANT);
+					lg_child_type = g_variant_type_copy (G_VARIANT_TYPE_ANY);
 				}
 
 				g_variant_type_free (child_type);
@@ -454,9 +465,9 @@ __calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment)
 				if (lg_key_type == NULL) {
 					lg_key_type = g_variant_type_copy (key_type);
 				} else if (g_variant_type_is_subtype_of (key_type, lg_key_type) == FALSE) {
-					/* HACK: Just make the least-general supertype a variant. */
+					/* HACK: Just make the least-general supertype a basic type. */
 					g_variant_type_free (lg_key_type);
-					lg_key_type = g_variant_type_copy (G_VARIANT_TYPE_VARIANT);
+					lg_key_type = g_variant_type_copy (G_VARIANT_TYPE_BASIC);
 				}
 
 				g_variant_type_free (key_type);
@@ -467,9 +478,9 @@ __calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment)
 				if (lg_value_type == NULL) {
 					lg_value_type = g_variant_type_copy (value_type);
 				} else if (g_variant_type_is_subtype_of (value_type, lg_value_type) == FALSE) {
-					/* HACK: Just make the least-general supertype a variant. */
+					/* HACK: Just make the least-general supertype an any type. */
 					g_variant_type_free (lg_value_type);
-					lg_value_type = g_variant_type_copy (G_VARIANT_TYPE_VARIANT);
+					lg_value_type = g_variant_type_copy (G_VARIANT_TYPE_ANY);
 				}
 
 				g_variant_type_free (value_type);
@@ -494,11 +505,42 @@ __calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment)
 }
 
 static GVariantType *
-_calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment)
+_calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment, GError **error)
 {
 	/* Cache the type. */
 	if (self->priv->variant_type == NULL) {
-		self->priv->variant_type = __calculate_type (self, environment);
+		/* If we have a type annotation, take that under consideration. Explode if the type we calculate doesn't match it. */
+		if (self->priv->type_annotation != NULL) {
+			GVariantType *calculated_type, *annotated_type;
+
+			calculated_type = __calculate_type (self, environment);
+			annotated_type = g_variant_type_new (self->priv->type_annotation);
+
+			if (g_variant_type_is_subtype_of (annotated_type, calculated_type) == FALSE) {
+				gchar *annotated_type_string, *calculated_type_string;
+
+				annotated_type_string = g_variant_type_dup_string (annotated_type);
+				calculated_type_string = g_variant_type_dup_string (calculated_type);
+
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+				             "Type mismatch between type annotation (‘%s’) and data structure type (‘%s’).", annotated_type_string,
+				             calculated_type_string);
+
+				g_free (calculated_type_string);
+				g_free (annotated_type_string);
+
+				g_variant_type_free (annotated_type);
+
+				return NULL;
+			}
+
+			self->priv->variant_type = annotated_type;
+
+			g_variant_type_free (calculated_type);
+		} else {
+			/* Just calculate the type. */
+			self->priv->variant_type = __calculate_type (self, environment);
+		}
 	}
 
 	return g_variant_type_copy (self->priv->variant_type);
@@ -508,6 +550,7 @@ static void
 dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstDataStructurePrivate *priv = DFSM_AST_DATA_STRUCTURE (node)->priv;
+	GVariantType *expected_type;
 	guint i;
 
 	switch (priv->data_structure_type) {
@@ -537,8 +580,6 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 
 			break;
 		case DFSM_AST_DATA_ARRAY: {
-			GVariantType *expected_type;
-
 			/* All entries valid? */
 			for (i = 0; i < priv->array_val->len; i++) {
 				DfsmAstExpression *expr;
@@ -552,11 +593,6 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 					return;
 				}
 			}
-
-			/* All entries subtypes of the array child type? Calculating the type of the overall array will necessarily find any type
-			 * errors with the individual entries. They're currently resolved by taking a variant as a supertype. */
-			expected_type = _calculate_type (DFSM_AST_DATA_STRUCTURE (node), environment);
-			g_variant_type_free (expected_type);
 
 			break;
 		}
@@ -577,8 +613,6 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 			break;
 		}
 		case DFSM_AST_DATA_DICT: {
-			GVariantType *expected_type = NULL;
-
 			/* All entries valid with no duplicate keys? */
 			for (i = 0; i < priv->dict_val->len; i++) {
 				DfsmAstDictionaryEntry *entry;
@@ -601,11 +635,6 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 
 			/* TODO: Check for duplicate keys. */
 
-			/* All entries subtypes of the dictionary entry type? Calculating the type of the overall dictionary will necessarily find any
-			 * type errors with the individual entries. They're currently resolved by taking a variant as a supertype. */
-			expected_type = _calculate_type (DFSM_AST_DATA_STRUCTURE (node), environment);
-			g_variant_type_free (expected_type);
-
 			break;
 		}
 		case DFSM_AST_DATA_VARIABLE:
@@ -620,6 +649,16 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 		default:
 			g_assert_not_reached ();
 	}
+
+	/* Calculating the type of the overall data structure will necessarily find any type errors. They're currently resolved by taking an any type
+	 * as a supertype for things like arrays and dictionaries. */
+	expected_type = _calculate_type (DFSM_AST_DATA_STRUCTURE (node), environment, error);
+
+	if (*error != NULL) {
+		return;
+	}
+
+	g_variant_type_free (expected_type);
 }
 
 /**
@@ -729,6 +768,16 @@ dfsm_ast_data_structure_set_weight (DfsmAstDataStructure *self, gdouble weight)
 	self->priv->weight = weight;
 }
 
+void
+dfsm_ast_data_structure_set_type_annotation (DfsmAstDataStructure *self, const gchar *type_annotation)
+{
+	g_return_if_fail (DFSM_IS_AST_DATA_STRUCTURE (self));
+	g_return_if_fail (type_annotation != NULL && *type_annotation != '\0');
+
+	g_free (self->priv->type_annotation);
+	self->priv->type_annotation = g_strdup (type_annotation);
+}
+
 /**
  * dfsm_ast_data_structure_calculate_type:
  * @self: a #DfsmAstDataStructure
@@ -744,10 +793,15 @@ dfsm_ast_data_structure_set_weight (DfsmAstDataStructure *self, gdouble weight)
 GVariantType *
 dfsm_ast_data_structure_calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment)
 {
+	GVariantType *retval;
+
 	g_return_val_if_fail (DFSM_IS_AST_DATA_STRUCTURE (self), NULL);
 	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), NULL);
 
-	return _calculate_type (self, environment);
+	retval = _calculate_type (self, environment, NULL);
+	g_assert (retval != NULL);
+
+	return retval;
 }
 
 /**

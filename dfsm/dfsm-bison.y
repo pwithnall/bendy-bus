@@ -68,6 +68,7 @@
 %token <str> DBUS_INTERFACE_NAME
 
 %token <str> IDENTIFIER
+%token <str> TYPE_ANNOTATION
 
 %token <str> STRING
 %token <unsigned_integer> BYTE
@@ -145,6 +146,7 @@
 %type <str> VariableName
 %type <ast_variable> Variable
 %type <ast_data_structure> FuzzyDataStructure
+%type <ast_data_structure> AnnotatedDataStructure
 %type <ast_data_structure> DataStructure
 %type <ptr_array> ArrayList ArrayListInner
 %type <ptr_array> DictionaryList DictionaryListInner
@@ -344,10 +346,15 @@ Variable: VariableName								{ $$ = dfsm_ast_variable_new (DFSM_VARIABLE_SCOPE_
 										                              $3, ERROR); ABORT_ON_ERROR; }
 ;
 
-/* Returns a new DfsmAstDataStructure or DfsmAstFuzzyDataStructure (which is a subclass). */
-FuzzyDataStructure: DataStructure					{ $$ = $1; }
-                  | DataStructure FUZZY					{ $$ = $1; dfsm_ast_data_structure_set_weight ($1, NAN); }
-                  | DataStructure FUZZY DOUBLE				{ $$ = $1; dfsm_ast_data_structure_set_weight ($1, $3); }
+/* Returns a new DfsmAstDataStructure. */
+FuzzyDataStructure: AnnotatedDataStructure					{ $$ = $1; }
+                  | AnnotatedDataStructure FUZZY				{ $$ = $1; dfsm_ast_data_structure_set_weight ($$, NAN); }
+                  | AnnotatedDataStructure FUZZY DOUBLE				{ $$ = $1; dfsm_ast_data_structure_set_weight ($$, $3); }
+;
+
+/* Returns a new DfsmAstDataStructure. */
+AnnotatedDataStructure: DataStructure						{ $$ = $1; }
+                      | TYPE_ANNOTATION DataStructure				{ $$ = $2; dfsm_ast_data_structure_set_type_annotation ($$, $1); }
 ;
 
 /* Returns a new DfsmAstDataStructure. */
