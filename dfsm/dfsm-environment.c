@@ -304,6 +304,7 @@ dfsm_environment_set_variable_value (DfsmEnvironment *self, DfsmVariableScope sc
 
 	g_return_if_fail (DFSM_IS_ENVIRONMENT (self));
 	g_return_if_fail (variable_name != NULL);
+	g_return_if_fail (new_value != NULL);
 
 	new_value_string = g_variant_print (new_value, FALSE);
 	g_debug ("Setting variable ‘%s’ (scope: %u) in environment %p to value: %s", variable_name, scope, self, new_value_string);
