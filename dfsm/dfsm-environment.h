@@ -51,17 +51,6 @@ typedef struct {
 	GObjectClass parent;
 } DfsmEnvironmentClass;
 
-typedef struct _DfsmFunctionInfo DfsmFunctionInfo;
-
-typedef GVariantType *(*DfsmFunctionCalculateTypeFunc) (const GVariantType *parameters_type, GError **error);
-typedef GVariant *(*DfsmFunctionEvaluateFunc) (GVariant *parameters, DfsmEnvironment *environment, GError **error);
-
-struct _DfsmFunctionInfo {
-	const gchar *name;
-	const DfsmFunctionCalculateTypeFunc calculate_type_func;
-	const DfsmFunctionEvaluateFunc evaluate_func;
-};
-
 GType dfsm_environment_get_type (void) G_GNUC_CONST;
 
 gboolean dfsm_environment_has_variable (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name) G_GNUC_PURE;
@@ -71,9 +60,11 @@ GVariant *dfsm_environment_dup_variable_value (DfsmEnvironment *self, DfsmVariab
 void dfsm_environment_set_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name, GVariant *new_value);
 void dfsm_environment_unset_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name);
 
-const DfsmFunctionInfo *dfsm_environment_get_function_info (const gchar *function_name) G_GNUC_PURE;
+gboolean dfsm_environment_function_exists (const gchar *function_name) G_GNUC_PURE;
 GVariantType *dfsm_environment_function_calculate_type (const gchar *function_name, const GVariantType *parameters_type,
                                                         GError **error) DFSM_CONSTRUCTOR;
+GVariant *dfsm_environment_function_evaluate (const gchar *function_name, GVariant *parameters, DfsmEnvironment *environment,
+                                              GError **error) DFSM_CONSTRUCTOR;
 
 void dfsm_environment_emit_signal (DfsmEnvironment *self, const gchar *signal_name, GVariant *parameters, GError **error);
 

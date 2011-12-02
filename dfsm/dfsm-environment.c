@@ -480,6 +480,12 @@ _in_array_calculate_type (const GVariantType *parameters_type, GError **error)
 	return g_variant_type_copy (G_VARIANT_TYPE_BOOLEAN);
 }
 
+typedef struct {
+	const gchar *name;
+	GVariantType *(*calculate_type_func) (const GVariantType *parameters_type, GError **error);
+	GVariant *(*evaluate_func) (GVariant *parameters, DfsmEnvironment *environment, GError **error);
+} DfsmFunctionInfo;
+
 static const DfsmFunctionInfo _function_info[] = {
 	/* Name,	Calculate type func,		Evaluate func. */
 	{ "keys",	_keys_calculate_type,		NULL /* TODO */ },
@@ -487,7 +493,7 @@ static const DfsmFunctionInfo _function_info[] = {
 	{ "inArray",	_in_array_calculate_type,	NULL /* TODO */ },
 };
 
-/**
+/*
  * dfsm_environment_get_function_info:
  * @function_name: name of the function to look up
  *
@@ -496,8 +502,8 @@ static const DfsmFunctionInfo _function_info[] = {
  *
  * Return value: (transfer none): information about the function, or %NULL
  */
-const DfsmFunctionInfo *
-dfsm_environment_get_function_info (const gchar *function_name)
+static const DfsmFunctionInfo *
+_get_function_info (const gchar *function_name)
 {
 	guint i;
 
@@ -511,6 +517,22 @@ dfsm_environment_get_function_info (const gchar *function_name)
 	}
 
 	return NULL;
+}
+
+/**
+ * dfsm_environment_function_exists:
+ * @function_name: name of the function to check whether it exists
+ *
+ * Check whether the built-in function with name @function_name exists.
+ *
+ * Return value: %TRUE if the function exists, %FALSE otherwise
+ */
+gboolean
+dfsm_environment_function_exists (const gchar *function_name)
+{
+	g_return_val_if_fail (function_name != NULL && *function_name != '\0', FALSE);
+
+	return (_get_function_info (function_name) != NULL) ? TRUE : FALSE;
 }
 
 /**
@@ -538,7 +560,7 @@ dfsm_environment_function_calculate_type (const gchar *function_name, const GVar
 	g_return_val_if_fail (g_variant_type_is_definite (parameters_type) == TRUE, NULL);
 	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
-	function_info = dfsm_environment_get_function_info (function_name);
+	function_info = _get_function_info (function_name);
 	g_assert (function_info != NULL);
 
 	g_assert (function_info->calculate_type_func != NULL);
@@ -550,6 +572,46 @@ dfsm_environment_function_calculate_type (const gchar *function_name, const GVar
 	}
 
 	return return_type;
+}
+
+/**
+ * dfsm_environment_function_evaluate:
+ * @function_name: name of the function to evaluate
+ * @parameters: the value of the input parameter (or parameters, if it's a tuple)
+ * @environment: an environment containing all defined variables
+ * @error: (allow-none): a #GError, or %NULL
+ *
+ * Evaluate @function_name when passed an input parameter, @parameters. The return value will have type as given by
+ * dfsm_environment_function_calculate_type() for the type of @parameters.
+ *
+ * It is an error to pass an incompatible type in @parameters; or to pass a non-existent @function_name.
+ *
+ * Return value: (transfer full): return value of the function
+ */
+GVariant *
+dfsm_environment_function_evaluate (const gchar *function_name, GVariant *parameters, DfsmEnvironment *environment, GError **error)
+{
+	const DfsmFunctionInfo *function_info;
+	GVariant *return_value;
+	GError *child_error = NULL;
+
+	g_return_val_if_fail (function_name != NULL && *function_name != '\0', NULL);
+	g_return_val_if_fail (parameters != NULL, NULL);
+	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), NULL);
+	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
+
+	function_info = _get_function_info (function_name);
+	g_assert (function_info != NULL);
+
+	g_assert (function_info->evaluate_func != NULL);
+	return_value = function_info->evaluate_func (parameters, environment, &child_error);
+	g_assert ((return_value == NULL) != (child_error == NULL));
+
+	if (child_error != NULL) {
+		g_propagate_error (error, child_error);
+	}
+
+	return return_value;
 }
 
 /**

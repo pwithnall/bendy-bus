@@ -98,11 +98,8 @@ static void
 dfsm_ast_expression_function_call_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstExpressionFunctionCallPrivate *priv = DFSM_AST_EXPRESSION_FUNCTION_CALL (node)->priv;
-	const DfsmFunctionInfo *function_info;
 
-	function_info = dfsm_environment_get_function_info (priv->function_name);
-
-	if (function_info == NULL || dfsm_is_function_name (priv->function_name) == FALSE) {
+	if (dfsm_environment_function_exists (priv->function_name) == FALSE || dfsm_is_function_name (priv->function_name) == FALSE) {
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid function name: %s", priv->function_name);
 		return;
 	}
@@ -118,7 +115,6 @@ static void
 dfsm_ast_expression_function_call_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstExpressionFunctionCallPrivate *priv = DFSM_AST_EXPRESSION_FUNCTION_CALL (node)->priv;
-	const DfsmFunctionInfo *function_info;
 	GVariantType *parameters_type, *return_type;
 
 	dfsm_ast_node_check (DFSM_AST_NODE (priv->parameters), environment, error);
@@ -126,9 +122,6 @@ dfsm_ast_expression_function_call_check (DfsmAstNode *node, DfsmEnvironment *env
 	if (*error != NULL) {
 		return;
 	}
-
-	function_info = dfsm_environment_get_function_info (priv->function_name);
-	g_assert (function_info != NULL);
 
 	/* Check the types are compatible. */
 	parameters_type = dfsm_ast_expression_calculate_type (priv->parameters, environment);
@@ -160,13 +153,8 @@ static GVariant *
 dfsm_ast_expression_function_call_evaluate (DfsmAstExpression *expression, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstExpressionFunctionCallPrivate *priv = DFSM_AST_EXPRESSION_FUNCTION_CALL (expression)->priv;
-	const DfsmFunctionInfo *function_info;
 	GVariant *parameters_value, *function_call_value;
 	GError *child_error = NULL;
-
-	/* Look up the function information. */
-	function_info = dfsm_environment_get_function_info (priv->function_name);
-	g_assert (function_info != NULL);
 
 	/* Evaluate the parameters. */
 	parameters_value = dfsm_ast_expression_evaluate (priv->parameters, environment, &child_error);
@@ -179,9 +167,15 @@ dfsm_ast_expression_function_call_evaluate (DfsmAstExpression *expression, DfsmE
 	}
 
 	/* Delegate evaluation of the function to the function's evaluation function. Function function function. */
-	g_assert (function_info->evaluate_func != NULL);
-	function_call_value = function_info->evaluate_func (parameters_value, environment, error);
+	function_call_value = dfsm_environment_function_evaluate (priv->function_name, parameters_value, environment, &child_error);
 	g_variant_unref (parameters_value);
+
+	if (child_error != NULL) {
+		g_assert (function_call_value == NULL);
+
+		g_propagate_error (error, child_error);
+		return NULL;
+	}
 
 	return function_call_value;
 }
