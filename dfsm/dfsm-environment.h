@@ -53,12 +53,12 @@ typedef struct {
 
 typedef struct _DfsmFunctionInfo DfsmFunctionInfo;
 
+typedef GVariantType *(*DfsmFunctionCalculateTypeFunc) (const GVariantType *parameters_type, GError **error);
 typedef GVariant *(*DfsmFunctionEvaluateFunc) (GVariant *parameters, DfsmEnvironment *environment, GError **error);
 
 struct _DfsmFunctionInfo {
 	const gchar *name;
-	const GVariantType *parameters_type;
-	const GVariantType *return_type;
+	const DfsmFunctionCalculateTypeFunc calculate_type_func;
 	const DfsmFunctionEvaluateFunc evaluate_func;
 };
 
@@ -71,6 +71,8 @@ void dfsm_environment_set_variable_value (DfsmEnvironment *self, DfsmVariableSco
 void dfsm_environment_unset_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name);
 
 const DfsmFunctionInfo *dfsm_environment_get_function_info (const gchar *function_name) G_GNUC_PURE;
+GVariantType *dfsm_environment_function_calculate_type (const gchar *function_name, const GVariantType *parameters_type,
+                                                        GError **error) DFSM_CONSTRUCTOR;
 
 void dfsm_environment_emit_signal (DfsmEnvironment *self, const gchar *signal_name, GVariant *parameters, GError **error);
 

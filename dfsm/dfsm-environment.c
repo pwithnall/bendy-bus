@@ -349,12 +349,103 @@ dfsm_environment_unset_variable_value (DfsmEnvironment *self, DfsmVariableScope 
 	g_hash_table_remove (variable_map, variable_name);
 }
 
+static void
+func_set_calculate_type_error (GError **error, const gchar *function_name, const GVariantType *parameters_supertype,
+                               const GVariantType *parameters_type)
+{
+	gchar *parameters_supertype_string, *parameters_type_string;
+
+	/* Error */
+	parameters_supertype_string = g_variant_type_dup_string (parameters_supertype);
+	parameters_type_string = g_variant_type_dup_string (parameters_type);
+
+	g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+	             "Type mismatch between formal and actual parameters to function ‘%s’: expects type ‘%s’ but received type ‘%s’.",
+	             function_name, parameters_supertype_string, parameters_type_string);
+
+	g_free (parameters_type_string);
+	g_free (parameters_supertype_string);
+}
+
+static GVariantType *
+_keys_calculate_type (const GVariantType *parameters_type, GError **error)
+{
+	const GVariantType *parameters_supertype = (const GVariantType*) "a{?*}";
+
+	if (g_variant_type_is_subtype_of (parameters_type, parameters_supertype) == FALSE) {
+		/* Error */
+		func_set_calculate_type_error (error, "keys", parameters_supertype, parameters_type);
+		return NULL;
+	}
+
+	/* For a{?*}, return a?. i.e. Return an array of the first element of the dictionary. */
+	return g_variant_type_new_array (g_variant_type_first (g_variant_type_element (parameters_type)));
+}
+
+static GVariantType *
+_pair_keys_calculate_type (const GVariantType *parameters_type, GError **error)
+{
+	const GVariantType *parameters_supertype = (const GVariantType*) "(a?a*)";
+	const GVariantType *first_type;
+	GVariantType *pair_type, *entry_type;
+
+	if (g_variant_type_is_subtype_of (parameters_type, parameters_supertype) == FALSE) {
+		/* Error */
+		func_set_calculate_type_error (error, "pairKeys", parameters_supertype, parameters_type);
+		return NULL;
+	}
+
+	/* For (a?a*), return a{?*}. i.e. Return a dictionary mapping the elements of the first input array to the elements of the second. */
+	first_type = g_variant_type_first (parameters_type);
+	entry_type = g_variant_type_new_dict_entry (g_variant_type_element (first_type), g_variant_type_element (g_variant_type_next (first_type)));
+	pair_type = g_variant_type_new_array (entry_type);
+	g_variant_type_free (entry_type);
+
+	return pair_type;
+}
+
+static GVariantType *
+_in_array_calculate_type (const GVariantType *parameters_type, GError **error)
+{
+	const GVariantType *parameters_supertype = (const GVariantType*) "(*a*)";
+	const GVariantType *first_type;
+
+	/* As well as conforming to the supertype, the two *s have to be in a subtype relationship. */
+	if (g_variant_type_is_subtype_of (parameters_type, parameters_supertype) == FALSE) {
+		/* Error */
+		func_set_calculate_type_error (error, "inArray", parameters_supertype, parameters_type);
+		return NULL;
+	}
+
+	first_type = g_variant_type_first (parameters_type);
+
+	if (g_variant_type_is_subtype_of (first_type, g_variant_type_element (g_variant_type_next (first_type))) == FALSE) {
+		gchar *parameters_supertype_string, *parameters_type_string;
+
+		/* Error */
+		parameters_supertype_string = g_variant_type_dup_string (parameters_supertype);
+		parameters_type_string = g_variant_type_dup_string (parameters_type);
+
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+		             "Type mismatch between formal and actual parameters to function ‘%s’: expects type ‘%s’ with the first item a subtype "
+		             "of the element type of the second item, but received type ‘%s’.",
+		             "inArray", parameters_supertype_string, parameters_type_string);
+
+		g_free (parameters_type_string);
+		g_free (parameters_supertype_string);
+
+		return NULL;
+	}
+
+	/* Always return a boolean. */
+	return g_variant_type_copy (G_VARIANT_TYPE_BOOLEAN);
+}
+
 static const DfsmFunctionInfo _function_info[] = {
-	/* TODO: Not typesafe, but I'm not sure we want polymorphism */
-	/* Name,	Parameters type,		Return type,			Evaluate func. */
-	{ "keys",	G_VARIANT_TYPE_ARRAY,		G_VARIANT_TYPE_ANY,		NULL /* TODO */ },
-	{ "newObject",	G_VARIANT_TYPE_OBJECT_PATH,	(const GVariantType*) "(os)",	NULL /* TODO */ },
-	{ "pairKeys",	(const GVariantType*) "(a?a*)",	(const GVariantType*) "a{?*}",	NULL /* TODO */ },
+	/* Name,	Calculate type func,		Evaluate func. */
+	{ "keys",	_keys_calculate_type,		NULL /* TODO */ },
+	{ "pairKeys",	_pair_keys_calculate_type,	NULL /* TODO */ },
+	{ "inArray",	_in_array_calculate_type,	NULL /* TODO */ },
 };
 
 /**
@@ -381,6 +472,45 @@ dfsm_environment_get_function_info (const gchar *function_name)
 	}
 
 	return NULL;
+}
+
+/**
+ * dfsm_environment_function_calculate_type:
+ * @function_name: name of the function to calculate the return type for
+ * @parameters_type: the type of the input parameter (or parameters, if it's a tuple)
+ * @error: (allow-none): a #GError, or %NULL
+ *
+ * Calculate the return type of @function_name when passed an input parameter of type @parameters_type. If the input parameter type is incompatible
+ * with the function, an error will be set and %NULL will be returned.
+ *
+ * It is an error to pass a non-definite type in @parameters_type; or to pass a non-existent @function_name.
+ *
+ * Return value: (transfer full): type of the return value of the function
+ */
+GVariantType *
+dfsm_environment_function_calculate_type (const gchar *function_name, const GVariantType *parameters_type, GError **error)
+{
+	const DfsmFunctionInfo *function_info;
+	GVariantType *return_type;
+	GError *child_error = NULL;
+
+	g_return_val_if_fail (function_name != NULL && *function_name != '\0', NULL);
+	g_return_val_if_fail (parameters_type != NULL, NULL);
+	g_return_val_if_fail (g_variant_type_is_definite (parameters_type) == TRUE, NULL);
+	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
+
+	function_info = dfsm_environment_get_function_info (function_name);
+	g_assert (function_info != NULL);
+
+	g_assert (function_info->calculate_type_func != NULL);
+	return_type = function_info->calculate_type_func (parameters_type, &child_error);
+	g_assert ((return_type == NULL) != (child_error == NULL));
+
+	if (child_error != NULL) {
+		g_propagate_error (error, child_error);
+	}
+
+	return return_type;
 }
 
 /**

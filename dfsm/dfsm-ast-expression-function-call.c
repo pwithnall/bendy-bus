@@ -119,7 +119,7 @@ dfsm_ast_expression_function_call_check (DfsmAstNode *node, DfsmEnvironment *env
 {
 	DfsmAstExpressionFunctionCallPrivate *priv = DFSM_AST_EXPRESSION_FUNCTION_CALL (node)->priv;
 	const DfsmFunctionInfo *function_info;
-	GVariantType *parameters_type;
+	GVariantType *parameters_type, *return_type;
 
 	dfsm_ast_node_check (DFSM_AST_NODE (priv->parameters), environment, error);
 
@@ -130,36 +130,30 @@ dfsm_ast_expression_function_call_check (DfsmAstNode *node, DfsmEnvironment *env
 	function_info = dfsm_environment_get_function_info (priv->function_name);
 	g_assert (function_info != NULL);
 
+	/* Check the types are compatible. */
 	parameters_type = dfsm_ast_expression_calculate_type (priv->parameters, environment);
+	return_type = dfsm_environment_function_calculate_type (priv->function_name, parameters_type, error);
+	g_variant_type_free (parameters_type);
 
-	if (g_variant_type_is_subtype_of (parameters_type, function_info->parameters_type) == FALSE) {
-		gchar *formal, *actual;
-
-		formal = g_variant_type_dup_string (function_info->parameters_type);
-		actual = g_variant_type_dup_string (parameters_type);
-
-		g_variant_type_free (parameters_type);
-
-		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-		             "Type mismatch between formal and actual parameters to function ‘%s’: expects type %s but received type %s.",
-		             priv->function_name, formal, actual);
+	if (*error != NULL) {
 		return;
 	}
 
-	g_variant_type_free (parameters_type);
+	g_variant_type_free (return_type);
 }
 
 static GVariantType *
 dfsm_ast_expression_function_call_calculate_type (DfsmAstExpression *expression, DfsmEnvironment *environment)
 {
 	DfsmAstExpressionFunctionCallPrivate *priv = DFSM_AST_EXPRESSION_FUNCTION_CALL (expression)->priv;
-	const DfsmFunctionInfo *function_info;
+	GVariantType *parameters_type, *return_type;
 
-	/* Type of the function call is just the return type of the function. */
-	function_info = dfsm_environment_get_function_info (priv->function_name);
-	g_assert (function_info != NULL);
+	parameters_type = dfsm_ast_expression_calculate_type (priv->parameters, environment);
+	return_type = dfsm_environment_function_calculate_type (priv->function_name, parameters_type, NULL);
+	g_assert (return_type != NULL);
+	g_variant_type_free (parameters_type);
 
-	return g_variant_type_copy (function_info->return_type);
+	return return_type;
 }
 
 static GVariant *
