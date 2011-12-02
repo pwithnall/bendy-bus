@@ -351,7 +351,7 @@ FuzzyDataStructure: DataStructure					{ $$ = $1; }
                   | DataStructure FUZZY DOUBLE				{ $$ = $1; dfsm_ast_data_structure_set_weight ($1, $3); }
 ;
 
-/* Returns a new DfsmAstDataStructure or DfsmAstVariable. */
+/* Returns a new DfsmAstDataStructure. */
 DataStructure: BYTE					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BYTE, &$1, ERROR); ABORT_ON_ERROR; }
              | TRUE_LITERAL				{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BOOLEAN,
 							                                    GUINT_TO_POINTER (TRUE), ERROR); ABORT_ON_ERROR; }
@@ -367,6 +367,8 @@ DataStructure: BYTE					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BYTE, 
              | STRING					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_STRING, $1, ERROR); ABORT_ON_ERROR; }
              | DBUS_OBJECT_PATH				{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_OBJECT_PATH, $1, ERROR); ABORT_ON_ERROR; }
              | DBUS_TYPE_SIGNATURE			{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_SIGNATURE, $1, ERROR); ABORT_ON_ERROR; }
+             | '<' Expression '>'			{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_VARIANT, $2, ERROR); ABORT_ON_ERROR; }
+             | '<' error '>'				{ $$ = NULL; YYABORT; }
              | ARRAY_L_BRACKET ArrayList ARRAY_R_BRACKET	{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_ARRAY, $2, ERROR); ABORT_ON_ERROR; }
              | ARRAY_L_BRACKET error ARRAY_R_BRACKET		{ $$ = NULL; YYABORT; }
              | L_PAREN StructureList R_PAREN		{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_STRUCT, $2, ERROR); ABORT_ON_ERROR; }

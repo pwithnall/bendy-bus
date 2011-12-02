@@ -187,9 +187,9 @@ DOUBLE					(\+-)?[0-9]+\.[0-9]+d
 "%" { return MODULUS; }
 "+" { return PLUS; }
 "-" { return MINUS; }
-"<" { return LT; }
+"<~" { return LT; }
 "<=" { return LTE; }
-">" { return GT; }
+"~>" { return GT; }
 ">=" { return GTE; }
 "==" { return EQ; }
 "!=" { return NEQ; }

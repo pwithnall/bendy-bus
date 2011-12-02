@@ -48,7 +48,7 @@ struct _DfsmAstDataStructurePrivate {
 		gchar *signature_val;
 		GPtrArray/*<DfsmAstExpression>*/ *array_val;
 		GPtrArray/*<DfsmAstExpression>*/ *struct_val;
-		GVariant *variant_val;
+		DfsmAstExpression *variant_val;
 		GPtrArray/*<DfsmAstDictionaryEntry>*/ *dict_val;
 		gint unix_fd_val;
 		gchar *regexp_val;
@@ -116,7 +116,7 @@ dfsm_ast_data_structure_finalize (GObject *object)
 			g_ptr_array_unref (priv->struct_val);
 			break;
 		case DFSM_AST_DATA_VARIANT:
-			g_variant_unref (priv->variant_val);
+			g_object_unref (priv->variant_val);
 			break;
 		case DFSM_AST_DATA_DICT:
 			g_ptr_array_unref (priv->dict_val);
@@ -182,7 +182,7 @@ dfsm_ast_data_structure_sanity_check (DfsmAstNode *node)
 
 			break;
 		case DFSM_AST_DATA_VARIANT:
-			g_assert (priv->variant_val != NULL);
+			g_assert (DFSM_IS_AST_EXPRESSION (priv->variant_val));
 			break;
 		case DFSM_AST_DATA_DICT:
 			g_assert (priv->dict_val != NULL);
@@ -284,8 +284,9 @@ dfsm_ast_data_structure_pre_check_and_register (DfsmAstNode *node, DfsmEnvironme
 			break;
 		}
 		case DFSM_AST_DATA_VARIANT:
-			if (g_variant_is_normal_form (priv->variant_val) == FALSE) {
-				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid variant: not in normal form");
+			dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (priv->variant_val), environment, error);
+
+			if (*error != NULL) {
 				return;
 			}
 
@@ -522,10 +523,18 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 		case DFSM_AST_DATA_STRING:
 		case DFSM_AST_DATA_OBJECT_PATH:
 		case DFSM_AST_DATA_SIGNATURE:
-		case DFSM_AST_DATA_VARIANT:
 		case DFSM_AST_DATA_UNIX_FD:
 		case DFSM_AST_DATA_REGEXP:
 			/* Nothing to do here */
+			break;
+		case DFSM_AST_DATA_VARIANT:
+			/* Valid expression? */
+			dfsm_ast_node_check (DFSM_AST_NODE (priv->variant_val), environment, error);
+
+			if (*error != NULL) {
+				return;
+			}
+
 			break;
 		case DFSM_AST_DATA_ARRAY: {
 			GVariantType *expected_type;
@@ -679,8 +688,7 @@ dfsm_ast_data_structure_new (DfsmAstDataStructureType data_structure_type, gpoin
 			priv->struct_val = g_ptr_array_ref (value); /* array of DfsmAstExpressions */
 			break;
 		case DFSM_AST_DATA_VARIANT:
-			/* Note: not representable in the FSM language. */
-			priv->variant_val = NULL;
+			priv->variant_val = g_object_ref (value); /* DfsmAstExpression */
 			break;
 		case DFSM_AST_DATA_DICT:
 			priv->dict_val = g_ptr_array_ref (value); /* array of DfsmAstDictionaryEntrys */
@@ -853,8 +861,22 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 
 			return g_variant_ref_sink (g_variant_builder_end (&builder));
 		}
-		case DFSM_AST_DATA_VARIANT:
-			return g_variant_ref_sink (g_variant_new_variant (priv->variant_val));
+		case DFSM_AST_DATA_VARIANT: {
+			GVariant *expr_value, *variant_value;
+			GError *child_error = NULL;
+
+			expr_value = dfsm_ast_expression_evaluate (priv->variant_val, environment, &child_error);
+
+			if (child_error != NULL) {
+				g_propagate_error (error, child_error);
+				return NULL;
+			}
+
+			variant_value = g_variant_ref_sink (g_variant_new_variant (expr_value));
+			g_variant_unref (expr_value);
+
+			return variant_value;
+		}
 		case DFSM_AST_DATA_DICT: {
 			GVariantBuilder builder;
 			guint i;
