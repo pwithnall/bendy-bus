@@ -312,7 +312,7 @@ dfsm_environment_set_variable_value (DfsmEnvironment *self, DfsmVariableScope sc
 	variable_info = look_up_variable_info (self, scope, variable_name, TRUE);
 	g_assert (variable_info != NULL);
 
-	g_variant_ref (new_value);
+	g_variant_ref_sink (new_value);
 
 	if (variable_info->value != NULL) {
 		/* Variable already exists; free the old value */
