@@ -683,7 +683,7 @@ dfsm_ast_data_structure_new (DfsmAstDataStructureType data_structure_type, gpoin
 	DfsmAstDataStructure *data_structure;
 	DfsmAstDataStructurePrivate *priv;
 
-	g_return_val_if_fail (value != NULL, NULL);
+	g_return_val_if_fail (data_structure_type == DFSM_AST_DATA_BOOLEAN || value != NULL, NULL);
 	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	data_structure = g_object_new (DFSM_TYPE_AST_DATA_STRUCTURE, NULL);
