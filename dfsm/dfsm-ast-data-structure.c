@@ -516,7 +516,13 @@ _calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment, GErro
 			calculated_type = __calculate_type (self, environment);
 			annotated_type = g_variant_type_new (self->priv->type_annotation);
 
-			if (g_variant_type_is_subtype_of (annotated_type, calculated_type) == FALSE) {
+			/* We specifically ignore the cases where the calculated type is a string but the annotated type is an object path or
+			 * D-Bus signature, since we require object paths and signatures to use string syntax in the language. */
+			if (g_variant_type_is_subtype_of (annotated_type, calculated_type) == FALSE &&
+			    !(g_variant_type_equal (calculated_type, G_VARIANT_TYPE_STRING) == TRUE &&
+			      g_variant_type_equal (annotated_type, G_VARIANT_TYPE_OBJECT_PATH) == TRUE) &&
+			    !(g_variant_type_equal (calculated_type, G_VARIANT_TYPE_STRING) == TRUE &&
+			      g_variant_type_equal (annotated_type, G_VARIANT_TYPE_SIGNATURE) == TRUE)) {
 				gchar *annotated_type_string, *calculated_type_string;
 
 				annotated_type_string = g_variant_type_dup_string (annotated_type);
@@ -851,8 +857,28 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 			return g_variant_ref_sink (g_variant_new_uint64 (priv->uint64_val));
 		case DFSM_AST_DATA_DOUBLE:
 			return g_variant_ref_sink (g_variant_new_double (priv->double_val));
-		case DFSM_AST_DATA_STRING:
-			return g_variant_ref_sink (g_variant_new_string (priv->string_val));
+		case DFSM_AST_DATA_STRING: {
+			GVariantType *data_structure_type;
+			GVariant *variant;
+
+			data_structure_type = dfsm_ast_data_structure_calculate_type (self, environment);
+
+			/* Slight irregularity: if we've calculated the data structure type to be an object path or D-Bus signature (i.e. because the
+			 * user added a type annotation), we need to create a GVariant of the appropriate type. */
+			if (g_variant_type_equal (data_structure_type, G_VARIANT_TYPE_STRING) == TRUE) {
+				variant = g_variant_new_string (priv->string_val);
+			} else if (g_variant_type_equal (data_structure_type, G_VARIANT_TYPE_OBJECT_PATH) == TRUE) {
+				variant = g_variant_new_object_path (priv->string_val);
+			} else if (g_variant_type_equal (data_structure_type, G_VARIANT_TYPE_SIGNATURE) == TRUE) {
+				variant = g_variant_new_signature (priv->string_val);
+			} else {
+				g_assert_not_reached ();
+			}
+
+			g_variant_type_free (data_structure_type);
+
+			return g_variant_ref_sink (variant);
+		}
 		case DFSM_AST_DATA_OBJECT_PATH:
 			return g_variant_ref_sink (g_variant_new_object_path (priv->object_path_val));
 		case DFSM_AST_DATA_SIGNATURE:
