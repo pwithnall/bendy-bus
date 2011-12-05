@@ -240,22 +240,29 @@ stdouterr_channel_cb (GIOChannel *channel, GIOCondition condition, const gchar *
 
 	if (condition & (G_IO_IN | G_IO_PRI)) {
 		while (TRUE) {
-			gchar *stdouterr_line;
+			gchar stdouterr_buf[256];
+			gsize bytes_read = 0;
 			GIOStatus status;
 			GError *child_error = NULL;
 
-			/* Read a line in */
-			do {
-				status = g_io_channel_read_line (channel, &stdouterr_line, NULL, NULL, &child_error);
-			} while (status == G_IO_STATUS_AGAIN);
+			/* Read a buffer-load in */
+			status = g_io_channel_read_chars (channel, stdouterr_buf, sizeof (stdouterr_buf) - 1 /* nul */, &bytes_read, &child_error);
+			stdouterr_buf[bytes_read] = '\0'; /* nul terminator */
 
 			switch (status) {
 				case G_IO_STATUS_NORMAL:
 					/* Read this line successfully. After handling it, we'll loop around and read another. */
-					g_debug ("%s: %s", channel_name, stdouterr_line);
+					g_debug ("%s: %s", channel_name, stdouterr_buf);
+
+					if (bytes_read != sizeof (stdouterr_buf)) {
+						/* Done? */
+						goto in_done;
+					}
+
 					break; /* and continue the loop */
 				case G_IO_STATUS_EOF:
 					/* We're done! */
+					g_debug ("%s: %s", channel_name, stdouterr_buf);
 					goto in_done;
 				case G_IO_STATUS_ERROR:
 					/* Error! */
@@ -264,6 +271,8 @@ stdouterr_channel_cb (GIOChannel *channel, GIOCondition condition, const gchar *
 
 					goto in_done;
 				case G_IO_STATUS_AGAIN:
+					/* Ignore and handle it next time. */
+					goto in_done;
 				default:
 					g_assert_not_reached ();
 			}
@@ -390,6 +399,7 @@ dsim_program_wrapper_spawn (DsimProgramWrapper *self, GError **error)
 	g_get_charset (&locale_charset);
 
 	child_stdout_channel = g_io_channel_unix_new (child_stdout);
+	g_io_channel_set_flags (child_stdout_channel, G_IO_FLAG_NONBLOCK, NULL);
 	g_io_channel_set_encoding (child_stdout_channel, locale_charset, NULL);
 
 	child_stdout_watch_id = g_io_add_watch (child_stdout_channel, G_IO_IN | G_IO_PRI | G_IO_ERR | G_IO_HUP | G_IO_NVAL,
@@ -400,6 +410,7 @@ dsim_program_wrapper_spawn (DsimProgramWrapper *self, GError **error)
 	g_io_channel_unref (child_stdout_channel);
 
 	child_stderr_channel = g_io_channel_unix_new (child_stderr);
+	g_io_channel_set_flags (child_stderr_channel, G_IO_FLAG_NONBLOCK, NULL);
 	g_io_channel_set_encoding (child_stderr_channel, locale_charset, NULL);
 
 	child_stderr_watch_id = g_io_add_watch (child_stderr_channel, G_IO_IN | G_IO_PRI | G_IO_ERR | G_IO_HUP | G_IO_NVAL,
