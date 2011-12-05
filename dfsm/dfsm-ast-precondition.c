@@ -108,6 +108,7 @@ static void
 dfsm_ast_precondition_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstPreconditionPrivate *priv = DFSM_AST_PRECONDITION (node)->priv;
+	GVariantType *condition_type;
 
 	dfsm_ast_node_check (DFSM_AST_NODE (priv->condition), environment, error);
 
@@ -115,7 +116,26 @@ dfsm_ast_precondition_check (DfsmAstNode *node, DfsmEnvironment *environment, GE
 		return;
 	}
 
-	/* TODO: Assert that the precondition is a boolean */
+	/* Check that the precondition is a boolean */
+	condition_type = dfsm_ast_expression_calculate_type (priv->condition, environment);
+
+	if (g_variant_type_equal (condition_type, G_VARIANT_TYPE_BOOLEAN) == FALSE) {
+		gchar *condition_type_string;
+
+		condition_type_string = g_variant_type_dup_string (condition_type);
+
+		g_variant_type_free (condition_type);
+
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+		             "Incorrect type for precondition expression: expects type ‘%s’ but received type ‘%s’.",
+		             "b", condition_type_string);
+
+		g_free (condition_type_string);
+
+		return;
+	}
+
+	g_variant_type_free (condition_type);
 }
 
 /**
