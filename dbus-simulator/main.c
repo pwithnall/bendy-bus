@@ -59,6 +59,8 @@ typedef struct {
 
 	/* Simulation gubbins */
 	DsimTestProgram *test_program;
+	gchar *test_program_name;
+	GPtrArray/*<string>*/ *test_program_argv;
 	DsimDBusDaemon *dbus_daemon;
 	gchar *dbus_address;
 	GDBusConnection *connection;
@@ -72,8 +74,13 @@ main_data_clear (MainData *data)
 	g_free (data->dbus_address);
 	g_ptr_array_unref (data->simulated_objects);
 
-	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program));
-	g_clear_object (&data->test_program);
+	if (data->test_program != NULL) {
+		dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program));
+		g_clear_object (&data->test_program);
+	}
+
+	g_ptr_array_unref (data->test_program_argv);
+	g_free (data->test_program_name);
 
 	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->dbus_daemon));
 	g_clear_object (&data->dbus_daemon);
@@ -175,7 +182,7 @@ connection_created_cb (GObject *source_object, GAsyncResult *result, MainData *d
 	}
 
 	/* TODO: How do we know when the simulation's finished? */
-	g_timeout_add_seconds (10, (GSourceFunc) simulation_timeout_cb, data);
+	g_timeout_add_seconds (60, (GSourceFunc) simulation_timeout_cb, data);
 
 	return;
 
@@ -193,12 +200,48 @@ error:
 }
 
 static void
+forward_envp_pair (GPtrArray/*<string>*/ *envp, const gchar *key)
+{
+	const gchar *value;
+
+	value = g_getenv (key);
+	if (value != NULL) {
+		g_ptr_array_add (envp, g_strdup_printf ("%s=%s", key, value));
+	}
+}
+
+static void
 dbus_daemon_notify_bus_address_cb (GObject *gobject, GParamSpec *pspec, MainData *data)
 {
-	/* Start building a D-Bus connection with our new bus address. */
+	GPtrArray/*<string>*/ *test_program_envp;
+	gchar *envp_pair;
+
 	g_assert (data->dbus_address == NULL);
 	data->dbus_address = g_strdup (dsim_dbus_daemon_get_bus_address (data->dbus_daemon));
 
+	/* Set up the test program ready for spawning. */
+	test_program_envp = g_ptr_array_new_with_free_func (g_free);
+
+	envp_pair = g_strdup_printf ("DBUS_SESSION_BUS_ADDRESS=%s", data->dbus_address);
+	g_ptr_array_add (test_program_envp, envp_pair);
+
+	forward_envp_pair (test_program_envp, "DISPLAY");
+	forward_envp_pair (test_program_envp, "XDG_DATA_HOME");
+	forward_envp_pair (test_program_envp, "XDG_CACHE_HOME");
+	forward_envp_pair (test_program_envp, "XDG_CONFIG_HOME");
+	forward_envp_pair (test_program_envp, "HOME");
+	forward_envp_pair (test_program_envp, "USER");
+	forward_envp_pair (test_program_envp, "HOSTNAME");
+	forward_envp_pair (test_program_envp, "SSH_CLIENT");
+	forward_envp_pair (test_program_envp, "SSH_TTY");
+	forward_envp_pair (test_program_envp, "SSH_CONNECTION");
+
+	data->test_program = dsim_test_program_new (g_file_new_for_path ("/tmp/test"), data->test_program_name, data->test_program_argv,
+	                                            test_program_envp);
+
+	g_ptr_array_unref (test_program_envp);
+
+	/* Start building a D-Bus connection with our new bus address. */
 	g_dbus_connection_new_for_address (data->dbus_address,
 	                                   G_DBUS_CONNECTION_FLAGS_AUTHENTICATION_CLIENT | G_DBUS_CONNECTION_FLAGS_MESSAGE_BUS_CONNECTION, NULL, NULL,
 	                                   (GAsyncReadyCallback) connection_created_cb, data);
@@ -327,9 +370,11 @@ main (int argc, char *argv[])
 
 	g_ptr_array_unref (simulated_objects);
 
-	/* Set up the test program ready for spawning. */
-	/* TODO */
-	data.test_program = dsim_test_program_new (g_file_new_for_path ("/tmp/test"), test_program_name, test_program_argv, NULL);
+	/* Store the test program name and argv, since we can only spawn it once we know the bus address. */
+	data.test_program_name = g_strdup (test_program_name);
+	data.test_program_argv = g_ptr_array_ref (test_program_argv);
+
+	g_ptr_array_unref (test_program_argv);
 
 	/* Start up our own private dbus-daemon instance. */
 	/* TODO */
