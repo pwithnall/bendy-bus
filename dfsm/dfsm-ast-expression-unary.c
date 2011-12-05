@@ -218,6 +218,7 @@ dfsm_ast_expression_unary_new (DfsmAstExpressionUnaryType expression_type, DfsmA
 	expression = g_object_new (DFSM_TYPE_AST_EXPRESSION_UNARY, NULL);
 	priv = expression->priv;
 
+	priv->expression_type = expression_type;
 	priv->child_node = g_object_ref (child_node);
 
 	return DFSM_AST_EXPRESSION (expression);

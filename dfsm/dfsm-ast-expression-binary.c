@@ -414,6 +414,7 @@ dfsm_ast_expression_binary_new (DfsmAstExpressionBinaryType expression_type, Dfs
 	expression = g_object_new (DFSM_TYPE_AST_EXPRESSION_BINARY, NULL);
 	priv = expression->priv;
 
+	priv->expression_type = expression_type;
 	priv->left_node = g_object_ref (left_node);
 	priv->right_node = g_object_ref (right_node);
 
