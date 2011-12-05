@@ -63,6 +63,8 @@ dfsm_sources = \
 	dfsm/dfsm-machine.c \
 	dfsm/dfsm-object.c \
 	dfsm/dfsm-environment.c \
+	dfsm/dfsm-internal.c \
+	dfsm/dfsm-internal.h \
 	$(NULL)
 
 dfsmincludedir = $(pkgincludedir)/dfsm

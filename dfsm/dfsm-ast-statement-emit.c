@@ -20,6 +20,7 @@
 #include <glib.h>
 
 #include "dfsm-ast-statement-emit.h"
+#include "dfsm-internal.h"
 #include "dfsm-parser.h"
 
 static void dfsm_ast_statement_emit_dispose (GObject *object);
@@ -113,6 +114,10 @@ static void
 dfsm_ast_statement_emit_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstStatementEmitPrivate *priv = DFSM_AST_STATEMENT_EMIT (node)->priv;
+	GDBusNodeInfo *node_info;
+	GDBusInterfaceInfo **interface_infos, *interface_info;
+	GDBusSignalInfo *signal_info = NULL;
+	GVariantType *expr_parameters_type, *signal_parameters_type;
 
 	dfsm_ast_node_check (DFSM_AST_NODE (priv->expression), environment, error);
 
@@ -120,7 +125,53 @@ dfsm_ast_statement_emit_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 		return;
 	}
 
-	/* TODO: Check expression's type matches the signal. Check the signal's from the right interface. */
+	/* Find the interface declaring the signal. */
+	node_info = dfsm_environment_get_dbus_node_info (environment);
+
+	for (interface_infos = node_info->interfaces; *interface_infos != NULL; interface_infos++) {
+		interface_info = *interface_infos;
+
+		signal_info = g_dbus_interface_info_lookup_signal (interface_info, priv->signal_name);
+
+		if (signal_info != NULL) {
+			/* Found the interface defining signal_name. */
+			break;
+		}
+	}
+
+	/* Failed to find a suitable interface? */
+	/* TODO: This doesn't check the interfaces against what the object actually declares it implements. */
+	if (signal_info == NULL) {
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+		             "Undeclared D-Bus signal referenced by an ‘emit’ statement: %s", priv->signal_name);
+		return;
+	}
+
+	/* Check the expression's type is a tuple. */
+	expr_parameters_type = dfsm_ast_expression_calculate_type (priv->expression, environment);
+	signal_parameters_type = dfsm_internal_dbus_arg_info_array_to_variant_type ((const GDBusArgInfo**) signal_info->args);
+
+	if (g_variant_type_is_subtype_of (expr_parameters_type, signal_parameters_type) == FALSE) {
+		gchar *expr_parameters_type_string, *signal_parameters_type_string;
+
+		expr_parameters_type_string = g_variant_type_dup_string (expr_parameters_type);
+		signal_parameters_type_string = g_variant_type_dup_string (signal_parameters_type);
+
+		g_variant_type_free (signal_parameters_type);
+		g_variant_type_free (expr_parameters_type);
+
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+		             "Type mismatch between formal and actual parameters to D-Bus signal ‘%s’: expects type ‘%s’ but received type ‘%s’.",
+		             priv->signal_name, signal_parameters_type_string, expr_parameters_type_string);
+
+		g_free (signal_parameters_type_string);
+		g_free (expr_parameters_type_string);
+
+		return;
+	}
+
+	g_variant_type_free (signal_parameters_type);
+	g_variant_type_free (expr_parameters_type);
 }
 
 static GVariant *
