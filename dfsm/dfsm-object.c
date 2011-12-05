@@ -478,9 +478,15 @@ dfsm_object_dbus_get_property (GDBusConnection *connection, const gchar *sender,
 {
 	DfsmObjectPrivate *priv = DFSM_OBJECT (user_data)->priv;
 	GVariant *value;
+	gchar *value_string;
 
 	/* Grab the value from the environment and be done with it. */
 	value = dfsm_environment_dup_variable_value (dfsm_machine_get_environment (priv->machine), DFSM_VARIABLE_SCOPE_OBJECT, property_name);
+
+	value_string = (value != NULL) ? g_variant_print (value, FALSE) : g_strdup ("(null)");
+	g_debug ("Getting D-Bus property ‘%s’ of interface ‘%s’ on object ‘%s’ for sender ‘%s’, value: %s", property_name, interface_name, object_path,
+	         sender, value_string);
+	g_free (value_string);
 
 	if (value == NULL) {
 		/* Variable wasn't found. This shouldn't ever happen, since it's checked for in the checking stage of interpretation. */
@@ -495,10 +501,16 @@ dfsm_object_dbus_set_property (GDBusConnection *connection, const gchar *sender,
                                const gchar *property_name, GVariant *value, GError **error, gpointer user_data)
 {
 	DfsmObjectPrivate *priv = DFSM_OBJECT (user_data)->priv;
+	gchar *value_string;
 	DfsmEnvironment *environment;
 	GVariant *old_value;
 	GVariantBuilder *builder;
 	GError *child_error = NULL;
+
+	value_string = g_variant_print (value, FALSE);
+	g_debug ("Setting D-Bus property ‘%s’ of interface ‘%s’ on object ‘%s’ for sender ‘%s’ to value: %s", property_name, interface_name,
+	         object_path, sender, value_string);
+	g_free (value_string);
 
 	/* Check to see if the value's actually changed. If it hasn't, bail. */
 	environment = dfsm_machine_get_environment (priv->machine);
