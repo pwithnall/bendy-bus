@@ -19,6 +19,7 @@
 
 #include "config.h"
 
+#include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <glib.h>
@@ -266,13 +267,13 @@ main (int argc, char *argv[])
 	GPtrArray/*<string>*/ *test_program_argv;
 	guint i;
 
-	g_type_init ();
-
 	/* Set up localisation. */
+	setlocale (LC_ALL, "");
 	bindtextdomain (GETTEXT_PACKAGE, PACKAGE_LOCALE_DIR);
 	bind_textdomain_codeset (GETTEXT_PACKAGE, "UTF-8");
 	textdomain (GETTEXT_PACKAGE);
 
+	g_type_init ();
 	g_set_application_name (_("D-Bus Simulator"));
 
 	/* Parse command line options */
