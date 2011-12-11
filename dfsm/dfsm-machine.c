@@ -691,7 +691,7 @@ done:
 	/* If we failed to execute a transition, warn and return the unit tuple. */
 	if (executed_transition == FALSE && child_error == NULL) {
 		g_warning ("Failed to execute any DFSM transitions as a result of method call ‘%s’. Ignoring method call.", method_name);
-		return_value = g_variant_new_tuple (NULL, 0);
+		return_value = g_variant_ref_sink (g_variant_new_tuple (NULL, 0));
 	} else if (executed_transition == FALSE || return_value == NULL) {
 		/* Error or precondition failure */
 		g_propagate_error (error, child_error);
