@@ -628,10 +628,16 @@ dfsm_environment_function_evaluate (const gchar *function_name, GVariant *parame
 void
 dfsm_environment_emit_signal (DfsmEnvironment *self, const gchar *signal_name, GVariant *parameters, GError **error)
 {
+	gchar *parameters_string;
+
 	g_return_if_fail (DFSM_IS_ENVIRONMENT (self));
 	g_return_if_fail (signal_name != NULL);
 	g_return_if_fail (parameters != NULL);
 	g_return_if_fail (error == NULL || *error == NULL);
+
+	parameters_string = g_variant_print (parameters, FALSE);
+	g_debug ("Emitting signal ‘%s’ in environment %p with parameters: %s", signal_name, self, parameters_string);
+	g_free (parameters_string);
 
 	/* Emit the signal. */
 	g_signal_emit (self, environment_signals[SIGNAL_SIGNAL_EMISSION], g_quark_from_string (signal_name), signal_name, parameters);

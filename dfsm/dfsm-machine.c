@@ -296,13 +296,16 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstTransi
 
 		/* Check we're in the right starting state. */
 		if (get_state_number_from_name (self, dfsm_ast_transition_get_from_state_name (transition)) != priv->machine_state) {
-			g_debug ("…Skipping transition %p due to being in the wrong state.", transition);
+			g_debug ("…Skipping transition %p from ‘%s’ to ‘%s’ due to being in the wrong state (‘%s’).", transition,
+			         dfsm_ast_transition_get_from_state_name (transition), dfsm_ast_transition_get_to_state_name (transition),
+			         (const gchar*) g_ptr_array_index (priv->state_names, priv->machine_state));
 			continue;
 		}
 
 		/* If this transition's preconditions are satisfied, execute it. Otherwise, loop round and try the next transition. */
 		if (dfsm_ast_transition_check_preconditions (transition, priv->environment, &child_error) == FALSE) {
-			g_debug ("…Skipping transition %p due to precondition failures.", transition);
+			g_debug ("…Skipping transition %p from ‘%s’ to ‘%s’ due to precondition failures.", transition,
+			         dfsm_ast_transition_get_from_state_name (transition), dfsm_ast_transition_get_to_state_name (transition));
 
 			/* Errors? These will either be runtime errors in evaluating the condition, or (more likely) errors thrown as a result of
 			 * precondition failure. In either case, we store the first occurrence and loop round to try the next transition instead. */
