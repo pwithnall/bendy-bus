@@ -19,6 +19,8 @@
 
 #include <errno.h>
 #include <unistd.h>
+#include <sys/resource.h>
+#include <sys/wait.h>
 #include <glib.h>
 #include <glib/gi18n.h>
 #include <gio/gio.h>
@@ -30,6 +32,8 @@ static void dsim_test_program_get_property (GObject *object, guint property_id, 
 static void dsim_test_program_set_property (GObject *object, guint property_id, const GValue *value, GParamSpec *pspec);
 static void dsim_test_program_build_argv (DsimProgramWrapper *wrapper, GPtrArray *argv);
 static void dsim_test_program_build_envp (DsimProgramWrapper *wrapper, GPtrArray *envp);
+static gboolean dsim_test_program_spawn_begin (DsimProgramWrapper *wrapper, GError **error);
+static void dsim_test_program_process_died (DsimProgramWrapper *wrapper, gint status);
 
 struct _DsimTestProgramPrivate {
 	GPtrArray/*<string>*/ *argv;
@@ -57,6 +61,8 @@ dsim_test_program_class_init (DsimTestProgramClass *klass)
 
 	wrapper_class->build_argv = dsim_test_program_build_argv;
 	wrapper_class->build_envp = dsim_test_program_build_envp;
+	wrapper_class->spawn_begin = dsim_test_program_spawn_begin;
+	wrapper_class->process_died = dsim_test_program_process_died;
 
 	/**
 	 * DsimTestProgram:argv:
@@ -176,6 +182,69 @@ dsim_test_program_build_envp (DsimProgramWrapper *wrapper, GPtrArray *envp)
 
 		g_assert (pair != NULL);
 		g_ptr_array_add (envp, g_strdup (pair));
+	}
+}
+
+static gboolean
+dsim_test_program_spawn_begin (DsimProgramWrapper *self, GError **error)
+{
+	struct rlimit rlp, new_rlp;
+
+	/* Try and raise the process’ resource limits to allow core dump files
+	 * to be generated. This should be inherited by the spawned test
+	 * program. */
+	if (getrlimit (RLIMIT_CORE, &rlp) == -1) {
+		int err = errno;
+		g_warning (_("Error %i reading RLIMIT_CORE resource limit: %s"), err, g_strerror (err));
+	} else {
+		new_rlp.rlim_cur = RLIM_SAVED_MAX;
+		new_rlp.rlim_max = RLIM_SAVED_MAX;
+
+		/* Push the CUR resource limit up to the MAX. We shouldn't need extra privileges to be able to do this. */
+		if (setrlimit (RLIMIT_CORE, &new_rlp) == -1) {
+			int err = errno;
+			g_warning (_("Error %i setting RLIMIT_CORE resource limit: %s"), err, g_strerror (err));
+		} else {
+			/* Successfully set the CUR resource limit to the MAX. */
+			rlp.rlim_cur = rlp.rlim_max;
+		}
+
+		/* Since we don't know what size is reasonable for a core dump file, warn the user if RLIMIT_CORE is anything less than infinity. */
+		if (rlp.rlim_cur >= RLIM_INFINITY) {
+			g_message (_("Note: Core dump files will be generated for the program under test if it crashes."));
+		} else if (rlp.rlim_cur > 0 && rlp.rlim_cur < RLIM_INFINITY) {
+			gchar *rlim_cur_string = g_format_size_full (rlp.rlim_cur, G_FORMAT_SIZE_LONG_FORMAT);
+			g_message (_("Note: Core dump files for the program under test may not be generated as a resource limit of %s bytes applies."
+			             "Run `ulimit -c unlimited` on the parent shell of this test utility to raise the resource limit."),
+			           rlim_cur_string);
+			g_free (rlim_cur_string);
+		} else {
+			g_message (_("Note: Core dump files for the program under test will not be generated as a resource limit of 0 bytes applies."
+			             "Run `ulimit -c unlimited` on the parent shell of this test utility to raise the resource limit."));
+		}
+	}
+
+	return FALSE;
+}
+
+static void
+dsim_test_program_process_died (DsimProgramWrapper *wrapper, gint status)
+{
+	GPid pid = dsim_program_wrapper_get_process_id (wrapper);
+
+	/* Examine the exit status. */
+	if (WIFEXITED (status)) {
+		g_message ("Program under test (PID: %i) exited normally with status %u.", pid, WEXITSTATUS (status));
+	} else if (WIFSIGNALED (status)) {
+#ifdef WCOREDUMP
+		if (WCOREDUMP (status)) {
+			g_message ("Program under test (PID: %i) terminated by signal %u and produced a core dump file.", pid, WTERMSIG (status));
+		} else {
+			g_message ("Program under test (PID: %i) terminated by signal %u.", pid, WTERMSIG (status));
+		}
+#else /* ifndef WCOREDUMP */
+		g_message ("Program under test (PID: %i) terminated by signal %u.", pid, WTERMSIG (status));
+#endif /* !WCOREDUMP */
 	}
 }
 
