@@ -18,6 +18,7 @@
  */
 
 #include <errno.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
@@ -236,14 +237,20 @@ dsim_test_program_process_died (DsimProgramWrapper *wrapper, gint status)
 	if (WIFEXITED (status)) {
 		g_message ("Program under test (PID: %i) exited normally with status %u.", pid, WEXITSTATUS (status));
 	} else if (WIFSIGNALED (status)) {
+		int sig;
+		char *sig_string;
+
+		sig = WTERMSIG (status);
+		sig_string = strsignal (sig);
+
 #ifdef WCOREDUMP
 		if (WCOREDUMP (status)) {
-			g_message ("Program under test (PID: %i) terminated by signal %u and produced a core dump file.", pid, WTERMSIG (status));
+			g_message ("Program under test (PID: %i) terminated by signal %u (%s) and produced a core dump file.", pid, sig, sig_string);
 		} else {
-			g_message ("Program under test (PID: %i) terminated by signal %u.", pid, WTERMSIG (status));
+			g_message ("Program under test (PID: %i) terminated by signal %u (%s).", pid, sig, sig_string);
 		}
 #else /* ifndef WCOREDUMP */
-		g_message ("Program under test (PID: %i) terminated by signal %u.", pid, WTERMSIG (status));
+		g_message ("Program under test (PID: %i) terminated by signal %u (%s).", pid, sig, sig_string);
 #endif /* !WCOREDUMP */
 	}
 }
