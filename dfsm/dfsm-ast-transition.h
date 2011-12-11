@@ -24,6 +24,7 @@
 #include <glib-object.h>
 
 #include <dfsm/dfsm-ast-node.h>
+#include <dfsm/dfsm-parser.h>
 
 G_BEGIN_DECLS
 
@@ -34,6 +35,7 @@ G_BEGIN_DECLS
  */
 typedef enum {
 	DFSM_AST_TRANSITION_METHOD_CALL,
+	DFSM_AST_TRANSITION_PROPERTY_SET,
 	DFSM_AST_TRANSITION_ARBITRARY,
 } DfsmAstTransitionTrigger;
 
@@ -57,7 +59,7 @@ typedef struct {
 
 GType dfsm_ast_transition_get_type (void) G_GNUC_CONST;
 
-DfsmAstTransition *dfsm_ast_transition_new (const gchar *from_state_name, const gchar *to_state_name, const gchar *transition_type,
+DfsmAstTransition *dfsm_ast_transition_new (const gchar *from_state_name, const gchar *to_state_name, const DfsmParserTransitionDetails *details,
                                             GPtrArray/*<DfsmAstPrecondition>*/ *preconditions,
                                             GPtrArray/*<DfsmAstStatement>*/ *statements, GError **error) DFSM_CONSTRUCTOR;
 
@@ -69,6 +71,7 @@ const gchar *dfsm_ast_transition_get_from_state_name (DfsmAstTransition *self) G
 const gchar *dfsm_ast_transition_get_to_state_name (DfsmAstTransition *self) G_GNUC_PURE;
 DfsmAstTransitionTrigger dfsm_ast_transition_get_trigger (DfsmAstTransition *self) G_GNUC_PURE;
 const gchar *dfsm_ast_transition_get_trigger_method_name (DfsmAstTransition *self) G_GNUC_PURE;
+const gchar *dfsm_ast_transition_get_trigger_property_name (DfsmAstTransition *self) G_GNUC_PURE;
 
 G_END_DECLS
 

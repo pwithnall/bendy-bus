@@ -168,6 +168,7 @@ TYPE_ANNOTATION				@[\(\)\{\}ybnqiuxtdsogarvehm\*\?@&^]+[ \t\n\r\v\f]+
 "to" { return TO; }
 "on" { return ON; }
 "method" { return METHOD; }
+"property" { return PROPERTY; }
 "random" { return RANDOM; }
 "precondition" { return PRECONDITION; }
 "throwing" { return THROWING; }

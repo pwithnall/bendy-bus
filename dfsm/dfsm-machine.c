@@ -55,8 +55,8 @@ dfsm_simulation_status_get_type (void)
 #define MAX_TIMEOUT 5000 /* ms */
 
 static void dfsm_machine_dispose (GObject *object);
-static void dfsm_machine_get_property (GObject *object, guint property_id, GValue *value, GParamSpec *pspec);
-static void dfsm_machine_set_property (GObject *object, guint property_id, const GValue *value, GParamSpec *pspec);
+static void dfsm_machine_get_gobject_property (GObject *object, guint property_id, GValue *value, GParamSpec *pspec);
+static void dfsm_machine_set_gobject_property (GObject *object, guint property_id, const GValue *value, GParamSpec *pspec);
 
 static void environment_signal_emission_cb (DfsmEnvironment *environment, const gchar *signal_name, GVariant *parameters, DfsmMachine *self);
 
@@ -72,6 +72,7 @@ struct _DfsmMachinePrivate {
 	GPtrArray/*<string>*/ *state_names; /* (indexed by DfsmMachineStateNumber) */
 	struct {
 		GHashTable/*<string, GPtrArray<DfsmAstTransition>>*/ *method_call_triggered; /* hash table of method name to transitions */
+		GHashTable/*<string, GPtrArray<DfsmAstTransition>>*/ *property_set_triggered; /* hash table of property name to transitions */
 		GPtrArray/*<DfsmAstTransition>*/ *arbitrarily_triggered; /* array of transitions */
 	} transitions;
 };
@@ -98,8 +99,8 @@ dfsm_machine_class_init (DfsmMachineClass *klass)
 
 	g_type_class_add_private (klass, sizeof (DfsmMachinePrivate));
 
-	gobject_class->get_property = dfsm_machine_get_property;
-	gobject_class->set_property = dfsm_machine_set_property;
+	gobject_class->get_property = dfsm_machine_get_gobject_property;
+	gobject_class->set_property = dfsm_machine_set_gobject_property;
 	gobject_class->dispose = dfsm_machine_dispose;
 
 	/**
@@ -184,6 +185,11 @@ dfsm_machine_dispose (GObject *object)
 		priv->transitions.method_call_triggered = NULL;
 	}
 
+	if (priv->transitions.property_set_triggered != NULL) {
+		g_hash_table_unref (priv->transitions.property_set_triggered);
+		priv->transitions.property_set_triggered = NULL;
+	}
+
 	if (priv->transitions.arbitrarily_triggered != NULL) {
 		g_ptr_array_unref (priv->transitions.arbitrarily_triggered);
 		priv->transitions.arbitrarily_triggered = NULL;
@@ -197,7 +203,7 @@ dfsm_machine_dispose (GObject *object)
 }
 
 static void
-dfsm_machine_get_property (GObject *object, guint property_id, GValue *value, GParamSpec *pspec)
+dfsm_machine_get_gobject_property (GObject *object, guint property_id, GValue *value, GParamSpec *pspec)
 {
 	DfsmMachinePrivate *priv = DFSM_MACHINE (object)->priv;
 
@@ -219,7 +225,7 @@ dfsm_machine_get_property (GObject *object, guint property_id, GValue *value, GP
 }
 
 static void
-dfsm_machine_set_property (GObject *object, guint property_id, const GValue *value, GParamSpec *pspec)
+dfsm_machine_set_gobject_property (GObject *object, guint property_id, const GValue *value, GParamSpec *pspec)
 {
 	DfsmMachinePrivate *priv = DFSM_MACHINE (object)->priv;
 
@@ -456,6 +462,7 @@ _dfsm_machine_new (DfsmEnvironment *environment, GPtrArray/*<string>*/ *state_na
 
 	/* Transitions need to be sorted by trigger method */
 	machine->priv->transitions.method_call_triggered = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) g_ptr_array_unref);
+	machine->priv->transitions.property_set_triggered = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) g_ptr_array_unref);
 	machine->priv->transitions.arbitrarily_triggered = g_ptr_array_new_with_free_func (g_object_unref);
 
 	for (i = 0; i < transitions->len; i++) {
@@ -475,6 +482,23 @@ _dfsm_machine_new (DfsmEnvironment *environment, GPtrArray/*<string>*/ *state_na
 					new_transitions = g_ptr_array_new_with_free_func (g_object_unref);
 					g_hash_table_insert (machine->priv->transitions.method_call_triggered,
 					                     g_strdup (dfsm_ast_transition_get_trigger_method_name (transition)), new_transitions);
+				}
+
+				g_ptr_array_add (new_transitions, g_object_ref (transition));
+
+				break;
+			}
+			case DFSM_AST_TRANSITION_PROPERTY_SET: {
+				GPtrArray/*<DfsmAstTransition>*/ *new_transitions;
+
+				/* Add the transition to a new or existing array of transitions for the given property name. */
+				new_transitions = g_hash_table_lookup (machine->priv->transitions.property_set_triggered,
+				                                       dfsm_ast_transition_get_trigger_property_name (transition));
+
+				if (new_transitions == NULL) {
+					new_transitions = g_ptr_array_new_with_free_func (g_object_unref);
+					g_hash_table_insert (machine->priv->transitions.property_set_triggered,
+					                     g_strdup (dfsm_ast_transition_get_trigger_property_name (transition)), new_transitions);
 				}
 
 				g_ptr_array_add (new_transitions, g_object_ref (transition));
@@ -674,6 +698,101 @@ done:
 	g_assert ((return_value != NULL) != (child_error != NULL));
 
 	return return_value;
+}
+
+/**
+ * dfsm_machine_set_property:
+ * @self: a #DfsmMachine
+ * @interface_name: the name of the D-Bus interface that @property_name is defined on
+ * @method_name: the name of the D-Bus property to set
+ * @value: new value for the property
+ * @error: a #GError
+ *
+ * Set the given @property_name to @value on the DFSM machine. The property will be set synchronously.
+ *
+ * Any signal emissions and additional property changes which occur as a result of the property being set will be made while this function is running.
+ *
+ * Return value: %TRUE if @property_name was changed (not just set) to @value, %FALSE otherwise
+ */
+gboolean
+dfsm_machine_set_property (DfsmMachine *self, const gchar *interface_name, const gchar *property_name, GVariant *value, GError **error)
+{
+	DfsmMachinePrivate *priv;
+	GPtrArray/*<DfsmAstTransition>*/ *possible_transitions;
+	gboolean executed_transition = FALSE;
+	GVariant *return_value = NULL;
+	GError *child_error = NULL;
+
+	g_return_val_if_fail (DFSM_IS_MACHINE (self), FALSE);
+	g_return_val_if_fail (interface_name != NULL && *interface_name != '\0', FALSE);
+	g_return_val_if_fail (property_name != NULL && *property_name != '\0', FALSE);
+	g_return_val_if_fail (value != NULL, FALSE);
+	g_return_val_if_fail (error != NULL && *error == NULL, FALSE);
+
+	priv = self->priv;
+
+	/* Can't set a property if the simulation isn't running. */
+	if (priv->simulation_status != DFSM_SIMULATION_STATUS_STARTED) {
+		g_set_error (error, DFSM_SIMULATION_ERROR, DFSM_SIMULATION_ERROR_INVALID_STATUS,
+		             "Can't set a D-Bus property if the simulation isn't running.");
+		goto done;
+	}
+
+	/* Look up the property name in our set of transitions which are triggered by property setters. */
+	possible_transitions = g_hash_table_lookup (priv->transitions.property_set_triggered, property_name);
+
+	if (possible_transitions == NULL || possible_transitions->len == 0) {
+		/* Unknown property. Run the default transition below. */
+		goto done;
+	}
+
+	/* Add the property value to the environment. */
+	dfsm_environment_set_variable_type (priv->environment, DFSM_VARIABLE_SCOPE_LOCAL, "value", g_variant_get_type (value));
+	dfsm_environment_set_variable_value (priv->environment, DFSM_VARIABLE_SCOPE_LOCAL, "value", value);
+
+	/* Find and potentially execute a transition from the array. */
+	return_value = find_and_execute_random_transition (self, possible_transitions, &executed_transition, &child_error);
+
+	/* Restore the environment. */
+	dfsm_environment_unset_variable_value (priv->environment, DFSM_VARIABLE_SCOPE_LOCAL, "value");
+
+	/* Swallow the return value. */
+	if (return_value != NULL) {
+		g_variant_unref (return_value);
+	}
+
+done:
+	/* If we failed to execute a transition but didn't return an error, run a default transition which just sets the corresponding variable in
+	 * the object. We don't do this if a transition was found and run successfully (or in error). */
+	if (executed_transition == FALSE && child_error == NULL) {
+		GVariant *old_value;
+
+		g_debug ("Couldn't find any DFSM transitions eligible to be executed as a result of setting property ‘%s’. Running default transition.",
+		         property_name);
+
+		/* Check to see if the value's actually changed. If it hasn't, bail. */
+		old_value = dfsm_environment_dup_variable_value (priv->environment, DFSM_VARIABLE_SCOPE_OBJECT, property_name);
+
+		if (old_value != NULL && g_variant_equal (old_value, value) == TRUE) {
+			g_variant_unref (old_value);
+			return FALSE;
+		}
+
+		g_variant_unref (old_value);
+
+		/* Set the variable's new value in the environment. */
+		dfsm_environment_set_variable_value (priv->environment, DFSM_VARIABLE_SCOPE_OBJECT, property_name, value);
+
+		return TRUE;
+	} else if (executed_transition == TRUE && child_error == NULL) {
+		/* Success! */
+		return TRUE;
+	} else {
+		/* Error or precondition failure */
+		g_propagate_error (error, child_error);
+	}
+
+	return FALSE;
 }
 
 /**

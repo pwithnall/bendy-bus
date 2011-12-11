@@ -52,6 +52,27 @@ dfsm_parser_block_list_free (DfsmParserBlockList *block_list)
 	}
 }
 
+DfsmParserTransitionDetails *
+dfsm_parser_transition_details_new (DfsmParserTransitionType transition_type, const gchar *str)
+{
+	DfsmParserTransitionDetails *details = g_slice_new (DfsmParserTransitionDetails);
+
+	details->transition_type = transition_type;
+	details->str = g_strdup (str);
+
+	return details;
+}
+
+void
+dfsm_parser_transition_details_free (DfsmParserTransitionDetails *details)
+{
+	if (details != NULL) {
+		g_free (details->str);
+
+		g_slice_free (DfsmParserTransitionDetails, details);
+	}
+}
+
 static gboolean
 _is_member_name (const gchar *member_name)
 {

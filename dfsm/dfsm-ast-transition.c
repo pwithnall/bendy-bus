@@ -38,6 +38,7 @@ struct _DfsmAstTransitionPrivate {
 	DfsmAstTransitionTrigger trigger;
 	union {
 		gchar *method_name; /* for DFSM_AST_TRANSITION_METHOD_CALL, otherwise NULL */
+		gchar *property_name; /* for DFSM_AST_TRANSITION_PROPERTY_SET, otherwise NULL */
 	} trigger_params;
 	GPtrArray *preconditions; /* array of DfsmAstPreconditions */
 	GPtrArray *statements; /* array of DfsmAstStatements */
@@ -95,6 +96,9 @@ dfsm_ast_transition_finalize (GObject *object)
 		case DFSM_AST_TRANSITION_METHOD_CALL:
 			g_free (priv->trigger_params.method_name);
 			break;
+		case DFSM_AST_TRANSITION_PROPERTY_SET:
+			g_free (priv->trigger_params.property_name);
+			break;
 		case DFSM_AST_TRANSITION_ARBITRARY:
 			/* Nothing to free here */
 			break;
@@ -123,6 +127,9 @@ dfsm_ast_transition_sanity_check (DfsmAstNode *node)
 	switch (priv->trigger) {
 		case DFSM_AST_TRANSITION_METHOD_CALL:
 			g_assert (priv->trigger_params.method_name != NULL);
+			break;
+		case DFSM_AST_TRANSITION_PROPERTY_SET:
+			g_assert (priv->trigger_params.property_name != NULL);
 			break;
 		case DFSM_AST_TRANSITION_ARBITRARY:
 			/* Nothing to do here */
@@ -159,6 +166,14 @@ dfsm_ast_transition_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *
 			if (g_dbus_is_member_name (priv->trigger_params.method_name) == FALSE) {
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus method name: %s",
 				             priv->trigger_params.method_name);
+				return;
+			}
+
+			break;
+		case DFSM_AST_TRANSITION_PROPERTY_SET:
+			if (g_dbus_is_member_name (priv->trigger_params.property_name) == FALSE) {
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus property name: %s",
+				             priv->trigger_params.property_name);
 				return;
 			}
 
@@ -244,6 +259,45 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 
 			break;
 		}
+		case DFSM_AST_TRANSITION_PROPERTY_SET: {
+			GDBusNodeInfo *node_info;
+			GDBusInterfaceInfo **interface_infos, *interface_info;
+			GDBusPropertyInfo *property_info;
+			GVariantType *property_type;
+
+			node_info = dfsm_environment_get_dbus_node_info (environment);
+
+			for (interface_infos = node_info->interfaces; *interface_infos != NULL; interface_infos++) {
+				interface_info = *interface_infos;
+
+				property_info = g_dbus_interface_info_lookup_property (interface_info, priv->trigger_params.property_name);
+
+				if (property_info != NULL) {
+					/* Found the interface defining property_name. */
+					break;
+				}
+			}
+
+			/* Failed to find a suitable interface? */
+			if (property_info == NULL) {
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+				             "Undeclared D-Bus property referenced as a transition trigger: %s", priv->trigger_params.property_name);
+				return;
+			}
+
+			/* Warn if the property isn't writeable. */
+			if ((property_info->flags & G_DBUS_PROPERTY_INFO_FLAGS_WRITABLE) == 0) {
+				g_warning ("D-Bus property ‘%s’ referenced as a transition trigger is not writeable.",
+				           priv->trigger_params.property_name);
+			}
+
+			/* Add the special “value” parameter to the environment so it's available when checking sub-nodes. */
+			property_type = g_variant_type_new (property_info->signature);
+			dfsm_environment_set_variable_type (environment, DFSM_VARIABLE_SCOPE_LOCAL, "value", property_type);
+			g_variant_type_free (property_type);
+
+			break;
+		}
 		case DFSM_AST_TRANSITION_ARBITRARY:
 			/* Nothing to do here */
 			break;
@@ -275,13 +329,15 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 		}
 	}
 
-	/* Restore the environment if this is a method-triggered transition. */
+	/* Restore the environment if this is a method- or property-triggered transition. */
 	if (priv->trigger == DFSM_AST_TRANSITION_METHOD_CALL && method_info->in_args != NULL) {
 		GDBusArgInfo **arg_infos;
 
 		for (arg_infos = method_info->in_args; *arg_infos != NULL; arg_infos++) {
 			dfsm_environment_unset_variable_value (environment, DFSM_VARIABLE_SCOPE_LOCAL, (*arg_infos)->name);
 		}
+	} else if (priv->trigger == DFSM_AST_TRANSITION_PROPERTY_SET) {
+		dfsm_environment_unset_variable_value (environment, DFSM_VARIABLE_SCOPE_LOCAL, "value");
 	}
 }
 
@@ -289,7 +345,7 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
  * dfsm_ast_transition_new:
  * @from_state_name: name of the FSM state being transitioned out of
  * @to_state_name: name of the FSM state being transitioned into
- * @transition_type: method name of the transition trigger, or ‘*’ for an arbitrary transition
+ * @details: details of the transition trigger (such as a method or property name)
  * @precondition: array of #DfsmAstPrecondition<!-- -->s for the transition
  * @statements: array of #DfsmAstStatement<!-- -->s to execute with the transition
  * @error: (allow-none): a #GError, or %NULL
@@ -299,7 +355,7 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
  * Return value: (transfer full): a new AST node
  */
 DfsmAstTransition *
-dfsm_ast_transition_new (const gchar *from_state_name, const gchar *to_state_name, const gchar *transition_type,
+dfsm_ast_transition_new (const gchar *from_state_name, const gchar *to_state_name, const DfsmParserTransitionDetails *details,
                          GPtrArray/*<DfsmAstPrecondition>*/ *preconditions, GPtrArray/*<DfsmAstStatement>*/ *statements, GError **error)
 {
 	DfsmAstTransition *transition;
@@ -307,7 +363,7 @@ dfsm_ast_transition_new (const gchar *from_state_name, const gchar *to_state_nam
 
 	g_return_val_if_fail (from_state_name != NULL && *from_state_name != '\0', NULL);
 	g_return_val_if_fail (to_state_name != NULL && *to_state_name != '\0', NULL);
-	g_return_val_if_fail (transition_type != NULL && *transition_type != '\0', NULL);
+	g_return_val_if_fail (details != NULL, NULL);
 	g_return_val_if_fail (preconditions != NULL, NULL);
 	g_return_val_if_fail (statements != NULL, NULL);
 	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
@@ -318,11 +374,20 @@ dfsm_ast_transition_new (const gchar *from_state_name, const gchar *to_state_nam
 	priv->from_state_name = g_strdup (from_state_name);
 	priv->to_state_name = g_strdup (to_state_name);
 
-	if (strcmp (transition_type, "*") == 0) {
-		priv->trigger = DFSM_AST_TRANSITION_ARBITRARY;
-	} else {
-		priv->trigger = DFSM_AST_TRANSITION_METHOD_CALL;
-		priv->trigger_params.method_name = g_strdup (transition_type);
+	priv->trigger = details->transition_type;
+
+	switch (priv->trigger) {
+		case DFSM_AST_TRANSITION_METHOD_CALL:
+			priv->trigger_params.method_name = g_strdup (details->str);
+			break;
+		case DFSM_AST_TRANSITION_PROPERTY_SET:
+			priv->trigger_params.property_name = g_strdup (details->str);
+			break;
+		case DFSM_AST_TRANSITION_ARBITRARY:
+			/* Nothing to do. */
+			break;
+		default:
+			g_assert_not_reached ();
 	}
 
 	priv->preconditions = g_ptr_array_ref (preconditions);
@@ -486,4 +551,22 @@ dfsm_ast_transition_get_trigger_method_name (DfsmAstTransition *self)
 	g_return_val_if_fail (self->priv->trigger == DFSM_AST_TRANSITION_METHOD_CALL, NULL);
 
 	return self->priv->trigger_params.method_name;
+}
+
+/**
+ * dfsm_ast_transition_get_trigger_property_name:
+ * @self: a #DfsmAstTransition
+ *
+ * Gets the name of the D-Bus property triggering this transition when it's assigned to. It is only valid to call this method if
+ * dfsm_ast_transition_get_trigger() returns %DFSM_AST_TRANSITION_PROPERTY_SET.
+ *
+ * Return value: name of the D-Bus property triggering this transition
+ */
+const gchar *
+dfsm_ast_transition_get_trigger_property_name (DfsmAstTransition *self)
+{
+	g_return_val_if_fail (DFSM_IS_AST_TRANSITION (self), NULL);
+	g_return_val_if_fail (self->priv->trigger == DFSM_AST_TRANSITION_PROPERTY_SET, NULL);
+
+	return self->priv->trigger_params.property_name;
 }

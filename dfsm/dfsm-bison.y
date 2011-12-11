@@ -54,6 +54,7 @@
 	DfsmAstStatement *ast_statement;
 	DfsmAstVariable *ast_variable;
 	DfsmParserBlockList *block_list;
+	DfsmParserTransitionDetails *transition_details;
 }
 
 %destructor { free ($$); } <str>
@@ -63,6 +64,7 @@
 %destructor { g_object_unref ($$); } <ast_object> <ast_data_structure> <ast_expression> <ast_transition>
 	<ast_precondition> <ast_statement> <ast_variable>
 %destructor { dfsm_parser_block_list_free ($$); } <block_list>
+%destructor { dfsm_parser_transition_details_free ($$); } <transition_details>
 
 %token <str> DBUS_OBJECT_PATH
 %token <str> DBUS_INTERFACE_NAME
@@ -96,6 +98,7 @@
 %token STATES
 %token TRANSITION
 %token METHOD
+%token PROPERTY
 %token RANDOM
 %token ON
 %token THROW
@@ -133,7 +136,8 @@
 %type <str> StateName
 %type <ast_transition> TransitionBlock
 %type <str> DBusMethodName
-%type <str> TransitionType
+%type <str> DBusPropertyName
+%type <transition_details> TransitionType
 %type <ptr_array> PreconditionList
 %type <ast_precondition> Precondition
 %type <str> DBusErrorName
@@ -261,9 +265,14 @@ TransitionBlock:
 DBusMethodName: IDENTIFIER							{ $$ = $1; /* steal ownership from flex */ }
 ;
 
-/* Returns a string representing the transition type. We hackily mix "*" in with method names, since it can never be a valid method name. */
-TransitionType: METHOD DBusMethodName						{ $$ = $2; /* steal ownership from flex */ }
-              | RANDOM								{ $$ = g_strdup ("*"); }
+/* Returns a new string containing the property name. */
+DBusPropertyName: IDENTIFIER							{ $$ = $1; /* steal ownership from flex */ }
+;
+
+/* Returns a DfsmParserTransitionDetails representing the transition type. */
+TransitionType: METHOD DBusMethodName				{ $$ = dfsm_parser_transition_details_new (DFSM_PARSER_TRANSITION_METHOD_CALL, $2); }
+              | PROPERTY DBusPropertyName			{ $$ = dfsm_parser_transition_details_new (DFSM_PARSER_TRANSITION_PROPERTY_SET, $2); }
+              | RANDOM						{ $$ = dfsm_parser_transition_details_new (DFSM_PARSER_TRANSITION_ARBITRARY, NULL); }
 ;
 
 /* Returns a new GPtrArray containing DfsmAstPreconditions. */

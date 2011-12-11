@@ -90,6 +90,7 @@ void dfsm_machine_stop_simulation (DfsmMachine *self);
 
 GVariant *dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const gchar *method_name, GVariant *parameters,
                                     GError **error) DFSM_CONSTRUCTOR;
+gboolean dfsm_machine_set_property (DfsmMachine *self, const gchar *interface_name, const gchar *property_name, GVariant *value, GError **error);
 
 DfsmEnvironment *dfsm_machine_get_environment (DfsmMachine *self) G_GNUC_PURE;
 

@@ -502,9 +502,6 @@ dfsm_object_dbus_set_property (GDBusConnection *connection, const gchar *sender,
 {
 	DfsmObjectPrivate *priv = DFSM_OBJECT (user_data)->priv;
 	gchar *value_string;
-	DfsmEnvironment *environment;
-	GVariant *old_value;
-	GVariantBuilder *builder;
 	GError *child_error = NULL;
 
 	value_string = g_variant_print (value, FALSE);
@@ -512,29 +509,27 @@ dfsm_object_dbus_set_property (GDBusConnection *connection, const gchar *sender,
 	         object_path, sender, value_string);
 	g_free (value_string);
 
-	/* Check to see if the value's actually changed. If it hasn't, bail. */
-	environment = dfsm_machine_get_environment (priv->machine);
-	old_value = dfsm_environment_dup_variable_value (environment, DFSM_VARIABLE_SCOPE_OBJECT, property_name);
+	/* Set the property on the machine. */
+	if (dfsm_machine_set_property (priv->machine, interface_name, property_name, value, &child_error) == TRUE) {
+		GVariantBuilder *builder;
+		GError *signal_error = NULL;
 
-	if (old_value != NULL && g_variant_equal (old_value, value) == TRUE) {
-		g_variant_unref (old_value);
-		return TRUE;
+		/* Emit a notification. */
+		builder = g_variant_builder_new (G_VARIANT_TYPE_ARRAY);
+		g_variant_builder_add (builder, "{sv}", property_name, value);
+		g_dbus_connection_emit_signal (connection, NULL, object_path, "org.freedesktop.DBus.Properties", "PropertiesChanged",
+		                               g_variant_new ("(sa{sv}as)", interface_name, builder, NULL), &signal_error);
+
+		if (signal_error != NULL) {
+			g_warning ("Runtime error in simulation while notifying of update to D-Bus property ‘%s’: %s", property_name,
+			           child_error->message);
+			g_clear_error (&signal_error);
+		}
 	}
 
-	g_variant_unref (old_value);
-
-	/* Set the variable's new value in the environment. */
-	dfsm_environment_set_variable_value (environment, DFSM_VARIABLE_SCOPE_OBJECT, property_name, value);
-
-	/* Emit a notification. */
-	builder = g_variant_builder_new (G_VARIANT_TYPE_ARRAY);
-	g_variant_builder_add (builder, "{sv}", property_name, value);
-	g_dbus_connection_emit_signal (connection, NULL, object_path, "org.freedesktop.DBus.Properties", "PropertiesChanged",
-	                               g_variant_new ("(sa{sv}as)", interface_name, builder, NULL), &child_error);
-
 	if (child_error != NULL) {
-		g_warning ("Runtime error in simulation while notifying of update to D-Bus property ‘%s’: %s", property_name, child_error->message);
-		g_clear_error (&child_error);
+		g_propagate_error (error, child_error);
+		return FALSE;
 	}
 
 	return TRUE;

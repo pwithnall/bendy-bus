@@ -67,6 +67,20 @@ typedef struct {
 DfsmParserBlockList *dfsm_parser_block_list_new (void) DFSM_CONSTRUCTOR;
 void dfsm_parser_block_list_free (DfsmParserBlockList *block_list);
 
+typedef enum {
+	DFSM_PARSER_TRANSITION_METHOD_CALL,
+	DFSM_PARSER_TRANSITION_PROPERTY_SET,
+	DFSM_PARSER_TRANSITION_ARBITRARY,
+} DfsmParserTransitionType;
+
+typedef struct {
+	DfsmParserTransitionType transition_type;
+	gchar *str;
+} DfsmParserTransitionDetails;
+
+DfsmParserTransitionDetails *dfsm_parser_transition_details_new (DfsmParserTransitionType transition_type, const gchar *str) DFSM_CONSTRUCTOR;
+void dfsm_parser_transition_details_free (DfsmParserTransitionDetails *details);
+
 gboolean dfsm_is_variable_name (const gchar *variable_name) G_GNUC_PURE;
 gboolean dfsm_is_state_name (const gchar *state_name) G_GNUC_PURE;
 gboolean dfsm_is_function_name (const gchar *function_name) G_GNUC_PURE;
