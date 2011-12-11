@@ -27,6 +27,7 @@
 #include <gio/gio.h>
 
 #include "test-program.h"
+#include "logging.h"
 
 static void dsim_test_program_dispose (GObject *object);
 static void dsim_test_program_get_property (GObject *object, guint property_id, GValue *value, GParamSpec *pspec);
@@ -293,6 +294,7 @@ dsim_test_program_new (GFile *working_directory, const gchar *program_name, GPtr
 	                        "program-name", program_name,
 	                        "argv", argv,
 	                        "envp", envp,
+	                        "logging-domain-name", dsim_logging_get_domain_name (DSIM_LOG_TEST_PROGRAM),
 	                        NULL);
 
 	g_ptr_array_unref (envp);

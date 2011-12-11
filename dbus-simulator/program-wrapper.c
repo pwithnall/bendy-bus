@@ -34,6 +34,7 @@ static void dsim_program_wrapper_set_property (GObject *object, guint property_i
 struct _DsimProgramWrapperPrivate {
 	GFile *working_directory;
 	gchar *program_name;
+	gchar *logging_domain_name;
 
 	/* Useful things */
 	GPid pid;
@@ -51,6 +52,7 @@ enum {
 	PROP_WORKING_DIRECTORY = 1,
 	PROP_PROGRAM_NAME,
 	PROP_PROCESS_ID,
+	PROP_LOGGING_DOMAIN_NAME,
 };
 
 enum {
@@ -108,6 +110,18 @@ dsim_program_wrapper_class_init (DsimProgramWrapperClass *klass)
 	                                                   "Process ID", "Process ID of the wrapped program.",
 	                                                   -1, G_MAXINT, -1,
 	                                                   G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+	/**
+	 * DsimProgramWrapper:logging-domain-name:
+	 *
+	 * Name of the logging domain name to use for all stdout/stderr output from the process.
+	 */
+	g_object_class_install_property (gobject_class, PROP_LOGGING_DOMAIN_NAME,
+	                                 g_param_spec_string ("logging-domain-name",
+	                                                      "Logging domain name",
+	                                                      "Name of the logging domain name to use for all stdout/stderr output from the process.",
+	                                                      NULL,
+	                                                      G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
 	/**
 	 * DsimProgramWrapper::spawn-begin:
@@ -181,6 +195,7 @@ dsim_program_wrapper_finalize (GObject *object)
 	DsimProgramWrapperPrivate *priv = DSIM_PROGRAM_WRAPPER (object)->priv;
 
 	g_free (priv->program_name);
+	g_free (priv->logging_domain_name);
 
 	/* Chain up to the parent class */
 	G_OBJECT_CLASS (dsim_program_wrapper_parent_class)->dispose (object);
@@ -200,6 +215,9 @@ dsim_program_wrapper_get_property (GObject *object, guint property_id, GValue *v
 			break;
 		case PROP_PROCESS_ID:
 			g_value_set_int (value, priv->pid);
+			break;
+		case PROP_LOGGING_DOMAIN_NAME:
+			g_value_set_string (value, priv->logging_domain_name);
 			break;
 		default:
 			/* We don't have any other property... */
@@ -221,6 +239,10 @@ dsim_program_wrapper_set_property (GObject *object, guint property_id, const GVa
 		case PROP_PROGRAM_NAME:
 			/* Construct-only */
 			priv->program_name = g_value_dup_string (value);
+			break;
+		case PROP_LOGGING_DOMAIN_NAME:
+			/* Construct-only */
+			priv->logging_domain_name = g_value_dup_string (value);
 			break;
 		case PROP_PROCESS_ID:
 			/* Read-only */
@@ -256,8 +278,20 @@ child_watch_cb (GPid pid, gint status, DsimProgramWrapper *self)
 }
 
 static gboolean
-stdouterr_channel_cb (GIOChannel *channel, GIOCondition condition, const gchar *channel_name)
+stdouterr_channel_cb (GIOChannel *channel, GIOCondition condition, gpointer user_data)
 {
+	const gchar *channel_name;
+	DsimProgramWrapper *self;
+
+	/* Decode the channel name from the user_data pointer. */
+	if (((gsize) user_data & 1) == 0) {
+		channel_name = "stdout";
+		self = DSIM_PROGRAM_WRAPPER ((gsize) user_data ^ 0);
+	} else {
+		channel_name = "stderr";
+		self = DSIM_PROGRAM_WRAPPER ((gsize) user_data ^ 1);
+	}
+
 	g_debug ("Received notification %u on %s channel.", condition, channel_name);
 
 	if (condition & (G_IO_IN | G_IO_PRI)) {
@@ -274,7 +308,8 @@ stdouterr_channel_cb (GIOChannel *channel, GIOCondition condition, const gchar *
 			switch (status) {
 				case G_IO_STATUS_NORMAL:
 					/* Read this line successfully. After handling it, we'll loop around and read another. */
-					g_debug ("%s: %s", channel_name, stdouterr_buf);
+					g_log (dsim_program_wrapper_get_logging_domain_name (self), G_LOG_LEVEL_MESSAGE, "%s: %s", channel_name,
+					       stdouterr_buf);
 
 					if (bytes_read != sizeof (stdouterr_buf)) {
 						/* Done? */
@@ -284,7 +319,8 @@ stdouterr_channel_cb (GIOChannel *channel, GIOCondition condition, const gchar *
 					break; /* and continue the loop */
 				case G_IO_STATUS_EOF:
 					/* We're done! */
-					g_debug ("%s: %s", channel_name, stdouterr_buf);
+					g_log (dsim_program_wrapper_get_logging_domain_name (self), G_LOG_LEVEL_MESSAGE, "%s: %s", channel_name,
+					       stdouterr_buf);
 					goto in_done;
 				case G_IO_STATUS_ERROR:
 					/* Error! */
@@ -419,7 +455,10 @@ dsim_program_wrapper_spawn (DsimProgramWrapper *self, GError **error)
 
 	priv->process_is_running = TRUE;
 
-	/* Listen for things on the daemon's stderr and stdout */
+	/* Listen for things on the daemon's stderr and stdout. We hackily pass extra information in the user_data for the callbacks; we set the LSB
+	 * of the pointer to be 1 iff the channel is stderr and 0 iff it's stdout. The rest of the bits contain the self pointer. */
+	g_assert (((gsize) self & 1) == 0); /* will our hack work? */
+
 	g_get_charset (&locale_charset);
 
 	child_stdout_channel = g_io_channel_unix_new (child_stdout);
@@ -427,7 +466,7 @@ dsim_program_wrapper_spawn (DsimProgramWrapper *self, GError **error)
 	g_io_channel_set_encoding (child_stdout_channel, locale_charset, NULL);
 
 	child_stdout_watch_id = g_io_add_watch (child_stdout_channel, G_IO_IN | G_IO_PRI | G_IO_ERR | G_IO_HUP | G_IO_NVAL,
-	                                        (GIOFunc) stdouterr_channel_cb, (gpointer) "stdout");
+	                                        (GIOFunc) stdouterr_channel_cb, (gpointer) ((gsize) self ^ 0 /* stdout */));
 
 	g_debug ("Listening to stdout pipe with watch ID %i.", child_stdout_watch_id);
 
@@ -438,7 +477,7 @@ dsim_program_wrapper_spawn (DsimProgramWrapper *self, GError **error)
 	g_io_channel_set_encoding (child_stderr_channel, locale_charset, NULL);
 
 	child_stderr_watch_id = g_io_add_watch (child_stderr_channel, G_IO_IN | G_IO_PRI | G_IO_ERR | G_IO_HUP | G_IO_NVAL,
-	                                        (GIOFunc) stdouterr_channel_cb, (gpointer) "stderr");
+	                                        (GIOFunc) stdouterr_channel_cb, (gpointer) ((gsize) self ^ 1 /* stderr */));
 
 	g_debug ("Listening to stderr pipe with watch ID %i.", child_stderr_watch_id);
 
@@ -524,4 +563,20 @@ dsim_program_wrapper_get_process_id (DsimProgramWrapper *self)
 	g_return_val_if_fail (DSIM_IS_PROGRAM_WRAPPER (self), -1);
 
 	return self->priv->pid;
+}
+
+/**
+ * dsim_program_wrapper_get_logging_domain_name:
+ * @self: a #DsimProgramWrapper
+ *
+ * Gets the string name of the logging domain which will be used for all stdout and stderr output from the process.
+ *
+ * Return value: name of the logging domain for the process
+ */
+const gchar *
+dsim_program_wrapper_get_logging_domain_name (DsimProgramWrapper *self)
+{
+	g_return_val_if_fail (DSIM_IS_PROGRAM_WRAPPER (self), NULL);
+
+	return self->priv->logging_domain_name;
 }

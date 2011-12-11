@@ -27,6 +27,7 @@
 #include <dfsm/dfsm.h>
 
 #include "dbus-daemon.h"
+#include "logging.h"
 #include "test-program.h"
 
 enum StatusCodes {
@@ -37,12 +38,28 @@ enum StatusCodes {
 	STATUS_DBUS_ERROR = 4,
 	STATUS_DAEMON_SPAWN_ERROR = 5,
 	STATUS_TEST_PROGRAM_SPAWN_ERROR = 6,
+	STATUS_LOGGING_PROBLEM = 7,
 };
 
 static gint random_seed = 0;
+static gchar *test_program_log_file = NULL;
+static gint test_program_log_fd = 0;
+static gchar *dbus_daemon_log_file = NULL;
+static gint dbus_daemon_log_fd = 0;
+static gchar *simulator_log_file = NULL;
+static gint simulator_log_fd = 0;
 
 static const GOptionEntry entries[] = {
 	{ "random-seed", 's', 0, G_OPTION_ARG_INT, &random_seed, N_("Seed value for the simulation’s random number generator"), N_("SEED") },
+	{ "test-program-log-file", 0, 0, G_OPTION_ARG_FILENAME, &test_program_log_file, N_("URI or path of a file to log test program output to"),
+	  N_("FILE") },
+	{ "test-program-log-fd", 0, 0, G_OPTION_ARG_INT, &test_program_log_fd, N_("Open FD to log test program output to"), N_("FD") },
+	{ "dbus-daemon-log-file", 0, 0, G_OPTION_ARG_FILENAME, &dbus_daemon_log_file, N_("URI or path of a file to log dbus-daemon output to"),
+	  N_("FILE") },
+	{ "dbus-daemon-log-fd", 0, 0, G_OPTION_ARG_INT, &dbus_daemon_log_fd, N_("Open FD to log dbus-daemon output to"), N_("FD") },
+	{ "simulator-log-file", 0, 0, G_OPTION_ARG_FILENAME, &simulator_log_file, N_("URI or path of a file to log simulator output to"),
+	  N_("FILE") },
+	{ "simulator-log-fd", 0, 0, G_OPTION_ARG_INT, &simulator_log_fd, N_("Open FD to log simulator output to"), N_("FD") },
 	{ NULL }
 };
 
@@ -414,6 +431,19 @@ main (int argc, char *argv[])
 
 	g_option_context_free (context);
 
+	/* Set up logging. */
+	dsim_logging_init (test_program_log_file, test_program_log_fd, dbus_daemon_log_file, dbus_daemon_log_fd, simulator_log_file, simulator_log_fd,
+	                   &error);
+
+	if (error != NULL) {
+		g_printerr (_("Error setting up logging: %s"), error->message);
+		g_printerr ("\n");
+
+		g_error_free (error);
+
+		exit (STATUS_LOGGING_PROBLEM);
+	}
+
 	/* Set up the random number generator. */
 	if (random_seed == 0) {
 		random_seed = (guint32) g_get_real_time ();
@@ -491,6 +521,7 @@ main (int argc, char *argv[])
 
 		g_error_free (error);
 		main_data_clear (&data);
+		dsim_logging_finalise ();
 
 		exit (STATUS_DAEMON_SPAWN_ERROR);
 	}
@@ -500,6 +531,7 @@ main (int argc, char *argv[])
 
 	/* Free the main data struct. */
 	main_data_clear (&data);
+	dsim_logging_finalise ();
 
 	return data.exit_status;
 }

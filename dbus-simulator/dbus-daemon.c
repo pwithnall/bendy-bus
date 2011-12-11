@@ -24,6 +24,7 @@
 #include <gio/gio.h>
 
 #include "dbus-daemon.h"
+#include "logging.h"
 
 static void dsim_dbus_daemon_dispose (GObject *object);
 static void dsim_dbus_daemon_finalize (GObject *object);
@@ -346,6 +347,7 @@ dsim_dbus_daemon_new (GFile *working_directory, GFile *configuration_file)
 	                     "program-name", "dbus-daemon",
 	                     "working-directory", working_directory,
 	                     "configuration-file", configuration_file,
+	                     "logging-domain-name", dsim_logging_get_domain_name (DSIM_LOG_DBUS_DAEMON),
 	                     NULL);
 }
 
