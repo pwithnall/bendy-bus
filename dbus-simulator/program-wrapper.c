@@ -580,3 +580,19 @@ dsim_program_wrapper_get_logging_domain_name (DsimProgramWrapper *self)
 
 	return self->priv->logging_domain_name;
 }
+
+/**
+ * dsim_program_wrapper_get_program_name:
+ * @self: a #DsimProgramWrapper
+ *
+ * Gets the filename/path of the program being wrapped.
+ *
+ * Return value: name of the program being wrapped
+ */
+const gchar *
+dsim_program_wrapper_get_program_name (DsimProgramWrapper *self)
+{
+	g_return_val_if_fail (DSIM_IS_PROGRAM_WRAPPER (self), NULL);
+
+	return self->priv->program_name;
+}

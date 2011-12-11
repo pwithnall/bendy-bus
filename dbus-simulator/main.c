@@ -48,6 +48,10 @@ static gchar *dbus_daemon_log_file = NULL;
 static gint dbus_daemon_log_fd = 0;
 static gchar *simulator_log_file = NULL;
 static gint simulator_log_fd = 0;
+static gint test_timeout = 0;
+static gint run_time = 0;
+static gint run_iters = 0;
+static gboolean run_infinitely = FALSE;
 
 static const GOptionEntry entries[] = {
 	{ "random-seed", 's', 0, G_OPTION_ARG_INT, &random_seed, N_("Seed value for the simulation’s random number generator"), N_("SEED") },
@@ -60,6 +64,11 @@ static const GOptionEntry entries[] = {
 	{ "simulator-log-file", 0, 0, G_OPTION_ARG_FILENAME, &simulator_log_file, N_("URI or path of a file to log simulator output to"),
 	  N_("FILE") },
 	{ "simulator-log-fd", 0, 0, G_OPTION_ARG_INT, &simulator_log_fd, N_("Open FD to log simulator output to"), N_("FD") },
+	{ "test-timeout", 't', 0, G_OPTION_ARG_INT, &test_timeout, N_("Timeout (in seconds) for a test run to be aborted if no D-Bus activity occurs"),
+	  N_("SECS") },
+	{ "run-time", 'r', 0, G_OPTION_ARG_INT, &run_time, N_("Maximum time (in seconds) the set of test runs should take"), N_("SECS") },
+	{ "run-iters", 'n', 0, G_OPTION_ARG_INT, &run_iters, N_("Maximum number of test runs which should be performed"), N_("COUNT") },
+	{ "run-infinitely", 'i', 0, G_OPTION_ARG_NONE, &run_infinitely, N_("Run test runs in an infinite loop (default)"), NULL },
 	{ NULL }
 };
 
@@ -88,6 +97,8 @@ typedef struct {
 	guint outstanding_bus_ownership_callbacks; /* number of calls to g_bus_own_name() which are outstanding */
 	GHashTable/*<string, uint>*/ *bus_name_ids; /* map from well-known bus name to its ownership ID */
 	GPtrArray/*<DfsmObject>*/ *simulated_objects;
+	guint num_test_runs_remaining;
+	guint test_run_inactivity_timeout_id;
 } MainData;
 
 static void
@@ -97,6 +108,11 @@ main_data_clear (MainData *data)
 	g_free (data->dbus_address);
 	g_ptr_array_unref (data->simulated_objects);
 	g_hash_table_unref (data->bus_name_ids);
+
+	if (data->test_run_inactivity_timeout_id != 0) {
+		g_source_remove (data->test_run_inactivity_timeout_id);
+		data->test_run_inactivity_timeout_id = 0;
+	}
 
 	if (data->test_program != NULL) {
 		dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program));
@@ -134,8 +150,32 @@ connection_close_cb (GObject *source_object, GAsyncResult *result, MainData *dat
 	g_main_loop_quit (data->main_loop);
 }
 
+static void restart_simulation (MainData *data);
+
 static gboolean
-simulation_timeout_cb (MainData *data)
+test_inactivity_timeout_cb (MainData *data)
+{
+	/* The current test run has hit a timeout; move on to the next test run. */
+	restart_simulation (data);
+	return FALSE;
+}
+
+static void
+simulated_object_dbus_activity_count_notify_cb (GObject *obj, GParamSpec *pspec, MainData *data)
+{
+	/* Reset our inactivity timeout. */
+	if (data->test_run_inactivity_timeout_id != 0) {
+		g_source_remove (data->test_run_inactivity_timeout_id);
+		data->test_run_inactivity_timeout_id = 0;
+	}
+
+	if (test_timeout > 0) {
+		data->test_run_inactivity_timeout_id = g_timeout_add_seconds (test_timeout, (GSourceFunc) test_inactivity_timeout_cb, data);
+	}
+}
+
+static void
+stop_simulation (MainData *data)
 {
 	guint i, bus_name_id;
 	GHashTableIter iter;
@@ -147,6 +187,8 @@ simulation_timeout_cb (MainData *data)
 	for (i = 0; i < data->simulated_objects->len; i++) {
 		DfsmObject *simulated_object = g_ptr_array_index (data->simulated_objects, i);
 		dfsm_object_unregister_on_bus (simulated_object);
+
+		g_signal_handlers_disconnect_by_func (simulated_object, simulated_object_dbus_activity_count_notify_cb, data);
 	}
 
 	/* Drop our well-known names. */
@@ -158,8 +200,6 @@ simulation_timeout_cb (MainData *data)
 
 	/* Disconnect from the bus. */
 	g_dbus_connection_close (data->connection, NULL, (GAsyncReadyCallback) connection_close_cb, data);
-
-	return FALSE;
 }
 
 static void
@@ -167,28 +207,113 @@ spawn_test_program (MainData *data)
 {
 	GError *error = NULL;
 
-	/* Spawn the program under test. */
 	dsim_program_wrapper_spawn (DSIM_PROGRAM_WRAPPER (data->test_program), &error);
+
+	if (data->num_test_runs_remaining > 0) {
+		data->num_test_runs_remaining--;
+	}
 
 	if (error != NULL) {
 		g_printerr (_("Error spawning test program instance: %s"), error->message);
 		g_printerr ("\n");
 
-		data->exit_status = STATUS_TEST_PROGRAM_SPAWN_ERROR;
+		g_error_free (error);
 
-		goto error;
+		data->exit_status = STATUS_TEST_PROGRAM_SPAWN_ERROR;
+		stop_simulation (data);
+
+		return;
+	}
+}
+
+static void
+restart_simulation (MainData *data)
+{
+	guint i;
+
+	/* Have we finished? */
+	if (data->num_test_runs_remaining == 0) {
+		g_debug ("Stopping simulation due to performing the desired number of test runs.");
+
+		stop_simulation (data);
+		return;
 	}
 
-	/* TODO: How do we know when the simulation's finished? */
-	g_timeout_add_seconds (60, (GSourceFunc) simulation_timeout_cb, data);
+	/* Stop the test program and reset all our simulation objects. */
+	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program));
 
-	return;
+	for (i = 0; i < data->simulated_objects->len; i++) {
+		DfsmObject *simulated_object = g_ptr_array_index (data->simulated_objects, i);
+		dfsm_object_reset (simulated_object);
+	}
 
-error:
-	g_error_free (error);
+	/* Re-spawn the program under test. */
+	spawn_test_program (data);
 
-	/* Convenient way to free everything. */
-	simulation_timeout_cb (data);
+	if (test_timeout > 0) {
+		data->test_run_inactivity_timeout_id = g_timeout_add_seconds (test_timeout, (GSourceFunc) test_inactivity_timeout_cb, data);
+	}
+}
+
+static void
+test_program_died_cb (DsimProgramWrapper *wrapper, gint status, MainData *data)
+{
+	if (WIFEXITED (status)) {
+		/* Exited normally: proceed to the next test run. */
+		restart_simulation (data);
+	} else {
+		/* Crashed: stop the entire simulation. */
+		g_debug ("Stopping simulation due to test program crashing (status: %i).", status);
+
+		stop_simulation (data);
+	}
+}
+
+static void
+dbus_daemon_died_cb (DsimProgramWrapper *wrapper, gint status, MainData *data)
+{
+	/* This should never happen. We assume the dbus-daemon is rock solid. */
+	if (!WIFEXITED (status)) {
+		g_debug ("Stopping simulation due to dbus-daemon crashing (status: %i).", status);
+		stop_simulation (data);
+	}
+}
+
+static gboolean
+simulation_timeout_cb (MainData *data)
+{
+	g_debug ("Stopping simulation due to simulation timeout being reached.");
+	stop_simulation (data);
+
+	return FALSE;
+}
+
+static void
+start_simulation (MainData *data)
+{
+	g_signal_connect (data->test_program, "process-died", (GCallback) test_program_died_cb, data);
+	g_signal_connect (data->dbus_daemon, "process-died", (GCallback) dbus_daemon_died_cb, data);
+
+	/* Spawn the program under test. */
+	spawn_test_program (data);
+
+	/* The simulation's finished when either:
+	 *  • We've run for at least run_time seconds (over all test runs).
+	 *  • We've run at least run_iters number of iterations.
+	 *  • The test program crashes.
+	 *  • The dbus-daemon crashes or exits normally (this should never happen).
+	 *
+	 * A single test run is finished when either:
+	 *  • We go without D-Bus activity for at least test_timeout seconds.
+	 *  • The test program exits normally.
+	 */
+	if (run_time > 0) {
+		g_timeout_add_seconds (run_time, (GSourceFunc) simulation_timeout_cb, data);
+	}
+
+	if (test_timeout > 0) {
+		data->test_run_inactivity_timeout_id = g_timeout_add_seconds (test_timeout, (GSourceFunc) test_inactivity_timeout_cb, data);
+	}
 }
 
 static void
@@ -203,7 +328,7 @@ name_acquired_cb (GDBusConnection *connection, const gchar *name, MainData *data
 	}
 
 	/* Spawn! */
-	spawn_test_program (data);
+	start_simulation (data);
 }
 
 static void
@@ -238,6 +363,7 @@ connection_created_cb (GObject *source_object, GAsyncResult *result, MainData *d
 
 		simulated_object = g_ptr_array_index (data->simulated_objects, i);
 
+		g_signal_connect (simulated_object, "notify::dbus-activity-count", (GCallback) simulated_object_dbus_activity_count_notify_cb, data);
 		dfsm_object_register_on_bus (simulated_object, data->connection, &error);
 
 		if (error != NULL) {
@@ -287,7 +413,7 @@ connection_created_cb (GObject *source_object, GAsyncResult *result, MainData *d
 		/* Release our outstanding callback and spawn the test program if it hasn't been spawned already. */
 		data->outstanding_bus_ownership_callbacks--;
 		if (data->outstanding_bus_ownership_callbacks == 0) {
-			spawn_test_program (data);
+			start_simulation (data);
 		}
 	}
 
@@ -498,6 +624,12 @@ main (int argc, char *argv[])
 	data.simulated_objects = g_ptr_array_ref (simulated_objects);
 	data.bus_name_ids = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
 	data.outstanding_bus_ownership_callbacks = 0;
+
+	if (run_infinitely == TRUE || (run_iters == 0 && run_time == 0)) {
+		data.num_test_runs_remaining = -1;
+	} else {
+		data.num_test_runs_remaining = run_iters;
+	}
 
 	g_ptr_array_unref (simulated_objects);
 
