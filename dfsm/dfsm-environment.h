@@ -60,6 +60,9 @@ GVariant *dfsm_environment_dup_variable_value (DfsmEnvironment *self, DfsmVariab
 void dfsm_environment_set_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name, GVariant *new_value);
 void dfsm_environment_unset_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name);
 
+void dfsm_environment_save_reset_point (DfsmEnvironment *self);
+void dfsm_environment_reset (DfsmEnvironment *self);
+
 gboolean dfsm_environment_function_exists (const gchar *function_name) G_GNUC_PURE;
 GVariantType *dfsm_environment_function_calculate_type (const gchar *function_name, const GVariantType *parameters_type,
                                                         GError **error) DFSM_CONSTRUCTOR;

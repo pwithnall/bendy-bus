@@ -29,6 +29,19 @@ typedef struct {
 	GVariant *value;
 } VariableInfo;
 
+static VariableInfo *
+variable_info_copy (VariableInfo *data)
+{
+	VariableInfo *new_data;
+
+	new_data = g_slice_new (VariableInfo);
+
+	new_data->type = g_variant_type_copy (data->type);
+	new_data->value = g_variant_ref (data->value);
+
+	return new_data;
+}
+
 static void
 variable_info_free (VariableInfo *data)
 {
@@ -45,8 +58,8 @@ static void dfsm_environment_get_property (GObject *object, guint property_id, G
 static void dfsm_environment_set_property (GObject *object, guint property_id, const GValue *value, GParamSpec *pspec);
 
 struct _DfsmEnvironmentPrivate {
-	GHashTable/*<string, VariableInfo>*/ *local_variables; /* string for variable name → variable */
-	GHashTable/*<string, VariableInfo>*/ *object_variables; /* string for variable name → variable */
+	GHashTable/*<string, VariableInfo>*/ *local_variables, *local_variables_original; /* string for variable name → variable */
+	GHashTable/*<string, VariableInfo>*/ *object_variables, *object_variables_original; /* string for variable name → variable */
 	GDBusNodeInfo *dbus_node_info;
 };
 
@@ -107,7 +120,9 @@ dfsm_environment_init (DfsmEnvironment *self)
 	self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, DFSM_TYPE_ENVIRONMENT, DfsmEnvironmentPrivate);
 
 	self->priv->local_variables = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) variable_info_free);
+	self->priv->local_variables_original = NULL;
 	self->priv->object_variables = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) variable_info_free);
+	self->priv->object_variables_original = NULL;
 }
 
 static void
@@ -125,9 +140,19 @@ dfsm_environment_dispose (GObject *object)
 		priv->local_variables = NULL;
 	}
 
+	if (priv->local_variables_original != NULL) {
+		g_hash_table_unref (priv->local_variables_original);
+		priv->local_variables_original = NULL;
+	}
+
 	if (priv->object_variables != NULL) {
 		g_hash_table_unref (priv->object_variables);
 		priv->object_variables = NULL;
+	}
+
+	if (priv->object_variables_original != NULL) {
+		g_hash_table_unref (priv->object_variables_original);
+		priv->object_variables_original = NULL;
 	}
 
 	/* Chain up to the parent class */
@@ -386,6 +411,77 @@ dfsm_environment_unset_variable_value (DfsmEnvironment *self, DfsmVariableScope 
 	/* Remove the variable. */
 	variable_map = get_map_for_scope (self, scope);
 	g_hash_table_remove (variable_map, variable_name);
+}
+
+static GHashTable *
+copy_environment_hash_table (GHashTable *table)
+{
+	GHashTable *new_table;
+	GHashTableIter iter;
+	gchar *key;
+	VariableInfo *value;
+
+	new_table = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) variable_info_free);
+
+	g_hash_table_iter_init (&iter, table);
+
+	while (g_hash_table_iter_next (&iter, (gpointer*) &key, (gpointer*) &value) == TRUE) {
+		g_hash_table_insert (new_table, g_strdup (key), variable_info_copy (value));
+	}
+
+	return new_table;
+}
+
+/**
+ * dfsm_environment_save_reset_point:
+ * @self: a #DfsmEnvironment
+ *
+ * Save the current values of all the variables in the environment into a special area of memory, where they'll stay untouched. If
+ * dfsm_environment_reset() is called later, these original values will then replace the current values of variables in the environment. This is
+ * a useful but hacky way of allowing the simulation to be reset.
+ *
+ * This must only be called once in the lifetime of a given #DfsmEnvironment.
+ */
+void
+dfsm_environment_save_reset_point (DfsmEnvironment *self)
+{
+	DfsmEnvironmentPrivate *priv;
+
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (self));
+
+	priv = self->priv;
+
+	g_assert (priv->local_variables_original == NULL && priv->object_variables_original == NULL);
+
+	/* Copy local_variables into local_variables_original and the same for object_variables. */
+	priv->local_variables_original = copy_environment_hash_table (priv->local_variables);
+	priv->object_variables_original = copy_environment_hash_table (priv->object_variables);
+}
+
+/**
+ * dfsm_environment_reset:
+ * @self: a #DfsmEnvironment
+ *
+ * Reset the values of the variables in the environment to those saved previously using dfsm_environment_save_reset_point(). This function may only be
+ * called after dfsm_environment_save_reset_point() has been called, but can then be called as many times as necessary.
+ */
+void
+dfsm_environment_reset (DfsmEnvironment *self)
+{
+	DfsmEnvironmentPrivate *priv;
+
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (self));
+
+	priv = self->priv;
+
+	g_assert (priv->local_variables_original != NULL && priv->object_variables_original != NULL);
+
+	/* Copy local_variables_original over local_variables and the same for object_variables. */
+	g_hash_table_unref (priv->local_variables);
+	priv->local_variables = copy_environment_hash_table (priv->local_variables_original);
+
+	g_hash_table_unref (priv->object_variables);
+	priv->object_variables = copy_environment_hash_table (priv->object_variables_original);
 }
 
 static void

@@ -235,6 +235,7 @@ dfsm_machine_set_gobject_property (GObject *object, guint property_id, const GVa
 			priv->environment = g_value_dup_object (value);
 			priv->signal_emission_handler = g_signal_connect (priv->environment, "signal-emission",
 			                                                  (GCallback) environment_signal_emission_cb, object);
+			dfsm_environment_save_reset_point (priv->environment);
 			break;
 		case PROP_MACHINE_STATE:
 			/* Read-only */
@@ -587,6 +588,42 @@ dfsm_machine_stop_simulation (DfsmMachine *self)
 	/* Change simulation status. */
 	priv->simulation_status = DFSM_SIMULATION_STATUS_STOPPED;
 	g_object_notify (G_OBJECT (self), "simulation-status");
+}
+
+/**
+ * dfsm_machine_reset_simulation:
+ * @self: a #DfsmMachine
+ *
+ * Reset the simulation. This can be called whether the simulation is currently running or stopped. In both cases, it resets the DFSM to its starting
+ * state, resets the environment, and resets the arbitrary transition timer.
+ */
+void
+dfsm_machine_reset_simulation (DfsmMachine *self)
+{
+	DfsmMachinePrivate *priv;
+
+	g_return_if_fail (DFSM_IS_MACHINE (self));
+
+	priv = self->priv;
+
+	g_debug ("Resetting the simulation.");
+
+	/* Reset the machine state. */
+	priv->machine_state = DFSM_MACHINE_STARTING_STATE;
+	g_object_notify (G_OBJECT (self), "machine-state");
+
+	/* Reset the environment. */
+	dfsm_environment_reset (priv->environment);
+
+	if (priv->simulation_status == DFSM_SIMULATION_STATUS_STARTED) {
+		if (priv->timeout_id != 0) {
+			g_debug ("Cancelling outstanding arbitrary transitions.");
+			g_source_remove (priv->timeout_id);
+			priv->timeout_id = 0;
+		}
+
+		schedule_arbitrary_transition (self);
+	}
 }
 
 /**

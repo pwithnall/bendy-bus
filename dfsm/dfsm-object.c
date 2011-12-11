@@ -51,6 +51,7 @@ struct _DfsmObjectPrivate {
 	GPtrArray/*<string>*/ *bus_names;
 	GPtrArray/*<string>*/ *interfaces;
 	GArray/*<uint>*/ *registration_ids; /* IDs for all the D-Bus interface registrations we've made, in the same order as ->interfaces. */
+	guint dbus_activity_count;
 };
 
 enum {
@@ -59,6 +60,7 @@ enum {
 	PROP_OBJECT_PATH,
 	PROP_WELL_KNOWN_BUS_NAMES,
 	PROP_INTERFACES,
+	PROP_DBUS_ACTIVITY_COUNT,
 };
 
 G_DEFINE_TYPE (DfsmObject, dfsm_object, G_TYPE_OBJECT)
@@ -132,6 +134,20 @@ dfsm_object_class_init (DfsmObjectClass *klass)
 	                                                     "Interfaces", "An array of the D-Bus interface names this object implements.",
 	                                                     G_TYPE_PTR_ARRAY,
 	                                                     G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+	/**
+	 * DfsmObject:dbus-activity-count:
+	 *
+	 * A count of the number of D-Bus activities which have occurred. An activity is a method call to a method on this object, getting one of this
+	 * object's properties, or setting one of them. Counting starts when dfsm_object_register_on_bus() is called and stops when
+	 * dfsm_object_unregister_on_bus() is called (but the count isn't reset until the next call to dfsm_object_register_on_bus() or
+	 * dfsm_object_reset()).
+	 */
+	g_object_class_install_property (gobject_class, PROP_DBUS_ACTIVITY_COUNT,
+	                                 g_param_spec_uint ("dbus-activity-count",
+	                                                    "D-Bus activity count", "A count of the number of D-Bus activities which have occurred.",
+	                                                    0, G_MAXUINT, 0,
+	                                                    G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 }
 
 static void
@@ -206,6 +222,9 @@ dfsm_object_get_property (GObject *object, guint property_id, GValue *value, GPa
 		case PROP_INTERFACES:
 			g_value_set_boxed (value, priv->interfaces);
 			break;
+		case PROP_DBUS_ACTIVITY_COUNT:
+			g_value_set_uint (value, priv->dbus_activity_count);
+			break;
 		default:
 			/* We don't have any other property... */
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -238,6 +257,8 @@ dfsm_object_set_property (GObject *object, guint property_id, const GValue *valu
 			priv->interfaces = g_ptr_array_ref (g_value_get_boxed (value));
 			break;
 		case PROP_CONNECTION:
+			/* Read-only */
+		case PROP_DBUS_ACTIVITY_COUNT:
 			/* Read-only */
 		default:
 			/* We don't have any other property... */
@@ -453,6 +474,10 @@ dfsm_object_dbus_method_call (GDBusConnection *connection, const gchar *sender, 
 	         object_path, parameters_string);
 	g_free (parameters_string);
 
+	/* Count the activity. */
+	priv->dbus_activity_count++;
+	g_object_notify (G_OBJECT (user_data), "dbus-activity-count");
+
 	/* Pass the method call through to the DFSM. */
 	return_value = dfsm_machine_call_method (priv->machine, interface_name, method_name, parameters, &child_error);
 
@@ -512,6 +537,10 @@ dfsm_object_dbus_get_property (GDBusConnection *connection, const gchar *sender,
 	GVariant *value;
 	gchar *value_string;
 
+	/* Count the activity. */
+	priv->dbus_activity_count++;
+	g_object_notify (G_OBJECT (user_data), "dbus-activity-count");
+
 	/* Grab the value from the environment and be done with it. */
 	value = dfsm_environment_dup_variable_value (dfsm_machine_get_environment (priv->machine), DFSM_VARIABLE_SCOPE_OBJECT, property_name);
 
@@ -540,6 +569,10 @@ dfsm_object_dbus_set_property (GDBusConnection *connection, const gchar *sender,
 	g_debug ("Setting D-Bus property ‘%s’ of interface ‘%s’ on object ‘%s’ for sender ‘%s’ to value: %s", property_name, interface_name,
 	         object_path, sender, value_string);
 	g_free (value_string);
+
+	/* Count the activity. */
+	priv->dbus_activity_count++;
+	g_object_notify (G_OBJECT (user_data), "dbus-activity-count");
 
 	/* Set the property on the machine. */
 	if (dfsm_machine_set_property (priv->machine, interface_name, property_name, value, &child_error) == TRUE) {
@@ -643,6 +676,10 @@ dfsm_object_register_on_bus (DfsmObject *self, GDBusConnection *connection, GErr
 	priv->connection = g_object_ref (connection);
 	g_object_notify (G_OBJECT (self), "connection");
 
+	/* Reset the activity counter. */
+	priv->dbus_activity_count = 0;
+	g_object_notify (G_OBJECT (self), "dbus-activity-count");
+
 	/* Start the DFSM. */
 	dfsm_machine_start_simulation (priv->machine);
 
@@ -708,6 +745,23 @@ dfsm_object_unregister_on_bus (DfsmObject *self)
 }
 
 /**
+ * dfsm_object_reset:
+ * @self: a #DfsmObject
+ *
+ * Resets the state of the #DfsmObject simulation to its initial state, as if it had just been created. Any bus registrations are retained.
+ */
+void
+dfsm_object_reset (DfsmObject *self)
+{
+	g_return_if_fail (DFSM_IS_OBJECT (self));
+
+	dfsm_machine_reset_simulation (self->priv->machine);
+
+	self->priv->dbus_activity_count = 0;
+	g_object_notify (G_OBJECT (self), "dbus-activity-count");
+}
+
+/**
  * dfsm_object_get_connection:
  * @self: a #DfsmMachine
  *
@@ -769,4 +823,20 @@ dfsm_object_get_well_known_bus_names (DfsmObject *self)
 	g_return_val_if_fail (DFSM_IS_OBJECT (self), NULL);
 
 	return self->priv->bus_names;
+}
+
+/**
+ * dfsm_object_get_dbus_activity_count:
+ * @self: a #DfsmObject
+ *
+ * Gets the value of the #DfsmObject:dbus-activity-count property.
+ *
+ * Return value: count of the number of D-Bus activities which have occurred in the simulation
+ */
+guint
+dfsm_object_get_dbus_activity_count (DfsmObject *self)
+{
+	g_return_val_if_fail (DFSM_IS_OBJECT (self), 0);
+
+	return self->priv->dbus_activity_count;
 }

@@ -3,6 +3,7 @@ dfsm_object_get_type
 dfsm_object_factory_from_files
 dfsm_object_register_on_bus
 dfsm_object_unregister_on_bus
+dfsm_object_reset
 dfsm_object_get_connection
 dfsm_object_get_machine
 dfsm_object_get_object_path

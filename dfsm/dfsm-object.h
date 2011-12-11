@@ -52,11 +52,13 @@ GPtrArray/*<DfsmObject>*/ *dfsm_object_factory_from_files (const gchar *simulati
 
 void dfsm_object_register_on_bus (DfsmObject *self, GDBusConnection *connection, GError **error);
 void dfsm_object_unregister_on_bus (DfsmObject *self);
+void dfsm_object_reset (DfsmObject *self);
 
 GDBusConnection *dfsm_object_get_connection (DfsmObject *self) G_GNUC_PURE;
 DfsmMachine *dfsm_object_get_machine (DfsmObject *self) G_GNUC_PURE;
 const gchar *dfsm_object_get_object_path (DfsmObject *self) G_GNUC_PURE;
 GPtrArray/*<string>*/ *dfsm_object_get_well_known_bus_names (DfsmObject *self) G_GNUC_PURE;
+guint dfsm_object_get_dbus_activity_count (DfsmObject *self);
 
 G_END_DECLS
 
