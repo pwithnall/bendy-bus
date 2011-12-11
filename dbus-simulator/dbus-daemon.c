@@ -31,6 +31,7 @@ static void dsim_dbus_daemon_finalize (GObject *object);
 static void dsim_dbus_daemon_get_property (GObject *object, guint property_id, GValue *value, GParamSpec *pspec);
 static void dsim_dbus_daemon_set_property (GObject *object, guint property_id, const GValue *value, GParamSpec *pspec);
 static void dsim_dbus_daemon_build_argv (DsimProgramWrapper *wrapper, GPtrArray *argv);
+static void dsim_dbus_daemon_build_envp (DsimProgramWrapper *wrapper, GPtrArray *envp);
 static gboolean dsim_dbus_daemon_spawn_begin (DsimProgramWrapper *wrapper, GError **error);
 static void dsim_dbus_daemon_spawn_end (DsimProgramWrapper *wrapper, GPid child_pid);
 static void dsim_dbus_daemon_process_died (DsimProgramWrapper *wrapper, gint status);
@@ -67,7 +68,7 @@ dsim_dbus_daemon_class_init (DsimDBusDaemonClass *klass)
 	gobject_class->finalize = dsim_dbus_daemon_finalize;
 
 	wrapper_class->build_argv = dsim_dbus_daemon_build_argv;
-	wrapper_class->build_envp = NULL;
+	wrapper_class->build_envp = dsim_dbus_daemon_build_envp;
 	wrapper_class->spawn_begin = dsim_dbus_daemon_spawn_begin;
 	wrapper_class->spawn_end = dsim_dbus_daemon_spawn_end;
 	wrapper_class->process_died = dsim_dbus_daemon_process_died;
@@ -180,6 +181,13 @@ dsim_dbus_daemon_build_argv (DsimProgramWrapper *wrapper, GPtrArray *argv)
 
 	g_assert (priv->address_pipe[1] != -1);
 	g_ptr_array_add (argv, g_strdup_printf ("--print-address=%i", priv->address_pipe[1]));
+}
+
+static void
+dsim_dbus_daemon_build_envp (DsimProgramWrapper *wrapper, GPtrArray *envp)
+{
+	/* Static parameters. Note that this has no effect unless dbus-daemon was compiled with verbose mode enabled. */
+	g_ptr_array_add (envp, g_strdup ("DBUS_VERBOSE=1"));
 }
 
 static gboolean
