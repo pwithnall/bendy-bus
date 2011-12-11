@@ -38,7 +38,10 @@ enum StatusCodes {
 	STATUS_TEST_PROGRAM_SPAWN_ERROR = 6,
 };
 
+static gint random_seed = 0;
+
 static const GOptionEntry entries[] = {
+	{ "random-seed", 's', 0, G_OPTION_ARG_INT, &random_seed, N_("Seed value for the simulation’s random number generator"), N_("SEED") },
 	{ NULL }
 };
 
@@ -323,6 +326,15 @@ main (int argc, char *argv[])
 	}
 
 	g_option_context_free (context);
+
+	/* Set up the random number generator. */
+	if (random_seed == 0) {
+		random_seed = (guint32) g_get_real_time ();
+	}
+
+	g_message (_("Note: Setting random number generator seed to %u."), random_seed);
+
+	g_random_set_seed ((guint32) random_seed);
 
 	/* Load the files. */
 	g_file_get_contents (simulation_filename, &simulation_code, NULL, &error);
