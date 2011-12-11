@@ -37,6 +37,7 @@ struct _DsimProgramWrapperPrivate {
 
 	/* Useful things */
 	GPid pid;
+	gboolean process_is_running;
 	gint stdout_fd;
 	gint stderr_fd;
 	guint pid_watch_id;
@@ -49,6 +50,7 @@ struct _DsimProgramWrapperPrivate {
 enum {
 	PROP_WORKING_DIRECTORY = 1,
 	PROP_PROGRAM_NAME,
+	PROP_PROCESS_ID,
 };
 
 enum {
@@ -95,6 +97,17 @@ dsim_program_wrapper_class_init (DsimProgramWrapperClass *klass)
 	                                                      "Program name", "Name of the executable to spawn.",
 	                                                      NULL,
 	                                                      G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+	/**
+	 * DsimProgramWrapper:process-id:
+	 *
+	 * Process ID of the wrapped program.
+	 */
+	g_object_class_install_property (gobject_class, PROP_PROCESS_ID,
+	                                 g_param_spec_int ("process-id",
+	                                                   "Process ID", "Process ID of the wrapped program.",
+	                                                   -1, G_MAXINT, -1,
+	                                                   G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
 	/**
 	 * DsimProgramWrapper::spawn-begin:
@@ -145,6 +158,7 @@ dsim_program_wrapper_init (DsimProgramWrapper *self)
 	self->priv->stderr_fd = -1;
 	self->priv->stdout_fd = -1;
 	self->priv->pid = -1;
+	self->priv->process_is_running = FALSE;
 }
 
 static void
@@ -184,6 +198,9 @@ dsim_program_wrapper_get_property (GObject *object, guint property_id, GValue *v
 		case PROP_PROGRAM_NAME:
 			g_value_set_string (value, priv->program_name);
 			break;
+		case PROP_PROCESS_ID:
+			g_value_set_int (value, priv->pid);
+			break;
 		default:
 			/* We don't have any other property... */
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -205,6 +222,8 @@ dsim_program_wrapper_set_property (GObject *object, guint property_id, const GVa
 			/* Construct-only */
 			priv->program_name = g_value_dup_string (value);
 			break;
+		case PROP_PROCESS_ID:
+			/* Read-only */
 		default:
 			/* We don't have any other property... */
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -230,7 +249,10 @@ child_watch_cb (GPid pid, gint status, DsimProgramWrapper *self)
 	close (priv->stderr_fd); priv->stderr_fd = -1;
 	close (priv->stdout_fd); priv->stdout_fd = -1;
 
-	g_spawn_close_pid (priv->pid); priv->pid = -1;
+	/* NOTE: We retain the PID for use by dsim_program_wrapper_get_process_id(). */
+	g_spawn_close_pid (priv->pid);
+
+	priv->process_is_running = FALSE;
 }
 
 static gboolean
@@ -328,7 +350,7 @@ dsim_program_wrapper_spawn (DsimProgramWrapper *self, GError **error)
 	klass = DSIM_PROGRAM_WRAPPER_GET_CLASS (self);
 
 	/* Is the process already running? */
-	if (priv->pid != -1) {
+	if (priv->process_is_running == TRUE) {
 		return;
 	}
 
@@ -395,6 +417,8 @@ dsim_program_wrapper_spawn (DsimProgramWrapper *self, GError **error)
 
 	g_debug ("Successfully spawned process %i, with stdout as %i and stderr as %i.", child_pid, child_stdout, child_stderr);
 
+	priv->process_is_running = TRUE;
+
 	/* Listen for things on the daemon's stderr and stdout */
 	g_get_charset (&locale_charset);
 
@@ -456,7 +480,7 @@ dsim_program_wrapper_kill (DsimProgramWrapper *self)
 	priv = self->priv;
 
 	/* Already killed? */
-	if (self->priv->pid == -1) {
+	if (self->priv->process_is_running == FALSE) {
 		g_debug ("Skipping killing `%s` (already dead).", priv->program_name);
 		return;
 	}
@@ -482,4 +506,22 @@ dsim_program_wrapper_get_working_directory (DsimProgramWrapper *self)
 	g_return_val_if_fail (DSIM_IS_PROGRAM_WRAPPER (self), NULL);
 
 	return self->priv->working_directory;
+}
+
+/**
+ * dsim_program_wrapper_get_process_id:
+ * @self: a #DsimProgramWrapper
+ *
+ * Gets the process ID of the wrapped program. This will be <code class="literal">-1</code> if the program hasn't yet been run using
+ * dsim_program_wrapper_spawn(). After dsim_program_wrapper_spawn() has been called, the process ID will be set and will remain set even after the
+ * wrapped program exits.
+ *
+ * Return value: process ID of the wrapped program, or <code class="literal">-1</code> if it hasn't been spawned yet
+ */
+GPid
+dsim_program_wrapper_get_process_id (DsimProgramWrapper *self)
+{
+	g_return_val_if_fail (DSIM_IS_PROGRAM_WRAPPER (self), -1);
+
+	return self->priv->pid;
 }

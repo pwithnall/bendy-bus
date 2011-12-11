@@ -58,6 +58,7 @@ void dsim_program_wrapper_spawn (DsimProgramWrapper *self, GError **error);
 void dsim_program_wrapper_kill (DsimProgramWrapper *self);
 
 GFile *dsim_program_wrapper_get_working_directory (DsimProgramWrapper *self) G_GNUC_PURE;
+GPid dsim_program_wrapper_get_process_id (DsimProgramWrapper *self);
 
 G_END_DECLS
 
