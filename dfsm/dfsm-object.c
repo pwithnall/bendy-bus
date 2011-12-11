@@ -48,6 +48,7 @@ struct _DfsmObjectPrivate {
 	DfsmMachine *machine;
 	gulong signal_emission_handler;
 	gchar *object_path;
+	GPtrArray/*<string>*/ *bus_names;
 	GPtrArray/*<string>*/ *interfaces;
 	GArray/*<uint>*/ *registration_ids; /* IDs for all the D-Bus interface registrations we've made, in the same order as ->interfaces. */
 };
@@ -56,6 +57,7 @@ enum {
 	PROP_CONNECTION = 1,
 	PROP_MACHINE,
 	PROP_OBJECT_PATH,
+	PROP_WELL_KNOWN_BUS_NAMES,
 	PROP_INTERFACES,
 };
 
@@ -107,6 +109,19 @@ dfsm_object_class_init (DfsmObjectClass *klass)
 	                                                      G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
 	/**
+	 * DfsmObject:well-known-bus-names:
+	 *
+	 * An array of the well-known D-Bus bus names this object should own. This is a #GPtrArray containing normal C strings, each of which is a D-Bus
+	 * well-known bus name.
+	 */
+	g_object_class_install_property (gobject_class, PROP_WELL_KNOWN_BUS_NAMES,
+	                                 g_param_spec_boxed ("well-known-bus-names",
+	                                                     "Well-known bus names",
+	                                                     "An array of the well-known D-Bus bus names this object should own.",
+	                                                     G_TYPE_PTR_ARRAY,
+	                                                     G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+	/**
 	 * DfsmObject:interfaces:
 	 *
 	 * An array of the D-Bus interface names this object implements. This is a #GPtrArray containing normal C strings, each of which is a D-Bus
@@ -137,6 +152,11 @@ dfsm_object_dispose (GObject *object)
 	if (priv->interfaces != NULL) {
 		g_ptr_array_unref (priv->interfaces);
 		priv->interfaces = NULL;
+	}
+
+	if (priv->bus_names != NULL) {
+		g_ptr_array_unref (priv->bus_names);
+		priv->bus_names = NULL;
 	}
 
 	if (priv->machine != NULL) {
@@ -180,6 +200,9 @@ dfsm_object_get_property (GObject *object, guint property_id, GValue *value, GPa
 		case PROP_OBJECT_PATH:
 			g_value_set_string (value, priv->object_path);
 			break;
+		case PROP_WELL_KNOWN_BUS_NAMES:
+			g_value_set_boxed (value, priv->bus_names);
+			break;
 		case PROP_INTERFACES:
 			g_value_set_boxed (value, priv->interfaces);
 			break;
@@ -206,6 +229,10 @@ dfsm_object_set_property (GObject *object, guint property_id, const GValue *valu
 			/* Construct-only */
 			priv->object_path = g_value_dup_string (value);
 			break;
+		case PROP_WELL_KNOWN_BUS_NAMES:
+			/* Construct-only */
+			priv->bus_names = g_ptr_array_ref (g_value_get_boxed (value));
+			break;
 		case PROP_INTERFACES:
 			/* Construct-only */
 			priv->interfaces = g_ptr_array_ref (g_value_get_boxed (value));
@@ -223,23 +250,27 @@ dfsm_object_set_property (GObject *object, guint property_id, const GValue *valu
  * dfsm_object_new:
  * @machine: a DFSM simulation to provide the object's behaviour
  * @object_path: the object's path on the bus
+ * @bus_names: an array of well-known bus names for the object to own
  * @interfaces: the interfaces to export the object as
  *
  * Creates a new #DfsmObject with behaviour given by @machine, which will be exported as @object_path (implementing all the interfaces in @interfaces)
- * on the D-Bus connection given when dfsm_object_register_on_bus() is called.
+ * on the D-Bus connection given when dfsm_object_register_on_bus() is called. The process will take ownership of all well-known bus names in @bus_names
+ * when creating the object.
  *
  * Return value: (transfer full): a new #DfsmObject
  */
 static DfsmObject *
-_dfsm_object_new (DfsmMachine *machine, const gchar *object_path, GPtrArray/*<string>*/ *interfaces)
+_dfsm_object_new (DfsmMachine *machine, const gchar *object_path, GPtrArray/*<string>*/ *bus_names, GPtrArray/*<string>*/ *interfaces)
 {
 	g_return_val_if_fail (DFSM_IS_MACHINE (machine), NULL);
 	g_return_val_if_fail (object_path != NULL, NULL);
+	g_return_val_if_fail (bus_names != NULL, NULL);
 	g_return_val_if_fail (interfaces != NULL, NULL);
 
 	return g_object_new (DFSM_TYPE_OBJECT,
 	                     "machine", machine,
 	                     "object-path", object_path,
+	                     "well-known-bus-names", bus_names,
 	                     "interfaces", interfaces,
 	                     NULL);
 }
@@ -339,7 +370,8 @@ dfsm_object_factory_from_files (const gchar *simulation_code, const gchar *intro
 		/* Build the machine and object wrapper. */
 		machine = _dfsm_machine_new (dfsm_ast_object_get_environment (ast_object), dfsm_ast_object_get_state_names (ast_object),
 		                             dfsm_ast_object_get_transitions (ast_object));
-		object = _dfsm_object_new (machine, dfsm_ast_object_get_object_path (ast_object), dfsm_ast_object_get_interface_names (ast_object));
+		object = _dfsm_object_new (machine, dfsm_ast_object_get_object_path (ast_object), dfsm_ast_object_get_well_known_bus_names (ast_object),
+		                           dfsm_ast_object_get_interface_names (ast_object));
 
 		g_ptr_array_add (object_array, g_object_ref (object));
 
@@ -721,4 +753,20 @@ dfsm_object_get_object_path (DfsmObject *self)
 	g_return_val_if_fail (DFSM_IS_OBJECT (self), NULL);
 
 	return self->priv->object_path;
+}
+
+/**
+ * dfsm_object_get_well_known_bus_names:
+ * @self: a #DfsmObject
+ *
+ * Gets the value of the #DfsmObject:well-known-bus-names property.
+ *
+ * Return value: (transfer none): an array of the well-known bus names this object owns
+ */
+GPtrArray/*<string>*/ *
+dfsm_object_get_well_known_bus_names (DfsmObject *self)
+{
+	g_return_val_if_fail (DFSM_IS_OBJECT (self), NULL);
+
+	return self->priv->bus_names;
 }

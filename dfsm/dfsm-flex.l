@@ -58,17 +58,18 @@ DBUS_OBJECT_PATH			\/({DBUS_OBJECT_PATH_ELEMENT}(\/{DBUS_OBJECT_PATH_ELEMENT})*)
  *  • Must be UTF-8.
  *  • Must not exceed 255 characters in length.
  */
-DBUS_INTERFACE_NAME_ELEMENT		[A-Za-z_]+[A-Za-z0-9_]*
-DBUS_INTERFACE_NAME			{DBUS_INTERFACE_NAME_ELEMENT}\.{DBUS_INTERFACE_NAME_ELEMENT}(\.{DBUS_INTERFACE_NAME_ELEMENT})*
-
-/* Additional restrictions not encoded here:
- *  • Must be UTF-8.
- *  • Must not exceed 255 characters in length.
- */
 DBUS_UNIQUE_BUS_NAME_ELEMENT		[A-Za-z0-9_-]+
 DBUS_UNIQUE_BUS_NAME			:{DBUS_UNIQUE_BUS_NAME_ELEMENT}\.{DBUS_UNIQUE_BUS_NAME_ELEMENT}(\.{DBUS_UNIQUE_BUS_NAME_ELEMENT})*
-DBUS_WELL_KNOWN_BUS_NAME_ELEMENT	[A-Za-z_-]+[A-Za-z0-9_-]*
-DBUS_WELL_KNOWN_BUS_NAME		{DBUS_WELL_KNOWN_BUS_NAME_ELEMENT}\.{DBUS_WELL_KNOWN_BUS_NAME_ELEMENT}(\.{DBUS_WELL_KNOWN_BUS_NAME_ELEMENT})*
+
+/* Includes D-Bus interface names and well-known bus names.
+ *
+ * Additional restrictions not encoded here:
+ *  • Must be UTF-8.
+ *  • Must not exceed 255 characters in length.
+ *  • Interface name elements can't contain hyphens.
+ */
+DBUS_NAME_ELEMENT			[A-Za-z_-]+[A-Za-z0-9_-]*
+DBUS_NAME				{DBUS_NAME_ELEMENT}\.{DBUS_NAME_ELEMENT}(\.{DBUS_NAME_ELEMENT})*
 
 /* Includes variable names, state names, function names, D-Bus member names, D-Bus error names.
  *
@@ -223,7 +224,7 @@ TYPE_ANNOTATION				@[\(\)\{\}ybnqiuxtdsogarvehm\*\?@&^]+[ \t\n\r\v\f]+
 }
 
 {DBUS_OBJECT_PATH} { yylval->str = strdup (yytext); return DBUS_OBJECT_PATH; }
-{DBUS_INTERFACE_NAME} { yylval->str = strdup (yytext); return DBUS_INTERFACE_NAME; }
+{DBUS_NAME} { yylval->str = strdup (yytext); return DBUS_NAME; }
 
 {IDENTIFIER} { yylval->str = strdup (yytext); return IDENTIFIER; }
 

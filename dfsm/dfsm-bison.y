@@ -67,7 +67,7 @@
 %destructor { dfsm_parser_transition_details_free ($$); } <transition_details>
 
 %token <str> DBUS_OBJECT_PATH
-%token <str> DBUS_INTERFACE_NAME
+%token <str> DBUS_NAME
 
 %token <str> IDENTIFIER
 %token <str> TYPE_ANNOTATION
@@ -127,8 +127,11 @@
 
 %type <ptr_array> Input
 %type <ast_object> ObjectBlock
+%type <ptr_array> BusNameList
+%type <str> DBusWellKnownBusName
 %type <block_list> BlockList
 %type <ptr_array> InterfaceNameList
+%type <str> DBusInterfaceName
 %type <hash_table> DataBlock
 %type <hash_table> DataList
 %type <ptr_array> StatesBlock
@@ -166,19 +169,29 @@ Input: /* empty */			{ $$ = g_ptr_array_new_with_free_func (g_object_unref); par
 
 /* Returns a new DfsmAstObject. */
 ObjectBlock:
-	OBJECT AT DBUS_OBJECT_PATH IMPLEMENTS InterfaceNameList L_BRACE
+	OBJECT AT DBUS_OBJECT_PATH BusNameList IMPLEMENTS InterfaceNameList L_BRACE
 		BlockList
 	R_BRACE									{
-											$$ = dfsm_ast_object_new (parser_data->dbus_node_info, $3, $5,
-											                          g_ptr_array_ref ($7->data_blocks),
-											                          g_ptr_array_ref ($7->state_blocks),
-											                          g_ptr_array_ref ($7->transitions),
+											$$ = dfsm_ast_object_new (parser_data->dbus_node_info, $3, $4,
+											                          $6,
+											                          g_ptr_array_ref ($8->data_blocks),
+											                          g_ptr_array_ref ($8->state_blocks),
+											                          g_ptr_array_ref ($8->transitions),
 											                          ERROR);
 											ABORT_ON_ERROR;
 										}
-|	OBJECT AT DBUS_OBJECT_PATH IMPLEMENTS InterfaceNameList L_BRACE
+|	OBJECT AT DBUS_OBJECT_PATH BusNameList IMPLEMENTS InterfaceNameList L_BRACE
 		error
 	R_BRACE									{ $$ = NULL; YYABORT; }
+;
+
+/* Returns a new GPtrArray<string>. */
+BusNameList: /* empty */							{ $$ = g_ptr_array_new_with_free_func (g_free); }
+           | BusNameList ',' DBusWellKnownBusName				{ $$ = $1; g_ptr_array_add ($$, $3 /* steal */); }
+;
+
+/* Returns a new string containing the well-known bus name. */
+DBusWellKnownBusName: DBUS_NAME							{ $$ = $1; /* steal ownership from flex */ }
 ;
 
 /* Returns a DfsmParserBlockList */
@@ -189,11 +202,15 @@ BlockList: /* empty */								{ $$ = dfsm_parser_block_list_new (); }
 ;
 
 /* Returns a GPtrArray of interface names (strings). */
-InterfaceNameList: DBUS_INTERFACE_NAME						{
+InterfaceNameList: DBusInterfaceName						{
 											$$ = g_ptr_array_new_with_free_func (g_free);
 											g_ptr_array_add ($$, $1 /* steal */);
 										}
-                 | InterfaceNameList ',' DBUS_INTERFACE_NAME			{ $$ = $1; g_ptr_array_add ($$, $3); }
+                 | InterfaceNameList ',' DBusInterfaceName			{ $$ = $1; g_ptr_array_add ($$, $3); }
+;
+
+/* Returns a new string containing the interface name. */
+DBusInterfaceName: DBUS_NAME							{ $$ = $1; /* steal ownership from flex */ }
 ;
 
 /* Returns a new GHashTable for the data items. */

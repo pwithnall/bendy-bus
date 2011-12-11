@@ -68,6 +68,8 @@ typedef struct {
 	DsimDBusDaemon *dbus_daemon;
 	gchar *dbus_address;
 	GDBusConnection *connection;
+	guint outstanding_bus_ownership_callbacks; /* number of calls to g_bus_own_name() which are outstanding */
+	GHashTable/*<string, uint>*/ *bus_name_ids; /* map from well-known bus name to its ownership ID */
 	GPtrArray/*<DfsmObject>*/ *simulated_objects;
 } MainData;
 
@@ -77,6 +79,7 @@ main_data_clear (MainData *data)
 	g_clear_object (&data->connection);
 	g_free (data->dbus_address);
 	g_ptr_array_unref (data->simulated_objects);
+	g_hash_table_unref (data->bus_name_ids);
 
 	if (data->test_program != NULL) {
 		dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program));
@@ -117,7 +120,8 @@ connection_close_cb (GObject *source_object, GAsyncResult *result, MainData *dat
 static gboolean
 simulation_timeout_cb (MainData *data)
 {
-	guint i;
+	guint i, bus_name_id;
+	GHashTableIter iter;
 
 	/* Simulation's finished, so kill the test program. */
 	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program));
@@ -128,10 +132,67 @@ simulation_timeout_cb (MainData *data)
 		dfsm_object_unregister_on_bus (simulated_object);
 	}
 
+	/* Drop our well-known names. */
+	g_hash_table_iter_init (&iter, data->bus_name_ids);
+
+	while (g_hash_table_iter_next (&iter, NULL, (gpointer*) &bus_name_id) == TRUE) {
+		g_bus_unown_name (bus_name_id);
+	}
+
 	/* Disconnect from the bus. */
 	g_dbus_connection_close (data->connection, NULL, (GAsyncReadyCallback) connection_close_cb, data);
 
 	return FALSE;
+}
+
+static void
+spawn_test_program (MainData *data)
+{
+	GError *error = NULL;
+
+	/* Spawn the program under test. */
+	dsim_program_wrapper_spawn (DSIM_PROGRAM_WRAPPER (data->test_program), &error);
+
+	if (error != NULL) {
+		g_printerr (_("Error spawning test program instance: %s"), error->message);
+		g_printerr ("\n");
+
+		data->exit_status = STATUS_TEST_PROGRAM_SPAWN_ERROR;
+
+		goto error;
+	}
+
+	/* TODO: How do we know when the simulation's finished? */
+	g_timeout_add_seconds (60, (GSourceFunc) simulation_timeout_cb, data);
+
+	return;
+
+error:
+	g_error_free (error);
+
+	/* Convenient way to free everything. */
+	simulation_timeout_cb (data);
+}
+
+static void
+name_acquired_cb (GDBusConnection *connection, const gchar *name, MainData *data)
+{
+	g_debug ("Acquired ownership of well-known bus name: %s", name);
+
+	/* Bail if this isn't the last callback. */
+	data->outstanding_bus_ownership_callbacks--;
+	if (data->outstanding_bus_ownership_callbacks > 0) {
+		return;
+	}
+
+	/* Spawn! */
+	spawn_test_program (data);
+}
+
+static void
+name_lost_cb (GDBusConnection *connection, const gchar *name, MainData *data)
+{
+	g_debug ("Lost ownership of well-known bus name: %s", name);
 }
 
 static void
@@ -173,20 +234,45 @@ connection_created_cb (GObject *source_object, GAsyncResult *result, MainData *d
 		}
 	}
 
-	/* Spawn the program under test. */
-	dsim_program_wrapper_spawn (DSIM_PROGRAM_WRAPPER (data->test_program), &error);
+	/* Register our bus connection under zero or more well-known names. Once this is done, spawn the program under test. */
+	for (i = 0; i < data->simulated_objects->len; i++) {
+		DfsmObject *simulated_object;
+		GPtrArray/*<string>*/ *bus_names;
+		guint j;
 
-	if (error != NULL) {
-		g_printerr (_("Error spawning test program instance: %s"), error->message);
-		g_printerr ("\n");
+		simulated_object = g_ptr_array_index (data->simulated_objects, i);
+		bus_names = dfsm_object_get_well_known_bus_names (simulated_object);
 
-		data->exit_status = STATUS_TEST_PROGRAM_SPAWN_ERROR;
+		/* Hold an outstanding callback while we loop over the bus names, so that don't spawn the program under test before we've finished
+		 * requesting to own all our bus names (e.g. if their callbacks are called very quickly. */
+		data->outstanding_bus_ownership_callbacks++;
 
-		goto error;
+		for (j = 0; j < bus_names->len; j++) {
+			const gchar *bus_name;
+			guint bus_name_id;
+
+			bus_name = g_ptr_array_index (bus_names, j);
+
+			/* Skip the name if another object's already requested to own it. */
+			if (g_hash_table_lookup_extended (data->bus_name_ids, bus_name, NULL, NULL) == TRUE) {
+				continue;
+			}
+
+			/* Own the name. We keep a count of all the outstanding callbacks and only spawn the program under test once all are
+			 * complete. */
+			data->outstanding_bus_ownership_callbacks++;
+			bus_name_id = g_bus_own_name_on_connection (data->connection, bus_name, G_BUS_NAME_OWNER_FLAGS_NONE,
+			                                            (GBusNameAcquiredCallback) name_acquired_cb, (GBusNameLostCallback) name_lost_cb,
+			                                            data, NULL);
+			g_hash_table_insert (data->bus_name_ids, g_strdup (bus_name), GUINT_TO_POINTER (bus_name_id));
+		}
+
+		/* Release our outstanding callback and spawn the test program if it hasn't been spawned already. */
+		data->outstanding_bus_ownership_callbacks--;
+		if (data->outstanding_bus_ownership_callbacks == 0) {
+			spawn_test_program (data);
+		}
 	}
-
-	/* TODO: How do we know when the simulation's finished? */
-	g_timeout_add_seconds (60, (GSourceFunc) simulation_timeout_cb, data);
 
 	return;
 
@@ -380,6 +466,8 @@ main (int argc, char *argv[])
 	data.main_loop = g_main_loop_new (NULL, FALSE);
 	data.exit_status = STATUS_SUCCESS;
 	data.simulated_objects = g_ptr_array_ref (simulated_objects);
+	data.bus_name_ids = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
+	data.outstanding_bus_ownership_callbacks = 0;
 
 	g_ptr_array_unref (simulated_objects);
 

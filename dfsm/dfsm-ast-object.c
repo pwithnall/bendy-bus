@@ -33,6 +33,7 @@ static void dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environme
 
 struct _DfsmAstObjectPrivate {
 	gchar *object_path;
+	GPtrArray *bus_names; /* array of strings */
 	GPtrArray *interface_names; /* array of strings */
 	DfsmEnvironment *environment; /* not populated until pre_check_and_register() */
 	GPtrArray *states; /* array of strings (indexed by DfsmAstStateNumber), not populated until pre_check_and_register() */
@@ -71,6 +72,11 @@ static void
 dfsm_ast_object_dispose (GObject *object)
 {
 	DfsmAstObjectPrivate *priv = DFSM_AST_OBJECT (object)->priv;
+
+	if (priv->bus_names != NULL) {
+		g_ptr_array_unref (priv->bus_names);
+		priv->bus_names = NULL;
+	}
 
 	if (priv->data_blocks != NULL) {
 		g_ptr_array_unref (priv->data_blocks);
@@ -121,9 +127,17 @@ dfsm_ast_object_sanity_check (DfsmAstNode *node)
 	guint i;
 
 	g_assert (priv->object_path != NULL);
+	g_assert (priv->bus_names != NULL);
 	g_assert (priv->interface_names != NULL);
 	g_assert (DFSM_IS_ENVIRONMENT (priv->environment));
 	g_assert (priv->states != NULL);
+
+	for (i = 0; i < priv->bus_names->len; i++) {
+		const gchar *bus_name;
+
+		bus_name = g_ptr_array_index (priv->bus_names, i);
+		g_assert (bus_name != NULL && *bus_name != '\0');
+	}
 
 	for (i = 0; i < priv->interface_names->len; i++) {
 		const gchar *interface_name;
@@ -160,6 +174,17 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 	if (g_variant_is_object_path (priv->object_path) == FALSE) {
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus object path: %s", priv->object_path);
 		return;
+	}
+
+	for (i = 0; i < priv->bus_names->len; i++) {
+		const gchar *bus_name;
+
+		bus_name = g_ptr_array_index (priv->bus_names, i);
+
+		if (g_dbus_is_name (bus_name) == FALSE || g_dbus_is_unique_name (bus_name) == TRUE) {
+			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus well-known bus name: %s", bus_name);
+			return;
+		}
 	}
 
 	node_info = dfsm_environment_get_dbus_node_info (environment);
@@ -408,6 +433,7 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
  * dfsm_ast_object_new:
  * @dbus_node_info: introspection data about the D-Bus interfaces used by the object
  * @object_path: the object's D-Bus path
+ * @bus_names: a (potentially empty) array of strings containing the well-known bus names the object should own
  * @interface_names: an array of strings containing the names of the D-Bus interfaces implemented by the object
  * @data_blocks: an array of #GHashTable<!-- -->s containing the object-level variables in the object
  * @state_blocks: an array of #GPtrArray<!-- -->s of strings containing the names of the possible states of the object
@@ -419,7 +445,7 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
  * Return value: (transfer full): a new AST node
  */
 DfsmAstObject *
-dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GPtrArray/*<string>*/ *interface_names,
+dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GPtrArray/*<string>*/ *bus_names, GPtrArray/*<string>*/ *interface_names,
                      GPtrArray/*<GHashTable<string,DfsmAstDataStructure>>*/ *data_blocks, GPtrArray/*<GPtrArray<string>>*/ *state_blocks,
                      GPtrArray/*<DfsmAstTransition>*/ *transition_blocks, GError **error)
 {
@@ -428,6 +454,7 @@ dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GP
 
 	g_return_val_if_fail (dbus_node_info != NULL, NULL);
 	g_return_val_if_fail (object_path != NULL && *object_path != '\0', NULL);
+	g_return_val_if_fail (bus_names != NULL, NULL);
 	g_return_val_if_fail (interface_names != NULL, NULL);
 	g_return_val_if_fail (data_blocks != NULL, NULL);
 	g_return_val_if_fail (state_blocks != NULL, NULL);
@@ -438,6 +465,7 @@ dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GP
 	priv = object->priv;
 
 	priv->object_path = g_strdup (object_path);
+	priv->bus_names = g_ptr_array_ref (bus_names);
 	priv->interface_names = g_ptr_array_ref (interface_names);
 	priv->environment = _dfsm_environment_new (dbus_node_info);
 	priv->states = g_ptr_array_new_with_free_func (g_free);
@@ -513,6 +541,23 @@ dfsm_ast_object_get_object_path (DfsmAstObject *self)
 	g_return_val_if_fail (DFSM_IS_AST_OBJECT (self), NULL);
 
 	return self->priv->object_path;
+}
+
+/**
+ * dfsm_ast_object_get_well_known_bus_names:
+ * @self: a #DfsmAstObject
+ *
+ * Gets an array of strings containing the D-Bus well-known bus names which should be owned by the object. This array may be empty, but will never be
+ * %NULL.
+ *
+ * Return value: (transfer none): array of D-Bus well-known bus names
+ */
+GPtrArray/*<string>*/ *
+dfsm_ast_object_get_well_known_bus_names (DfsmAstObject *self)
+{
+	g_return_val_if_fail (DFSM_IS_AST_OBJECT (self), NULL);
+
+	return self->priv->bus_names;
 }
 
 /**

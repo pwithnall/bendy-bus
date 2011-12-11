@@ -47,7 +47,8 @@ typedef struct {
 
 GType dfsm_ast_object_get_type (void) G_GNUC_CONST;
 
-DfsmAstObject *dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GPtrArray/*<string>*/ *interface_names,
+DfsmAstObject *dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GPtrArray/*<string>*/ *bus_names,
+                                    GPtrArray/*<string>*/ *interface_names,
                                     GPtrArray/*<GHashTable>*/ *data_blocks, GPtrArray/*<GPtrArray>*/ *state_blocks,
                                     GPtrArray/*<DfsmAstTransition>*/ *transition_blocks, GError **error) DFSM_CONSTRUCTOR;
 
@@ -56,6 +57,7 @@ DfsmEnvironment *dfsm_ast_object_get_environment (DfsmAstObject *self) G_GNUC_PU
 GPtrArray/*<string>*/ *dfsm_ast_object_get_state_names (DfsmAstObject *self) G_GNUC_PURE;
 GPtrArray/*<DfsmAstTransition>*/ *dfsm_ast_object_get_transitions (DfsmAstObject *self) G_GNUC_PURE;
 const gchar *dfsm_ast_object_get_object_path (DfsmAstObject *self) G_GNUC_PURE;
+GPtrArray/*<string>*/ *dfsm_ast_object_get_well_known_bus_names (DfsmAstObject *self) G_GNUC_PURE;
 GPtrArray/*<string>*/ *dfsm_ast_object_get_interface_names (DfsmAstObject *self) G_GNUC_PURE;
 
 G_END_DECLS

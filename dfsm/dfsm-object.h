@@ -56,6 +56,7 @@ void dfsm_object_unregister_on_bus (DfsmObject *self);
 GDBusConnection *dfsm_object_get_connection (DfsmObject *self) G_GNUC_PURE;
 DfsmMachine *dfsm_object_get_machine (DfsmObject *self) G_GNUC_PURE;
 const gchar *dfsm_object_get_object_path (DfsmObject *self) G_GNUC_PURE;
+GPtrArray/*<string>*/ *dfsm_object_get_well_known_bus_names (DfsmObject *self) G_GNUC_PURE;
 
 G_END_DECLS
 
