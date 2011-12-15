@@ -246,7 +246,11 @@ dsim_test_program_process_died (DsimProgramWrapper *wrapper, gint status)
 
 #ifdef WCOREDUMP
 		if (WCOREDUMP (status)) {
-			g_message ("Program under test (PID: %i) terminated by signal %u (%s) and produced a core dump file.", pid, sig, sig_string);
+			gchar *working_directory_string = g_file_get_path (dsim_program_wrapper_get_working_directory (wrapper));
+			g_message ("Program under test (PID: %i) terminated by signal %u (%s) and produced a core dump file in “%s”. "
+			           "This can be debugged using `gdb %s core-dump-file`.", pid, sig, sig_string, working_directory_string,
+			           dsim_program_wrapper_get_program_name (wrapper));
+			g_free (working_directory_string);
 		} else {
 			g_message ("Program under test (PID: %i) terminated by signal %u (%s).", pid, sig, sig_string);
 		}
