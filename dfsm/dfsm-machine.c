@@ -71,9 +71,9 @@ struct _DfsmMachinePrivate {
 	/* Static data */
 	GPtrArray/*<string>*/ *state_names; /* (indexed by DfsmMachineStateNumber) */
 	struct {
-		GHashTable/*<string, GPtrArray<DfsmAstTransition>>*/ *method_call_triggered; /* hash table of method name to transitions */
-		GHashTable/*<string, GPtrArray<DfsmAstTransition>>*/ *property_set_triggered; /* hash table of property name to transitions */
-		GPtrArray/*<DfsmAstTransition>*/ *arbitrarily_triggered; /* array of transitions */
+		GHashTable/*<string, GPtrArray<DfsmAstObjectTransition>>*/ *method_call_triggered; /* hash table of method name to transitions */
+		GHashTable/*<string, GPtrArray<DfsmAstObjectTransition>>*/ *property_set_triggered; /* hash table of property name to transitions */
+		GPtrArray/*<DfsmAstObjectTransition>*/ *arbitrarily_triggered; /* array of transitions */
 	} transitions;
 };
 
@@ -248,27 +248,14 @@ dfsm_machine_set_gobject_property (GObject *object, guint property_id, const GVa
 	}
 }
 
-static DfsmMachineStateNumber
-get_state_number_from_name (DfsmMachine *self, const gchar *state_name)
+static const gchar *
+get_state_name (DfsmMachine *self, DfsmMachineStateNumber state_number)
 {
-	guint i;
-
-	/* TODO: This is nasty and slow. Can't we eliminate state names entirely by this point? */
-	for (i = 0; i < self->priv->state_names->len; i++) {
-		const gchar *candidate_name;
-
-		candidate_name = g_ptr_array_index (self->priv->state_names, i);
-
-		if (strcmp (candidate_name, state_name) == 0) {
-			return i;
-		}
-	}
-
-	g_assert_not_reached ();
+	return (const gchar*) g_ptr_array_index (self->priv->state_names, state_number);
 }
 
 static GVariant *
-find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstTransition>*/ *possible_transitions, gboolean *executed_transition,
+find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstObjectTransition>*/ *possible_transitions, gboolean *executed_transition,
                                     GError **error)
 {
 	DfsmMachinePrivate *priv = self->priv;
@@ -291,22 +278,24 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstTransi
 	 * checking preconditions of transitions until we find one which is satisfied. We then execute that transition. */
 	rand_offset = g_random_int_range (0, possible_transitions->len);
 	for (i = 0; i < possible_transitions->len; i++) {
+		DfsmAstObjectTransition *object_transition;
 		DfsmAstTransition *transition;
 
-		transition = g_ptr_array_index (possible_transitions, (i + rand_offset) % possible_transitions->len);
+		object_transition = g_ptr_array_index (possible_transitions, (i + rand_offset) % possible_transitions->len);
+		transition = object_transition->transition;
 
 		/* Check we're in the right starting state. */
-		if (get_state_number_from_name (self, dfsm_ast_transition_get_from_state_name (transition)) != priv->machine_state) {
+		if (object_transition->from_state != priv->machine_state) {
 			g_debug ("…Skipping transition %p from ‘%s’ to ‘%s’ due to being in the wrong state (‘%s’).", transition,
-			         dfsm_ast_transition_get_from_state_name (transition), dfsm_ast_transition_get_to_state_name (transition),
-			         (const gchar*) g_ptr_array_index (priv->state_names, priv->machine_state));
+			         get_state_name (self, object_transition->from_state), get_state_name (self, object_transition->to_state),
+			         get_state_name (self, priv->machine_state));
 			continue;
 		}
 
 		/* If this transition's preconditions are satisfied, execute it. Otherwise, loop round and try the next transition. */
 		if (dfsm_ast_transition_check_preconditions (transition, priv->environment, &child_error) == FALSE) {
 			g_debug ("…Skipping transition %p from ‘%s’ to ‘%s’ due to precondition failures.", transition,
-			         dfsm_ast_transition_get_from_state_name (transition), dfsm_ast_transition_get_to_state_name (transition));
+			         get_state_name (self, object_transition->from_state), get_state_name (self, object_transition->to_state));
 
 			/* Errors? These will either be runtime errors in evaluating the condition, or (more likely) errors thrown as a result of
 			 * precondition failure. In either case, we store the first occurrence and loop round to try the next transition instead. */
@@ -326,7 +315,8 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstTransi
 		g_clear_error (&precondition_error);
 
 		/* Execute the transition. */
-		g_debug ("…Executing transition %p.", transition);
+		g_debug ("…Executing transition %p from ‘%s’ to ‘%s’.", transition, get_state_name (self, object_transition->from_state),
+		         get_state_name (self, object_transition->to_state));
 		return_value = dfsm_ast_transition_execute (transition, priv->environment, &child_error);
 
 		/* Various possibilities for return values. */
@@ -341,7 +331,7 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstTransi
 			*executed_transition = TRUE;
 
 			/* Change machine state. */
-			priv->machine_state = get_state_number_from_name (self, dfsm_ast_transition_get_to_state_name (transition));
+			priv->machine_state = object_transition->to_state;
 			g_object_notify (G_OBJECT (self), "machine-state");
 		} else if (return_value == NULL && child_error != NULL) {
 			/* Error, either during execution or as a result of a throw statement. Don't change states. */
@@ -443,14 +433,14 @@ environment_signal_emission_cb (DfsmEnvironment *environment, const gchar *signa
  * dfsm_machine_new:
  * @environment: a #DfsmEnvironment containing all the variables and functions used by the machine
  * @state_names: an array of strings of all the state names used in the DFSM
- * @transitions: an opaque array of structures representing each of the possible transitions in the DFSM
+ * @transitions: an array of structures (#DfsmAstObjectTransition<!-- -->s) representing each of the possible transitions in the DFSM
  *
  * Creates a new #DfsmMachine with the given environment, states and set of transitions.
  *
  * Return value: (transfer full): a new #DfsmMachine
  */
 DfsmMachine *
-_dfsm_machine_new (DfsmEnvironment *environment, GPtrArray/*<string>*/ *state_names, GPtrArray/*<DfsmAstTransition>*/ *transitions)
+_dfsm_machine_new (DfsmEnvironment *environment, GPtrArray/*<string>*/ *state_names, GPtrArray/*<DfsmAstObjectTransition>*/ *transitions)
 {
 	DfsmMachine *machine;
 	guint i;
@@ -467,51 +457,53 @@ _dfsm_machine_new (DfsmEnvironment *environment, GPtrArray/*<string>*/ *state_na
 	/* Transitions need to be sorted by trigger method */
 	machine->priv->transitions.method_call_triggered = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) g_ptr_array_unref);
 	machine->priv->transitions.property_set_triggered = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, (GDestroyNotify) g_ptr_array_unref);
-	machine->priv->transitions.arbitrarily_triggered = g_ptr_array_new_with_free_func (g_object_unref);
+	machine->priv->transitions.arbitrarily_triggered = g_ptr_array_new_with_free_func ((GDestroyNotify) dfsm_ast_object_transition_unref);
 
 	for (i = 0; i < transitions->len; i++) {
+		DfsmAstObjectTransition *object_transition;
 		DfsmAstTransition *transition;
 
-		transition = g_ptr_array_index (transitions, i);
+		object_transition = g_ptr_array_index (transitions, i);
+		transition = object_transition->transition;
 
 		switch (dfsm_ast_transition_get_trigger (transition)) {
 			case DFSM_AST_TRANSITION_METHOD_CALL: {
-				GPtrArray/*<DfsmAstTransition>*/ *new_transitions;
+				GPtrArray/*<DfsmAstObjectTransition>*/ *new_transitions;
 
 				/* Add the transition to a new or existing array of transitions for the given method name. */
 				new_transitions = g_hash_table_lookup (machine->priv->transitions.method_call_triggered,
 				                                       dfsm_ast_transition_get_trigger_method_name (transition));
 
 				if (new_transitions == NULL) {
-					new_transitions = g_ptr_array_new_with_free_func (g_object_unref);
+					new_transitions = g_ptr_array_new_with_free_func ((GDestroyNotify) dfsm_ast_object_transition_unref);
 					g_hash_table_insert (machine->priv->transitions.method_call_triggered,
 					                     g_strdup (dfsm_ast_transition_get_trigger_method_name (transition)), new_transitions);
 				}
 
-				g_ptr_array_add (new_transitions, g_object_ref (transition));
+				g_ptr_array_add (new_transitions, dfsm_ast_object_transition_ref (object_transition));
 
 				break;
 			}
 			case DFSM_AST_TRANSITION_PROPERTY_SET: {
-				GPtrArray/*<DfsmAstTransition>*/ *new_transitions;
+				GPtrArray/*<DfsmAstObjectTransition>*/ *new_transitions;
 
 				/* Add the transition to a new or existing array of transitions for the given property name. */
 				new_transitions = g_hash_table_lookup (machine->priv->transitions.property_set_triggered,
 				                                       dfsm_ast_transition_get_trigger_property_name (transition));
 
 				if (new_transitions == NULL) {
-					new_transitions = g_ptr_array_new_with_free_func (g_object_unref);
+					new_transitions = g_ptr_array_new_with_free_func ((GDestroyNotify) dfsm_ast_object_transition_unref);
 					g_hash_table_insert (machine->priv->transitions.property_set_triggered,
 					                     g_strdup (dfsm_ast_transition_get_trigger_property_name (transition)), new_transitions);
 				}
 
-				g_ptr_array_add (new_transitions, g_object_ref (transition));
+				g_ptr_array_add (new_transitions, dfsm_ast_object_transition_ref (object_transition));
 
 				break;
 			}
 			case DFSM_AST_TRANSITION_ARBITRARY:
 				/* Arbitrary transition */
-				g_ptr_array_add (machine->priv->transitions.arbitrarily_triggered, g_object_ref (transition));
+				g_ptr_array_add (machine->priv->transitions.arbitrarily_triggered, dfsm_ast_object_transition_ref (object_transition));
 				break;
 			default:
 				g_assert_not_reached ();
@@ -645,7 +637,7 @@ GVariant *
 dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const gchar *method_name, GVariant *parameters, GError **error)
 {
 	DfsmMachinePrivate *priv;
-	GPtrArray/*<DfsmAstTransition>*/ *possible_transitions;
+	GPtrArray/*<DfsmAstObjectTransition>*/ *possible_transitions;
 	gboolean executed_transition = FALSE;
 	GVariant *return_value = NULL;
 	GDBusNodeInfo *node_info;
@@ -758,7 +750,7 @@ gboolean
 dfsm_machine_set_property (DfsmMachine *self, const gchar *interface_name, const gchar *property_name, GVariant *value, GError **error)
 {
 	DfsmMachinePrivate *priv;
-	GPtrArray/*<DfsmAstTransition>*/ *possible_transitions;
+	GPtrArray/*<DfsmAstObjectTransition>*/ *possible_transitions;
 	gboolean executed_transition = FALSE;
 	GVariant *return_value = NULL;
 	GError *child_error = NULL;

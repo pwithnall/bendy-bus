@@ -33,8 +33,6 @@ static void dfsm_ast_transition_pre_check_and_register (DfsmAstNode *node, DfsmE
 static void dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 
 struct _DfsmAstTransitionPrivate {
-	gchar *from_state_name;
-	gchar *to_state_name;
 	DfsmAstTransitionTrigger trigger;
 	union {
 		gchar *method_name; /* for DFSM_AST_TRANSITION_METHOD_CALL, otherwise NULL */
@@ -106,9 +104,6 @@ dfsm_ast_transition_finalize (GObject *object)
 			g_assert_not_reached ();
 	}
 
-	g_free (priv->to_state_name);
-	g_free (priv->from_state_name);
-
 	/* Chain up to the parent class */
 	G_OBJECT_CLASS (dfsm_ast_transition_parent_class)->finalize (object);
 }
@@ -119,8 +114,6 @@ dfsm_ast_transition_sanity_check (DfsmAstNode *node)
 	DfsmAstTransitionPrivate *priv = DFSM_AST_TRANSITION (node)->priv;
 	guint i;
 
-	g_assert (priv->from_state_name != NULL);
-	g_assert (priv->to_state_name != NULL);
 	g_assert (priv->preconditions != NULL);
 	g_assert (priv->statements != NULL);
 
@@ -152,14 +145,6 @@ dfsm_ast_transition_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *
 {
 	DfsmAstTransitionPrivate *priv = DFSM_AST_TRANSITION (node)->priv;
 	guint i;
-
-	if (dfsm_is_state_name (priv->from_state_name) == FALSE) {
-		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid state name: %s", priv->from_state_name);
-		return;
-	} else if (dfsm_is_state_name (priv->to_state_name) == FALSE) {
-		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid state name: %s", priv->to_state_name);
-		return;
-	}
 
 	switch (priv->trigger) {
 		case DFSM_AST_TRANSITION_METHOD_CALL:
@@ -216,8 +201,6 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 	DfsmAstTransitionPrivate *priv = DFSM_AST_TRANSITION (node)->priv;
 	guint i;
 	GDBusMethodInfo *method_info = NULL;
-
-	/* TODO: Check two state names exist */
 
 	switch (priv->trigger) {
 		case DFSM_AST_TRANSITION_METHOD_CALL: {
@@ -343,26 +326,23 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 
 /**
  * dfsm_ast_transition_new:
- * @from_state_name: name of the FSM state being transitioned out of
- * @to_state_name: name of the FSM state being transitioned into
  * @details: details of the transition trigger (such as a method or property name)
  * @precondition: array of #DfsmAstPrecondition<!-- -->s for the transition
  * @statements: array of #DfsmAstStatement<!-- -->s to execute with the transition
  * @error: (allow-none): a #GError, or %NULL
  *
- * Create a new #DfsmAstTransition representing a single transition from @from_state_name to @to_state_name.
+ * Create a new #DfsmAstTransition representing a single transition. The state pairs the transition can be applied to are stored in the #DfsmAstObject
+ * containing this transition, since the same #DfsmAstTransition could be applied to many different state pairs.
  *
  * Return value: (transfer full): a new AST node
  */
 DfsmAstTransition *
-dfsm_ast_transition_new (const gchar *from_state_name, const gchar *to_state_name, const DfsmParserTransitionDetails *details,
-                         GPtrArray/*<DfsmAstPrecondition>*/ *preconditions, GPtrArray/*<DfsmAstStatement>*/ *statements, GError **error)
+dfsm_ast_transition_new (const DfsmParserTransitionDetails *details, GPtrArray/*<DfsmAstPrecondition>*/ *preconditions,
+                         GPtrArray/*<DfsmAstStatement>*/ *statements, GError **error)
 {
 	DfsmAstTransition *transition;
 	DfsmAstTransitionPrivate *priv;
 
-	g_return_val_if_fail (from_state_name != NULL && *from_state_name != '\0', NULL);
-	g_return_val_if_fail (to_state_name != NULL && *to_state_name != '\0', NULL);
 	g_return_val_if_fail (details != NULL, NULL);
 	g_return_val_if_fail (preconditions != NULL, NULL);
 	g_return_val_if_fail (statements != NULL, NULL);
@@ -370,9 +350,6 @@ dfsm_ast_transition_new (const gchar *from_state_name, const gchar *to_state_nam
 
 	transition = g_object_new (DFSM_TYPE_AST_TRANSITION, NULL);
 	priv = transition->priv;
-
-	priv->from_state_name = g_strdup (from_state_name);
-	priv->to_state_name = g_strdup (to_state_name);
 
 	priv->trigger = details->transition_type;
 
@@ -462,7 +439,7 @@ dfsm_ast_transition_execute (DfsmAstTransition *self, DfsmEnvironment *environme
 
 	priv = self->priv;
 
-	g_debug ("Executing transition from state ‘%s’ to ‘%s’.", priv->from_state_name, priv->to_state_name);
+	g_debug ("Executing transition %p in environment %p.", self, environment);
 
 	for (i = 0; i < priv->statements->len; i++) {
 		DfsmAstStatement *statement;
@@ -486,38 +463,6 @@ dfsm_ast_transition_execute (DfsmAstTransition *self, DfsmEnvironment *environme
 	g_assert (return_value == NULL || g_variant_is_floating (return_value) == FALSE);
 
 	return return_value;
-}
-
-/**
- * dfsm_ast_transition_get_from_state_name:
- * @self: a #DfsmAstTransition
- *
- * TODO
- *
- * Return value: TODO
- */
-const gchar *
-dfsm_ast_transition_get_from_state_name (DfsmAstTransition *self)
-{
-	g_return_val_if_fail (DFSM_IS_AST_TRANSITION (self), NULL);
-
-	return self->priv->from_state_name;
-}
-
-/**
- * dfsm_ast_transition_get_to_state_name:
- * @self: a #DfsmAstTransition
- *
- * TODO
- *
- * Return value: TODO
- */
-const gchar *
-dfsm_ast_transition_get_to_state_name (DfsmAstTransition *self)
-{
-	g_return_val_if_fail (DFSM_IS_AST_TRANSITION (self), NULL);
-
-	return self->priv->to_state_name;
 }
 
 /**

@@ -25,6 +25,41 @@
 #include "dfsm-ast-transition.h"
 #include "dfsm-parser.h"
 
+DfsmAstObjectTransition *
+dfsm_ast_object_transition_new (DfsmMachineStateNumber from_state, DfsmMachineStateNumber to_state, DfsmAstTransition *transition)
+{
+	DfsmAstObjectTransition *object_transition = g_slice_new (DfsmAstObjectTransition);
+
+	object_transition->from_state = from_state;
+	object_transition->to_state = to_state;
+	object_transition->transition = g_object_ref (transition);
+	object_transition->ref_count = 1;
+
+	return object_transition;
+}
+
+DfsmAstObjectTransition *
+dfsm_ast_object_transition_ref (DfsmAstObjectTransition *object_transition)
+{
+	g_assert (object_transition != NULL);
+
+	g_atomic_int_inc (&object_transition->ref_count);
+
+	return object_transition;
+}
+
+void
+dfsm_ast_object_transition_unref (DfsmAstObjectTransition *object_transition)
+{
+	g_assert (object_transition != NULL);
+
+	if (g_atomic_int_dec_and_test (&object_transition->ref_count) == TRUE) {
+		g_object_unref (object_transition->transition);
+
+		g_slice_free (DfsmAstObjectTransition, object_transition);
+	}
+}
+
 static void dfsm_ast_object_dispose (GObject *object);
 static void dfsm_ast_object_finalize (GObject *object);
 static void dfsm_ast_object_sanity_check (DfsmAstNode *node);
@@ -37,11 +72,12 @@ struct _DfsmAstObjectPrivate {
 	GPtrArray *interface_names; /* array of strings */
 	DfsmEnvironment *environment; /* not populated until pre_check_and_register() */
 	GPtrArray *states; /* array of strings (indexed by DfsmAstStateNumber), not populated until pre_check_and_register() */
-	GPtrArray *transitions; /* array of DfsmAstTransitions */
+	GPtrArray *transitions; /* array of DfsmAstObjectTransitions (no index), not populated until pre_check_and_register() */
 
 	/* Temporary (only used until pre_check_and_register()) */
 	GPtrArray/*<GHashTable<string,DfsmAstDataStructure>>*/ *data_blocks;
 	GPtrArray/*<GPtrArray<string>>*/ *state_blocks;
+	GPtrArray/*<DfsmParserTransitionBlock>*/ *transition_blocks;
 };
 
 G_DEFINE_TYPE (DfsmAstObject, dfsm_ast_object, DFSM_TYPE_AST_NODE)
@@ -88,6 +124,11 @@ dfsm_ast_object_dispose (GObject *object)
 		priv->state_blocks = NULL;
 	}
 
+	if (priv->transition_blocks != NULL) {
+		g_ptr_array_unref (priv->transition_blocks);
+		priv->transition_blocks = NULL;
+	}
+
 	if (priv->transitions != NULL) {
 		g_ptr_array_unref (priv->transitions);
 		priv->transitions = NULL;
@@ -131,6 +172,7 @@ dfsm_ast_object_sanity_check (DfsmAstNode *node)
 	g_assert (priv->interface_names != NULL);
 	g_assert (DFSM_IS_ENVIRONMENT (priv->environment));
 	g_assert (priv->states != NULL);
+	g_assert (priv->transitions != NULL);
 
 	for (i = 0; i < priv->bus_names->len; i++) {
 		const gchar *bus_name;
@@ -155,11 +197,31 @@ dfsm_ast_object_sanity_check (DfsmAstNode *node)
 		g_assert (state_name != NULL);
 	}
 
-	for (i = 0; i < priv->transitions->len; i++) {
-		DfsmAstTransition *transition;
+	if (priv->transition_blocks != NULL) {
+		for (i = 0; i < priv->transition_blocks->len; i++) {
+			guint j;
+			DfsmParserTransitionBlock *transition_block = g_ptr_array_index (priv->transition_blocks, i);
 
-		transition = g_ptr_array_index (priv->transitions, i);
-		g_assert (transition != NULL);
+			g_assert (transition_block != NULL);
+			g_assert (DFSM_IS_AST_TRANSITION (transition_block->transition));
+			g_assert (transition_block->state_pairs != NULL);
+			g_assert (transition_block->state_pairs->len > 0);
+
+			for (j = 0; j < transition_block->state_pairs->len; j++) {
+				DfsmParserStatePair *state_pair = g_ptr_array_index (transition_block->state_pairs, j);
+				g_assert (state_pair->from_state_name != NULL);
+				g_assert (state_pair->to_state_name != NULL);
+			}
+		}
+	}
+
+	for (i = 0; i < priv->transitions->len; i++) {
+		DfsmAstObjectTransition *object_transition;
+
+		object_transition = g_ptr_array_index (priv->transitions, i);
+
+		g_assert (object_transition != NULL);
+		g_assert (DFSM_IS_AST_TRANSITION (object_transition->transition));
 	}
 }
 
@@ -170,10 +232,11 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 	guint i;
 	GPtrArray *states;
 	GDBusNodeInfo *node_info;
+	GHashTable/*<string, DfsmMachineStateNumber>*/ *state_numbers = NULL;
 
 	if (g_variant_is_object_path (priv->object_path) == FALSE) {
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus object path: %s", priv->object_path);
-		return;
+		goto done;
 	}
 
 	for (i = 0; i < priv->bus_names->len; i++) {
@@ -183,7 +246,7 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 
 		if (g_dbus_is_name (bus_name) == FALSE || g_dbus_is_unique_name (bus_name) == TRUE) {
 			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus well-known bus name: %s", bus_name);
-			return;
+			goto done;
 		}
 	}
 
@@ -198,7 +261,7 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 		/* Valid interface name? */
 		if (g_dbus_is_interface_name (interface_name) == FALSE) {
 			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus interface name: %s", interface_name);
-			return;
+			goto done;
 		}
 
 		/* Duplicates? */
@@ -206,14 +269,14 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 			if (strcmp (interface_name, g_ptr_array_index (priv->interface_names, f)) == 0) {
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Duplicate D-Bus interface name: %s",
 				             interface_name);
-				return;
+				goto done;
 			}
 		}
 
 		/* Defined in the node info? */
 		if (g_dbus_node_info_lookup_interface (node_info, interface_name) == NULL) {
 			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Unknown D-Bus interface name: %s", interface_name);
-			return;
+			goto done;
 		}
 	}
 
@@ -231,20 +294,20 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 			/* Valid variable name? */
 			if (dfsm_is_variable_name (key) == FALSE) {
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid variable name: %s", key);
-				return;
+				goto done;
 			}
 
 			/* Check for duplicates */
 			if (dfsm_environment_has_variable (priv->environment, DFSM_VARIABLE_SCOPE_OBJECT, key) == TRUE) {
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Duplicate variable name: %s", key);
-				return;
+				goto done;
 			}
 
 			/* Check the value expression. */
 			dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (value_data_structure), priv->environment, error);
 
 			if (*error != NULL) {
-				return;
+				goto done;
 			}
 		}
 	}
@@ -253,11 +316,16 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 	 * file (it just appears in a different position due to the way the parser's recursion is implemented). i.e. It's the main state. */
 	if (priv->state_blocks->len == 0 || ((GPtrArray*) g_ptr_array_index (priv->state_blocks, 0))->len == 0) {
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "A default state is required.");
-		return;
+		goto done;
 	}
+
+	/* While we're at it, create a temporary hash table which maps state names (strings) to their allocated state numbers. This is useful for
+	 * duplicate detection, and for quickly looking up the state numbers corresponding to the state names when we process transitions below. */
+	state_numbers = g_hash_table_new (g_str_hash, g_str_equal);
 
 	states = g_ptr_array_index (priv->state_blocks, 0);
 	g_ptr_array_add (priv->states, g_strdup ((gchar*) g_ptr_array_index (states, states->len - 1)));
+	g_hash_table_insert (state_numbers, g_ptr_array_index (states, states->len - 1), GUINT_TO_POINTER (0));
 
 	for (i = 0; i < priv->state_blocks->len; i++) {
 		guint f;
@@ -266,7 +334,6 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 
 		for (f = 0; f < states->len; f++) {
 			const gchar *state_name;
-			guint g;
 
 			/* Skip the main state. */
 			if (i == 0 && f == states->len - 1) {
@@ -278,34 +345,82 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 			/* Valid state name? */
 			if (dfsm_is_state_name (state_name) == FALSE) {
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid state name: %s", state_name);
-				return;
+				goto done;
 			}
 
 			/* Check for duplicates */
-			for (g = 0; g < priv->states->len; g++) {
-				if (strcmp (state_name, g_ptr_array_index (priv->states, g)) == 0) {
-					g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Duplicate state name: %s", state_name);
-					return;
-				}
+			if (g_hash_table_lookup_extended (state_numbers, state_name, NULL, NULL) == TRUE) {
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Duplicate state name: %s", state_name);
+				goto done;
 			}
 
 			g_ptr_array_add (priv->states, g_strdup (state_name));
+			g_hash_table_insert (state_numbers, (gpointer) state_name, GUINT_TO_POINTER (priv->states->len - 1));
 		}
 	}
 
 	g_ptr_array_unref (priv->state_blocks);
 	priv->state_blocks = NULL;
 
-	for (i = 0; i < priv->transitions->len; i++) {
-		DfsmAstTransition *transition;
+	for (i = 0; i < priv->transition_blocks->len; i++) {
+		DfsmParserTransitionBlock *transition_block;
+		guint j;
 
-		transition = g_ptr_array_index (priv->transitions, i);
+		transition_block = g_ptr_array_index (priv->transition_blocks, i);
 
-		dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (transition), environment, error);
+		/* Check the transition itself first. */
+		dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (transition_block->transition), environment, error);
 
 		if (*error != NULL) {
-			return;
+			goto done;
 		}
+
+		/* Register it against all its listed state pairs. */
+		for (j = 0; j < transition_block->state_pairs->len; j++) {
+			const DfsmParserStatePair *state_pair;
+			gpointer state_number_ptr;
+			DfsmMachineStateNumber from_state_number, to_state_number;
+			DfsmAstObjectTransition *object_transition;
+
+			state_pair = g_ptr_array_index (transition_block->state_pairs, j);
+
+			/* Validate the state names. */
+			if (dfsm_is_state_name (state_pair->from_state_name) == FALSE) {
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid ‘from’ state name: %s",
+				             state_pair->from_state_name);
+				goto done;
+			} else if (dfsm_is_state_name (state_pair->to_state_name) == FALSE) {
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid ‘to’ state name: %s",
+				             state_pair->to_state_name);
+				goto done;
+			}
+
+			/* Look up the allocated numbers of these state names. */
+			if (g_hash_table_lookup_extended (state_numbers, state_pair->from_state_name, NULL, &state_number_ptr) == FALSE) {
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Unknown ‘from’ state name: %s",
+				             state_pair->from_state_name);
+				goto done;
+			} else {
+				from_state_number = GPOINTER_TO_UINT (state_number_ptr);
+			}
+
+			if (g_hash_table_lookup_extended (state_numbers, state_pair->to_state_name, NULL, &state_number_ptr) == FALSE) {
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Unknown ‘to’ state name: %s",
+				             state_pair->to_state_name);
+				goto done;
+			} else {
+				to_state_number = GPOINTER_TO_UINT (state_number_ptr);
+			}
+
+			/* Register the transition. */
+			object_transition = dfsm_ast_object_transition_new (from_state_number, to_state_number, transition_block->transition);
+			g_ptr_array_add (priv->transitions, object_transition);
+		}
+	}
+
+done:
+	if (state_numbers != NULL) {
+		g_hash_table_unref (state_numbers);
 	}
 }
 
@@ -417,11 +532,11 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
 
 	/* Check each transition. */
 	for (i = 0; i < priv->transitions->len; i++) {
-		DfsmAstTransition *transition;
+		DfsmAstObjectTransition *object_transition;
 
-		transition = g_ptr_array_index (priv->transitions, i);
+		object_transition = g_ptr_array_index (priv->transitions, i);
 
-		dfsm_ast_node_check (DFSM_AST_NODE (transition), environment, error);
+		dfsm_ast_node_check (DFSM_AST_NODE (object_transition->transition), environment, error);
 
 		if (*error != NULL) {
 			return;
@@ -437,7 +552,7 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
  * @interface_names: an array of strings containing the names of the D-Bus interfaces implemented by the object
  * @data_blocks: an array of #GHashTable<!-- -->s containing the object-level variables in the object
  * @state_blocks: an array of #GPtrArray<!-- -->s of strings containing the names of the possible states of the object
- * @transition_blocks: an array of #DfsmAstTransition<!-- -->s containing the object's possible state transitions
+ * @transition_blocks: an array of #DfsmParserTransitionBlock<!-- -->s containing the object's possible state transitions
  * @error: (allow-none): a #GError, or %NULL
  *
  * Create a new #DfsmAstObject AST node.
@@ -447,7 +562,7 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
 DfsmAstObject *
 dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GPtrArray/*<string>*/ *bus_names, GPtrArray/*<string>*/ *interface_names,
                      GPtrArray/*<GHashTable<string,DfsmAstDataStructure>>*/ *data_blocks, GPtrArray/*<GPtrArray<string>>*/ *state_blocks,
-                     GPtrArray/*<DfsmAstTransition>*/ *transition_blocks, GError **error)
+                     GPtrArray/*<DfsmParserTransitionBlock>*/ *transition_blocks, GError **error)
 {
 	DfsmAstObject *object;
 	DfsmAstObjectPrivate *priv;
@@ -469,10 +584,11 @@ dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GP
 	priv->interface_names = g_ptr_array_ref (interface_names);
 	priv->environment = _dfsm_environment_new (dbus_node_info);
 	priv->states = g_ptr_array_new_with_free_func (g_free);
-	priv->transitions = g_ptr_array_ref (transition_blocks);
+	priv->transitions = g_ptr_array_new_with_free_func ((GDestroyNotify) dfsm_ast_object_transition_unref);
 
 	priv->data_blocks = g_ptr_array_ref (data_blocks);
 	priv->state_blocks = g_ptr_array_ref (state_blocks);
+	priv->transition_blocks = g_ptr_array_ref (transition_blocks);
 
 	return object;
 
@@ -519,7 +635,7 @@ dfsm_ast_object_get_state_names (DfsmAstObject *self)
  *
  * Return value: TODO
  */
-GPtrArray/*<DfsmAstTransition>*/ *
+GPtrArray/*<GPtrArray<DfsmAstObjectTransitionPair>>*/ *
 dfsm_ast_object_get_transitions (DfsmAstObject *self)
 {
 	g_return_val_if_fail (DFSM_IS_AST_OBJECT (self), NULL);

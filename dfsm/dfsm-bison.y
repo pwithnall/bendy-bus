@@ -55,6 +55,7 @@
 	DfsmAstVariable *ast_variable;
 	DfsmParserBlockList *block_list;
 	DfsmParserTransitionDetails *transition_details;
+	DfsmParserTransitionBlock *transition_block;
 }
 
 %destructor { free ($$); } <str>
@@ -65,6 +66,7 @@
 	<ast_precondition> <ast_statement> <ast_variable>
 %destructor { dfsm_parser_block_list_free ($$); } <block_list>
 %destructor { dfsm_parser_transition_details_free ($$); } <transition_details>
+%destructor { dfsm_parser_transition_block_free ($$); } <transition_block>
 
 %token <str> DBUS_OBJECT_PATH
 %token <str> DBUS_NAME
@@ -137,7 +139,8 @@
 %type <ptr_array> StatesBlock
 %type <ptr_array> StateList
 %type <str> StateName
-%type <ast_transition> TransitionBlock
+%type <transition_block> TransitionBlock
+%type <ptr_array> StatePairList
 %type <str> DBusMethodName
 %type <str> DBusPropertyName
 %type <transition_details> TransitionType
@@ -266,16 +269,26 @@ StateList: /* empty */								{ $$ = g_ptr_array_new_with_free_func (g_free); }
 StateName: IDENTIFIER								{ $$ = $1; /* steal ownership from flex */ }
 ;
 
-/* Returns a new DfsmAstTransition. */
+/* Returns a new DfsmParserTransitionBlock. */
 TransitionBlock:
-	TRANSITION FROM StateName TO StateName ON TransitionType L_BRACE
+	TRANSITION StatePairList ON TransitionType L_BRACE
 		PreconditionList
 		StatementList
-	R_BRACE									{ $$ = dfsm_ast_transition_new ($3, $5, $7, $9, $10, ERROR);
-										  ABORT_ON_ERROR; }
-|	TRANSITION FROM StateName TO StateName ON TransitionType L_BRACE
+	R_BRACE							{ $$ = dfsm_parser_transition_block_new (dfsm_ast_transition_new ($4, $6, $7, ERROR),
+								                                         $2);
+								  ABORT_ON_ERROR; }
+|	TRANSITION StatePairList ON TransitionType L_BRACE
 		error
-	R_BRACE									{ $$ = NULL; YYABORT; }
+	R_BRACE							{ $$ = NULL; YYABORT; }
+;
+
+/* Returns a GPtrArray of DfsmParserStatePairs. */
+StatePairList: FROM StateName TO StateName				{
+										$$ = g_ptr_array_new_with_free_func (
+											(GDestroyNotify) dfsm_parser_state_pair_free);
+										g_ptr_array_add ($$, dfsm_parser_state_pair_new ($2, $4));
+									}
+             | StatePairList ',' FROM StateName TO StateName		{ $$ = $1; g_ptr_array_add ($$, dfsm_parser_state_pair_new ($4, $6)); }
 ;
 
 /* Returns a new string containing the method name. */

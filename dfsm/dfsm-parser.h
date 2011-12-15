@@ -61,7 +61,7 @@ G_GNUC_INTERNAL DfsmMachine *_dfsm_machine_new (DfsmEnvironment *environment, GP
 typedef struct {
 	GPtrArray *data_blocks; /* array of GHashTables */
 	GPtrArray *state_blocks; /* array of GPtrArrays of states */
-	GPtrArray *transitions; /* array of DfsmAstTransitions */
+	GPtrArray *transitions; /* array of DfsmParserTransitionBlocks */
 } DfsmParserBlockList;
 
 DfsmParserBlockList *dfsm_parser_block_list_new (void) DFSM_CONSTRUCTOR;
@@ -80,6 +80,25 @@ typedef struct {
 
 DfsmParserTransitionDetails *dfsm_parser_transition_details_new (DfsmParserTransitionType transition_type, const gchar *str) DFSM_CONSTRUCTOR;
 void dfsm_parser_transition_details_free (DfsmParserTransitionDetails *details);
+
+#include "dfsm-ast-transition.h"
+
+typedef struct {
+	DfsmAstTransition *transition;
+	GPtrArray/*<DfsmParserStatePair>*/ *state_pairs;
+} DfsmParserTransitionBlock;
+
+DfsmParserTransitionBlock *dfsm_parser_transition_block_new (DfsmAstTransition *transition,
+                                                             GPtrArray/*<DfsmParserStatePair>*/ *state_pairs) DFSM_CONSTRUCTOR;
+void dfsm_parser_transition_block_free (DfsmParserTransitionBlock *block);
+
+typedef struct {
+	gchar *from_state_name;
+	gchar *to_state_name;
+} DfsmParserStatePair;
+
+DfsmParserStatePair *dfsm_parser_state_pair_new (const gchar *from_state_name, const gchar *to_state_name) DFSM_CONSTRUCTOR;
+void dfsm_parser_state_pair_free (DfsmParserStatePair *state_pair);
 
 gboolean dfsm_is_variable_name (const gchar *variable_name) G_GNUC_PURE;
 gboolean dfsm_is_state_name (const gchar *state_name) G_GNUC_PURE;

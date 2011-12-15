@@ -24,8 +24,25 @@
 #include <glib-object.h>
 
 #include <dfsm/dfsm-ast-node.h>
+#include <dfsm/dfsm-ast-transition.h>
 
 G_BEGIN_DECLS
+
+typedef guint DfsmAstObjectStateNumber; /* same as DfsmAstObjectStateNumber */
+
+typedef struct {
+	DfsmAstObjectStateNumber from_state;
+	DfsmAstObjectStateNumber to_state;
+	DfsmAstTransition *transition;
+
+	/*< private >*/
+	gint ref_count;
+} DfsmAstObjectTransition;
+
+DfsmAstObjectTransition *dfsm_ast_object_transition_new (DfsmAstObjectStateNumber from_state, DfsmAstObjectStateNumber to_state,
+                                                         DfsmAstTransition *transition) DFSM_CONSTRUCTOR;
+DfsmAstObjectTransition *dfsm_ast_object_transition_ref (DfsmAstObjectTransition *object_transition);
+void dfsm_ast_object_transition_unref (DfsmAstObjectTransition *object_transition);
 
 #define DFSM_TYPE_AST_OBJECT		(dfsm_ast_object_get_type ())
 #define DFSM_AST_OBJECT(o)		(G_TYPE_CHECK_INSTANCE_CAST ((o), DFSM_TYPE_AST_OBJECT, DfsmAstObject))
@@ -50,12 +67,12 @@ GType dfsm_ast_object_get_type (void) G_GNUC_CONST;
 DfsmAstObject *dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GPtrArray/*<string>*/ *bus_names,
                                     GPtrArray/*<string>*/ *interface_names,
                                     GPtrArray/*<GHashTable>*/ *data_blocks, GPtrArray/*<GPtrArray>*/ *state_blocks,
-                                    GPtrArray/*<DfsmAstTransition>*/ *transition_blocks, GError **error) DFSM_CONSTRUCTOR;
+                                    GPtrArray/*<DfsmParserTransitionBlock>*/ *transition_blocks, GError **error) DFSM_CONSTRUCTOR;
 
 /* TODO: Eliminate these */
 DfsmEnvironment *dfsm_ast_object_get_environment (DfsmAstObject *self) G_GNUC_PURE;
 GPtrArray/*<string>*/ *dfsm_ast_object_get_state_names (DfsmAstObject *self) G_GNUC_PURE;
-GPtrArray/*<DfsmAstTransition>*/ *dfsm_ast_object_get_transitions (DfsmAstObject *self) G_GNUC_PURE;
+GPtrArray/*<DfsmAstObjectTransition>*/ *dfsm_ast_object_get_transitions (DfsmAstObject *self) G_GNUC_PURE;
 const gchar *dfsm_ast_object_get_object_path (DfsmAstObject *self) G_GNUC_PURE;
 GPtrArray/*<string>*/ *dfsm_ast_object_get_well_known_bus_names (DfsmAstObject *self) G_GNUC_PURE;
 GPtrArray/*<string>*/ *dfsm_ast_object_get_interface_names (DfsmAstObject *self) G_GNUC_PURE;

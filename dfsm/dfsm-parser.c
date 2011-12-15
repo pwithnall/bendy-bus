@@ -35,7 +35,7 @@ dfsm_parser_block_list_new (void)
 
 	block_list->data_blocks = g_ptr_array_new_with_free_func ((GDestroyNotify) g_hash_table_unref);
 	block_list->state_blocks = g_ptr_array_new_with_free_func ((GDestroyNotify) g_ptr_array_unref);
-	block_list->transitions = g_ptr_array_new_with_free_func (g_object_unref);
+	block_list->transitions = g_ptr_array_new_with_free_func ((GDestroyNotify) dfsm_parser_transition_block_free);
 
 	return block_list;
 }
@@ -70,6 +70,55 @@ dfsm_parser_transition_details_free (DfsmParserTransitionDetails *details)
 		g_free (details->str);
 
 		g_slice_free (DfsmParserTransitionDetails, details);
+	}
+}
+
+DfsmParserTransitionBlock *
+dfsm_parser_transition_block_new (DfsmAstTransition *transition, GPtrArray/*<DfsmParserStatePair>*/ *state_pairs)
+{
+	DfsmParserTransitionBlock *block = g_slice_new (DfsmParserTransitionBlock);
+
+	block->transition = g_object_ref (transition);
+	block->state_pairs = g_ptr_array_ref (state_pairs);
+
+	return block;
+}
+
+void
+dfsm_parser_transition_block_free (DfsmParserTransitionBlock *block)
+{
+	if (block != NULL) {
+		g_ptr_array_unref (block->state_pairs);
+		g_object_unref (block->transition);
+
+		g_slice_free (DfsmParserTransitionBlock, block);
+	}
+}
+
+DfsmParserStatePair *
+dfsm_parser_state_pair_new (const gchar *from_state_name, const gchar *to_state_name)
+{
+	DfsmParserStatePair *state_pair = g_slice_new (DfsmParserStatePair);
+
+	/* Allow null transitions. */
+	if (from_state_name == NULL) {
+		from_state_name = to_state_name;
+	}
+
+	state_pair->from_state_name = g_strdup (from_state_name);
+	state_pair->to_state_name = g_strdup (to_state_name);
+
+	return state_pair;
+}
+
+void
+dfsm_parser_state_pair_free (DfsmParserStatePair *state_pair)
+{
+	if (state_pair != NULL) {
+		g_free (state_pair->from_state_name);
+		g_free (state_pair->to_state_name);
+
+		g_slice_free (DfsmParserStatePair, state_pair);
 	}
 }
 
