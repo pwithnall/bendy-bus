@@ -520,7 +520,7 @@ _keys_calculate_type (const GVariantType *parameters_type, GError **error)
 static GVariantType *
 _pair_keys_calculate_type (const GVariantType *parameters_type, GError **error)
 {
-	const GVariantType *parameters_supertype = (const GVariantType*) "(a?a*)";
+	const GVariantType *parameters_supertype = (const GVariantType*) "(a?*)";
 	const GVariantType *first_type;
 	GVariantType *pair_type, *entry_type;
 
@@ -530,9 +530,10 @@ _pair_keys_calculate_type (const GVariantType *parameters_type, GError **error)
 		return NULL;
 	}
 
-	/* For (a?a*), return a{?*}. i.e. Return a dictionary mapping the elements of the first input array to the elements of the second. */
+	/* For (a?*), return a{?*}. i.e. Return a dictionary mapping the elements of the first input array to the second element (which will
+	 * typically be fuzzy and evaluated once per key). */
 	first_type = g_variant_type_first (parameters_type);
-	entry_type = g_variant_type_new_dict_entry (g_variant_type_element (first_type), g_variant_type_element (g_variant_type_next (first_type)));
+	entry_type = g_variant_type_new_dict_entry (g_variant_type_element (first_type), g_variant_type_next (first_type));
 	pair_type = g_variant_type_new_array (entry_type);
 	g_variant_type_free (entry_type);
 
