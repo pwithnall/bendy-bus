@@ -167,6 +167,7 @@ TYPE_ANNOTATION				@[\(\)\{\}ybnqiuxtdsogarvehm\*\?@&^]+[ \t\n\r\v\f]+
 "transition" { return TRANSITION; }
 "from" { return FROM; }
 "to" { return TO; }
+"inside" { return INSIDE; }
 "on" { return ON; }
 "method" { return METHOD; }
 "property" { return PROPERTY; }

@@ -56,6 +56,7 @@
 	DfsmParserBlockList *block_list;
 	DfsmParserTransitionDetails *transition_details;
 	DfsmParserTransitionBlock *transition_block;
+	DfsmParserStatePair *state_pair;
 }
 
 %destructor { free ($$); } <str>
@@ -67,6 +68,7 @@
 %destructor { dfsm_parser_block_list_free ($$); } <block_list>
 %destructor { dfsm_parser_transition_details_free ($$); } <transition_details>
 %destructor { dfsm_parser_transition_block_free ($$); } <transition_block>
+%destructor { dfsm_parser_state_pair_free ($$); } <state_pair>
 
 %token <str> DBUS_OBJECT_PATH
 %token <str> DBUS_NAME
@@ -97,6 +99,7 @@
 %token FROM
 %token PRECONDITION
 %token TO
+%token INSIDE
 %token STATES
 %token TRANSITION
 %token METHOD
@@ -141,6 +144,7 @@
 %type <str> StateName
 %type <transition_block> TransitionBlock
 %type <ptr_array> StatePairList
+%type <state_pair> StatePair
 %type <str> DBusMethodName
 %type <str> DBusPropertyName
 %type <transition_details> TransitionType
@@ -283,12 +287,17 @@ TransitionBlock:
 ;
 
 /* Returns a GPtrArray of DfsmParserStatePairs. */
-StatePairList: FROM StateName TO StateName				{
-										$$ = g_ptr_array_new_with_free_func (
-											(GDestroyNotify) dfsm_parser_state_pair_free);
-										g_ptr_array_add ($$, dfsm_parser_state_pair_new ($2, $4));
-									}
-             | StatePairList ',' FROM StateName TO StateName		{ $$ = $1; g_ptr_array_add ($$, dfsm_parser_state_pair_new ($4, $6)); }
+StatePairList: StatePair							{
+											$$ = g_ptr_array_new_with_free_func (
+												(GDestroyNotify) dfsm_parser_state_pair_free);
+											g_ptr_array_add ($$, $1);
+										}
+             | StatePairList ',' StatePair					{ $$ = $1; g_ptr_array_add ($$, $3); }
+;
+
+/* Returns a new DfsmParserStatePair. */
+StatePair: FROM StateName TO StateName						{ $$ = dfsm_parser_state_pair_new ($2, $4); }
+         | INSIDE StateName							{ $$ = dfsm_parser_state_pair_new (NULL, $2); }
 ;
 
 /* Returns a new string containing the method name. */
