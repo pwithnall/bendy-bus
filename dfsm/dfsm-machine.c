@@ -692,11 +692,17 @@ dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const 
 	if (method_info->in_args != NULL) {
 		for (i = 0; method_info->in_args[i] != NULL && i < g_variant_n_children (parameters); i++) {
 			GVariant *parameter;
+			GVariantType *parameter_type;
 
 			/* Add the (i)th tuple child of the input parameters to the environment with the name given by the (i)th in argument in the
 			 * method info. */
 			parameter = g_variant_get_child_value (parameters, i);
+			parameter_type = g_variant_type_new (method_info->in_args[i]->signature);
+
+			dfsm_environment_set_variable_type (priv->environment, DFSM_VARIABLE_SCOPE_LOCAL, method_info->in_args[i]->name, parameter_type);
 			dfsm_environment_set_variable_value (priv->environment, DFSM_VARIABLE_SCOPE_LOCAL, method_info->in_args[i]->name, parameter);
+
+			g_variant_type_free (parameter_type);
 			g_variant_unref (parameter);
 		}
 	}
