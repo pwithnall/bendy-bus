@@ -44,6 +44,22 @@
 		yylloc->first_column = yycolumn; \
 		yylloc->last_column = yycolumn + yyleng - 1; \
 		yycolumn += yyleng;
+
+	static unsigned int tab_width = 8; /* default */
+
+	#define YY_USER_INIT \
+		{ \
+			/* We parse the TABSIZE environment variable, as used by ls(1), to get the user's tab size preference. */ \
+			char *tabsize = getenv ("TABSIZE"); \
+			if (tabsize != NULL) { \
+				char *tabsize_end = NULL; \
+				unsigned long int new_tab_width = strtoul (tabsize, &tabsize_end, 10); \
+				if (*tabsize != '\0' && tabsize_end != NULL && *tabsize_end == '\0' && new_tab_width <= UINT_MAX) { \
+					/* Valid. */ \
+					tab_width = new_tab_width; \
+				} \
+			} \
+		}
 %}
 
 %x comment
@@ -238,7 +254,8 @@ TYPE_ANNOTATION				@[\(\)\{\}ybnqiuxtdsogarvehm\*\?@&^]+[ \t\n\r\v\f]+
 {UINT64} { yylval->unsigned_integer = g_ascii_strtoull (yytext, NULL, 10); return UINT64; }
 {DOUBLE} { yylval->flt = g_ascii_strtod (yytext, NULL); return DOUBLE; }
 
-[ \t\n\r\v\f] { /* Ignore whitespace */ }
+[\t] { /* Ignore tabs, but ensure they change the source code location appropriately. */ yycolumn += tab_width - 1 /* will be counted once later */; }
+[ \n\r\v\f] { /* Ignore whitespace */ }
 
 . { return (int) yytext[0]; } /* Unmatched characters */
 
