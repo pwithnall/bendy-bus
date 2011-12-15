@@ -218,6 +218,41 @@ GITIGNOREFILES += \
 	dbus-simulator/.libs/ \
 	$(NULL)
 
+# dbus-simulator-lint
+bin_PROGRAMS += dbus-simulator-lint/dbus-simulator-lint
+
+dbus_simulator_lint_dbus_simulator_lint_SOURCES = \
+	dbus-simulator-lint/main.c \
+	$(NULL)
+
+dbus_simulator_lint_dbus_simulator_lint_CPPFLAGS = \
+	-I$(top_srcdir) \
+	-DPACKAGE_LOCALE_DIR=\""$(datadir)/locale"\" \
+	-DG_LOG_DOMAIN=\"dbus-simulator-lint\" \
+	$(DISABLE_DEPRECATED) \
+	$(AM_CPPFLAGS) \
+	$(NULL)
+
+dbus_simulator_lint_dbus_simulator_lint_CFLAGS = \
+	$(WARN_CFLAGS) \
+	$(GLIB_CFLAGS) \
+	$(GIO_CFLAGS) \
+	$(AM_CFLAGS) \
+	$(NULL)
+
+dbus_simulator_lint_dbus_simulator_lint_LDADD = \
+	$(top_builddir)/dfsm/libdfsm.la \
+	$(GLIB_LIBS) \
+	$(GIO_LIBS) \
+	$(AM_LDADD) \
+	$(NULL)
+
+# git.mk can't handle non-recursive automake so well
+GITIGNOREFILES += \
+	dbus-simulator-lint/.dirstamp \
+	dbus-simulator-lint/.libs/ \
+	$(NULL)
+
 # Marshalling
 dbus_simulator_marshal_sources = \
 	dbus-simulator/marshal.c \
