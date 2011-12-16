@@ -17,6 +17,8 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <limits.h>
+#include <string.h>
 #include <glib.h>
 
 #include "dfsm-ast-data-structure.h"
@@ -753,7 +755,7 @@ dfsm_ast_data_structure_new (DfsmAstDataStructureType data_structure_type, gpoin
 	}
 
 	priv->data_structure_type = data_structure_type;
-	priv->weight = -1.0;
+	priv->weight = 0.0;
 
 	return data_structure;
 }
@@ -761,17 +763,78 @@ dfsm_ast_data_structure_new (DfsmAstDataStructureType data_structure_type, gpoin
 /**
  * dfsm_ast_data_structure_set_weight:
  * @self: a #DfsmAstDataStructure
- * @weight: weight of the structure for fuzzing, or %NAN
+ * @weight: weight of the structure for fuzzing
  *
- * Set the weight of the data structure. The @weight determines how “important” the datastructure is for fuzzing. %NAN indicates no preference as to
- * the structure's weight, and negative values mean the structure shouldn't be fuzzed.
+ * Set the weight of the data structure. The @weight determines how “important” the data structure is for fuzzing. <code class="literal">1.0</code>
+ * indicates no preference as to the structure's weight, more positive values mean more importance, and negative or zero values mean the structure
+ * shouldn't be fuzzed at all.
  */
 void
 dfsm_ast_data_structure_set_weight (DfsmAstDataStructure *self, gdouble weight)
 {
 	g_return_if_fail (DFSM_IS_AST_DATA_STRUCTURE (self));
 
+	/* Normalise the weight. */
+	if (weight < 0.0) {
+		weight = 0.0;
+	}
+
+	/* Some data structure types don't support fuzzing. */
+	if (weight > 0.0) {
+		switch (self->priv->data_structure_type) {
+			case DFSM_AST_DATA_BYTE:
+			case DFSM_AST_DATA_BOOLEAN:
+			case DFSM_AST_DATA_INT16:
+			case DFSM_AST_DATA_UINT16:
+			case DFSM_AST_DATA_INT32:
+			case DFSM_AST_DATA_UINT32:
+			case DFSM_AST_DATA_INT64:
+			case DFSM_AST_DATA_UINT64:
+			case DFSM_AST_DATA_DOUBLE:
+			case DFSM_AST_DATA_STRING:
+			case DFSM_AST_DATA_OBJECT_PATH:
+			case DFSM_AST_DATA_SIGNATURE:
+			case DFSM_AST_DATA_ARRAY:
+			case DFSM_AST_DATA_DICT:
+				/* No problems with fuzzing these. */
+				break;
+			case DFSM_AST_DATA_STRUCT:
+				g_warning ("Can't fuzz structures. Ignoring the indication to fuzz %p.", self);
+				return;
+			case DFSM_AST_DATA_VARIANT:
+				g_warning ("Can't fuzz variants. Ignoring the indication to fuzz %p.", self);
+				return;
+			case DFSM_AST_DATA_UNIX_FD:
+				g_warning ("Can't fuzz Unix FDs. Ignoring the indication to fuzz %p.", self);
+				return;
+			case DFSM_AST_DATA_REGEXP:
+				g_warning ("Can't fuzz regular expressions. Ignoring the indication to fuzz %p.", self);
+				return;
+			case DFSM_AST_DATA_VARIABLE:
+				g_warning ("Can't fuzz variables. Ignoring the indication to fuzz %p.", self);
+				return;
+			default:
+				g_assert_not_reached ();
+		}
+	}
+
 	self->priv->weight = weight;
+}
+
+/**
+ * dfsm_ast_data_structure_get_weight:
+ * @self: a #DfsmAstDataStructure
+ *
+ * Get the fuzzing weight of this structure. For more information, see dfsm_ast_data_structure_set_weight().
+ *
+ * Return value: fuzzing weight of the data structure
+ */
+gdouble
+dfsm_ast_data_structure_get_weight (DfsmAstDataStructure *self)
+{
+	g_return_val_if_fail (DFSM_IS_AST_DATA_STRUCTURE (self), 0.0);
+
+	return self->priv->weight;
 }
 
 void
@@ -810,6 +873,617 @@ dfsm_ast_data_structure_calculate_type (DfsmAstDataStructure *self, DfsmEnvironm
 	return retval;
 }
 
+static gboolean
+should_be_fuzzed (DfsmAstDataStructure *self)
+{
+	return (self->priv->weight > 0.0) ? TRUE : FALSE;
+}
+
+static gint64
+fuzz_signed_int (gint64 default_value, gint64 min_value, gint64 max_value)
+{
+	guint32 distribution;
+
+	g_assert (min_value <= default_value && default_value <= max_value);
+
+	/* We use a non-uniform distribution for this:
+	 *  • With probability 0.3 we get a number in the range [-5, 5].
+	 *  • With probability 0.3 we keep our default value.
+	 *  • With probability 0.4 we take a random integer in the given range.
+	 */
+
+	distribution = g_random_int ();
+
+	if (distribution <= G_MAXUINT32 * 0.3) {
+		/* Number in the range [-5, 5]. */
+		return g_random_int_range (-5, 6);
+	} else if (distribution <= G_MAXUINT32 * 0.6) {
+		/* Default value. */
+		return default_value;
+	} else {
+		/* Random int in the given range. If the range is large, we'll have to combine a g_random_int() call with a coin toss to determine
+		 * the sign, since g_random_int() only returns 32-bit integers. */
+		if (min_value >= G_MININT32 && max_value <= G_MAXINT32) {
+			return g_random_int_range (min_value, max_value);
+		} else {
+			g_assert (min_value == G_MININT64 && max_value == G_MAXINT64);
+
+			if (g_random_boolean () == TRUE) {
+				return g_random_int ();
+			} else {
+				return (-1) - g_random_int (); /* shift it down by 1 so we don't cover 0 twice */
+			}
+		}
+	}
+}
+
+static guint64
+fuzz_unsigned_int (guint64 default_value, guint64 min_value, guint64 max_value)
+{
+	guint32 distribution;
+
+	g_assert (min_value <= default_value && default_value <= max_value);
+
+	/* We use a non-uniform distribution for this:
+	 *  • With probability 0.3 we get a number in the range [0, 10].
+	 *  • With probability 0.3 we keep our default value.
+	 *  • With probability 0.4 we take a random integer in the given range.
+	 */
+
+	distribution = g_random_int ();
+
+	if (distribution <= G_MAXUINT32 * 0.3) {
+		/* Number in the range [0, 10]. */
+		return g_random_int_range (0, 11);
+	} else if (distribution <= G_MAXUINT32 * 0.6) {
+		/* Default value. */
+		return default_value;
+	} else {
+		/* Random int in the given range. If the range is large, we'll have to combine two g_random_int() calls to get a 64-bit integer,
+		 * since g_random_int() only returns 32-bit integers. */
+		if (/*min_value >= 0 && */ max_value <= G_MAXUINT32) {
+			g_assert (min_value == 0 && max_value == G_MAXUINT32);
+
+			return g_random_int ();
+		} else {
+			g_assert (min_value == 0 && max_value == G_MAXUINT64);
+
+			return (((guint64) g_random_int () << 32) | (guint64) g_random_int ());
+		}
+	}
+}
+
+static void
+find_random_block_with_separator (const gchar *input, gsize input_length /* bytes */, const gchar separator, const gchar **block_start,
+                                  const gchar **block_end)
+{
+	guint num_separators = 0;
+	gint start_separator, end_separator;
+	const gchar *i;
+
+	g_assert (input != NULL);
+
+	/* Count the number of occurrences of the separator in the input string. */
+	for (i = input; ((gsize) (i - input)) < input_length; i++) {
+		if (*i == separator) {
+			num_separators++;
+		}
+	}
+
+	g_assert (num_separators > 0);
+
+	/* Randomly choose two separator instances to be the start and end of the block. We also consider the start and end of the string as
+	 * separators: this allows us to handle the situation of a single separator in the string. */
+	start_separator = g_random_int_range (0, num_separators + 1);
+	end_separator = (num_separators > 0) ? g_random_int_range (0, num_separators) : 0; /* sampling without replacement */
+
+	if (start_separator > end_separator) {
+		gint temp = start_separator;
+		start_separator = end_separator;
+		end_separator = temp;
+	}
+
+	/* Re-adjust the end separator so that both separators use the same numbering scheme, and are guaranteed to be different. */
+	if (end_separator >= start_separator) {
+		end_separator++;
+	}
+
+	/* Assign the start separator. start_separator == 0 means the start of the string. start_separator == num_separators means the end of the
+	 * string. */
+	for (i = input; start_separator >= 0 && ((gsize) (i - input)) < input_length; i++) {
+		if (*i == separator) {
+			start_separator--;
+		}
+	}
+
+	*block_start = i;
+
+	/* Assign the end separator. Same as above. */
+	for (i = input; end_separator >= 0 && ((gsize) (i - input)) < input_length; i++) {
+		if (*i == separator) {
+			end_separator--;
+		}
+	}
+
+	*block_end = i;
+}
+
+static gsize
+find_random_block (const gchar *input, gsize input_length /* bytes */, const gchar **block_start_out, const gchar **block_end_out)
+{
+	gboolean has_slash = FALSE, has_dot = FALSE, has_colon = FALSE, has_comma = FALSE;
+	guint num_characters_found = 0, distribution;
+	const gchar *i, *block_start, *block_end;
+
+	g_assert (input != NULL);
+
+	/* Bail quickly if the input is empty. */
+	if (*input == '\0') {
+		block_start = input;
+		block_end = input;
+
+		goto done;
+	}
+
+	/* We use a uniform distribution over all separators _which exist_. We consider these four characters to be common separators for blocks of
+	 * text, which is true in the D-Bus world. Dots are used in interface names and slashes are used in object paths. Commas and colons are not
+	 * specifically used in D-Bus, but are commonly used elsewhere in software. */
+	for (i = input; num_characters_found < 4 && ((gsize) (i - input)) < input_length; i++) {
+		if (*i == '/' && has_slash == FALSE) {
+			has_slash = TRUE;
+			num_characters_found++;
+		} else if (*i == '.' && has_dot == FALSE) {
+			has_dot = TRUE;
+			num_characters_found++;
+		} else if (*i == ':' && has_colon == FALSE) {
+			has_colon = TRUE;
+			num_characters_found++;
+		} else if (*i == ',' && has_comma == FALSE) {
+			has_comma = TRUE;
+			num_characters_found++;
+		}
+	}
+
+	if (num_characters_found == 0) {
+		guint32 start_offset;
+		glong input_length_unicode = g_utf8_strlen (input, input_length);
+
+		g_assert (input_length_unicode > 0);
+
+		/* Give up on interesting separators and just choose a block of characters at random. */
+		start_offset = g_random_int_range (0, input_length_unicode);
+		block_start = g_utf8_offset_to_pointer (input, start_offset);
+		block_end = g_utf8_offset_to_pointer (block_start, g_random_int_range (0, input_length_unicode - start_offset + 1));
+
+		goto done;
+	}
+
+	/* Since we know that there's at least one instance of at least one of the four separator characters in the input, randomly choose a separator
+	 * character and find a block delimited by it. */
+	distribution = g_random_int ();
+
+	if (distribution < G_MAXUINT32 / num_characters_found) {
+		// Could be any of the characters.
+		if (has_slash == TRUE) {
+			find_random_block_with_separator (input, input_length, '/', &block_start, &block_end);
+		} else if (has_dot == TRUE) {
+			find_random_block_with_separator (input, input_length, '.', &block_start, &block_end);
+		} else if (has_colon == TRUE) {
+			find_random_block_with_separator (input, input_length, ':', &block_start, &block_end);
+		} else {
+			find_random_block_with_separator (input, input_length, ',', &block_start, &block_end);
+		}
+	} else if (distribution < 2 * G_MAXUINT32 / num_characters_found) {
+		// Can't be the first character.
+		if (has_dot == TRUE) {
+			find_random_block_with_separator (input, input_length, '.', &block_start, &block_end);
+		} else if (has_colon == TRUE) {
+			find_random_block_with_separator (input, input_length, ':', &block_start, &block_end);
+		} else {
+			find_random_block_with_separator (input, input_length, ',', &block_start, &block_end);
+		}
+	} else if (distribution < 3 * G_MAXUINT32 / num_characters_found) {
+		// Can't be the second character.
+		if (has_colon == TRUE) {
+			find_random_block_with_separator (input, input_length, ':', &block_start, &block_end);
+		} else {
+			find_random_block_with_separator (input, input_length, ',', &block_start, &block_end);
+		}
+	} else {
+		// Must be a comma.
+		find_random_block_with_separator (input, input_length, ',', &block_start, &block_end);
+	}
+
+done:
+	g_assert (block_start <= block_end);
+	g_assert (block_end <= input + input_length);
+	g_assert ((gint32) g_utf8_get_char_validated (block_start, -1) >= 0);
+	g_assert ((gint32) g_utf8_get_char_validated (block_end, -1) >= 0);
+
+	*block_start_out = block_start;
+	*block_end_out = block_end;
+
+	return (block_end - block_start);
+}
+
+static void
+generate_whitespace (gchar *buffer, gsize whitespace_length)
+{
+	const gchar whitespace_chars[] = {
+		' ',
+		'\t',
+		'\n',
+		'\r',
+		'\v',
+		'\f'
+	};
+
+	while (whitespace_length-- > 0) {
+		/* NOTE: This could be sped up if necessary by generating a full 32 bits of randomness then splitting it, bitwise, into ~10 groups of
+		 * three bits, which could each be used to index whitespace_chars. */
+		buffer[whitespace_length] = whitespace_chars[g_random_int_range (0, G_N_ELEMENTS (whitespace_chars))];
+	}
+}
+
+static gunichar
+generate_character (void)
+{
+	guint32 distribution;
+
+	/* We use a non-uniform distribution for this.
+	 *  • With probability 0.5 we choose an ASCII character.
+	 *  • With probability 0.4 we choose any other valid Unicode character.
+	 *  • With probability 0.1 we choose any invalid Unicode character (such as the replacement character).
+	 */
+	distribution = g_random_int ();
+
+	if (distribution < G_MAXUINT32 * 0.5) {
+		/* ASCII. */
+		return g_random_int_range (0x00, 0xFF + 1);
+	} else if (distribution < G_MAXUINT32 * 0.9) {
+		gunichar output;
+
+		/* Valid Unicode. It would be impractical to list all assigned and valid code points here such that they all have a uniform
+		 * probability of being chosen. Consequently, we just choose a random code point from planes 0, 1 and 2, and check whether it's
+		 * assigned. If not, we choose another. */
+		output = g_random_int_range (0x00, 0x2FFFF + 1);
+		while (g_unichar_isdefined (output) == FALSE) {
+			output = g_random_int_range (0x00, 0x2FFFF + 1);
+		}
+
+		return output;
+	} else {
+		guint32 i;
+
+		/* Invalid Unicode. We choose code points from:
+		 *  • Private Use Area: U+E000–U+F8FF (6400 points).
+		 *  • Supplementary Private Use Area A: U+F0000–U+FFFFF (65536 points).
+		 *  • Supplementary Private Use Area B: U+100000–U+10FFFF (65536 points).
+		 *  • Surrogates Area: U+D800–U+DFFF (2048 points).
+		 *  • Noncharacters: U+FFFE, U+FFFF, U+1FFFE, U+1FFFF, …, U+10FFFE, U+10FFFF; U+FDD0–U+FDEF (64 points).
+		 *  • Replacement Character: U+FFFD (1 point).
+		 *
+		 * This gives 139585 points in total.
+		 */
+
+		i = g_random_int_range (0, 139585);
+
+		if (i < 6400) {
+			/* Private Use Area */
+			return 0xE000 + i;
+		}
+
+		i -= 6400;
+
+		if (i < 65536) {
+			/* Supplementary Private Use Area A */
+			return 0xF0000 + i;
+		}
+
+		i -= 65536;
+
+		if (i < 65536) {
+			/* Supplementary Private Use Area B */
+			return 0x100000 + i;
+		}
+
+		i -= 65536;
+
+		if (i < 2048) {
+			/* Surrogates Area */
+			return 0xD800 + i;
+		}
+
+		i -= 2048;
+
+		if (i < 32) {
+			/* Noncharacters (1) */
+			return ((i / 2) + 1) * 0x10000 - 1 - (i % 2);
+		}
+
+		i -= 32;
+
+		if (i < 32) {
+			/* Noncharacters (2) */
+			return 0xFDD0 + i;
+		}
+
+		/* Replacement Character */
+		return 0xFFFD;
+	}
+}
+
+static gchar *
+fuzz_string (const gchar *default_value)
+{
+	guint32 distribution;
+	gchar *fuzzy_string = NULL;
+	gsize default_value_length, fuzzy_string_length = 0; /* both in bytes */
+
+	/* We use a non-uniform distribution over several possible approaches to fuzzing the string.
+	 *  • With probability 0.1 we change the case of some letters.
+	 *  • With probability 0.3 we replace some letters with random replacements.
+	 *  • With probability 0.1 we delete a random block of text.
+	 *  • With probability 0.2 we overwrite a random block of text with a random replacement.
+	 *  • With probability 0.1 we clone a random block of text to somewhere else in the string.
+	 *  • With probability 0.2 we swap two random blocks of text.
+	 *
+	 * Additionally, and independently, we randomly add whitespace to the start and end of the string with probability 0.2.
+	 */
+
+	distribution = g_random_int ();
+	default_value_length = strlen (default_value);
+
+	if (distribution < G_MAXUINT32 * 0.1 && default_value_length > 0) {
+		guint i;
+
+		/* Case changing. Note that the probability of changing any given character position is ill-defined because it's dependent on the
+		 * indices of the previously flipped characters, and also whether the character in question is ASCII. */
+		fuzzy_string = g_strdup (default_value);
+		fuzzy_string_length = default_value_length;
+
+		i = g_random_int_range (0, fuzzy_string_length + 1);
+
+		while (i < fuzzy_string_length) {
+			if (g_ascii_isupper (fuzzy_string[i]) == TRUE) {
+				fuzzy_string[i] = g_ascii_tolower (fuzzy_string[i]);
+			} else if (g_ascii_islower (fuzzy_string[i]) == TRUE) {
+				fuzzy_string[i] = g_ascii_toupper (fuzzy_string[i]);
+			}
+
+			i += g_random_int_range (i + 1, fuzzy_string_length + 1);
+		}
+	} else if (distribution < G_MAXUINT32 * 0.4 && default_value_length > 0) {
+		guint old_i, i, j;
+		glong default_value_length_unicode;
+		gchar *temp;
+
+		/* Letter replacement. As with case changing, the probability of replacing any given character position is ill-defined because it's
+		 * dependent on the indices of the previously replaced characters. Note that we have to perform this operation in terms of Unicode
+		 * characters, rather than bytes. */
+		default_value_length_unicode = g_utf8_strlen (default_value, -1);
+		fuzzy_string = g_malloc (default_value_length_unicode * 6 /* max. byte length of a UTF-8 character */ + 1);
+		temp = fuzzy_string;
+
+		old_i = 0;
+		i = g_random_int_range (0, default_value_length_unicode + 1);
+
+		while (i < default_value_length_unicode) {
+			/* Copy the chunk between the previously replaced character and the next character to replace (at character offset i). */
+			for (j = old_i; j < i; j++) {
+				const gchar *next_char = g_utf8_find_next_char (default_value, NULL);
+
+				while (default_value < next_char) {
+					*(temp++) = *(default_value++);
+				}
+			}
+
+			/* Replace character i. */
+			temp += g_unichar_to_utf8 (generate_character (), temp);
+			default_value = g_utf8_next_char (default_value);
+
+			/* Choose the next character to replace. */
+			old_i = i + 1;
+			i = g_random_int_range (old_i, default_value_length_unicode + 1);
+		}
+
+		/* Copy the final chunk. */
+		for (j = old_i; j < i; j++) {
+			const gchar *next_char = g_utf8_find_next_char (default_value, NULL);
+
+			while (default_value < next_char) {
+				*(temp++) = *(default_value++);
+			}
+		}
+
+		*temp = '\0';
+
+		fuzzy_string_length = temp - fuzzy_string;
+	} else if (distribution < G_MAXUINT32 * 0.5 && default_value_length > 0) {
+		const gchar *block_start, *block_end;
+		gsize block_length;
+
+		/* Block deletion. Find a random block and build a new string which doesn't include it. */
+		block_length = find_random_block (default_value, default_value_length, &block_start, &block_end);
+
+		fuzzy_string_length = default_value_length - block_length;
+		fuzzy_string = g_malloc (fuzzy_string_length + 1);
+
+		strncpy (fuzzy_string, default_value, block_start - default_value);
+		strncpy (fuzzy_string + (block_start - default_value), block_end, default_value + default_value_length - block_end);
+		fuzzy_string[fuzzy_string_length] = '\0';
+	} else if (distribution < G_MAXUINT32 * 0.7) {
+		gchar *block_start, *block_end, *i;
+
+		/* Block overwriting. Find a random block and build a new string which replaces it with the same number of bytes. */
+		fuzzy_string = g_strdup (default_value);
+		fuzzy_string_length = default_value_length;
+
+		find_random_block (fuzzy_string, fuzzy_string_length, (const gchar**) &block_start, (const gchar**) &block_end);
+
+		for (i = block_start; i + 8 <= block_end;) {
+			*(i++) = 'd';
+			*(i++) = 'e';
+			*(i++) = 'a';
+			*(i++) = 'd';
+			*(i++) = 'b';
+			*(i++) = 'e';
+			*(i++) = 'e';
+			*(i++) = 'f';
+		}
+
+		switch (block_end - i) {
+			case 7:
+				*(i++) = 'f';
+			case 6:
+				*(i++) = 'u';
+			case 5:
+				*(i++) = 'z';
+			case 4:
+				*(i++) = 'z';
+			case 3:
+				*(i++) = 'i';
+			case 2:
+				*(i++) = 'n';
+			case 1:
+				*(i++) = 'g';
+			case 0:
+				/* Don't potentially overwrite the nul terminator */
+				break;
+			default:
+				g_assert_not_reached ();
+		}
+	} else if (distribution < G_MAXUINT32 * 0.8 && default_value_length > 0) {
+		const gchar *block_start, *block_end;
+		gsize block_length;
+
+		/* Block cloning. Find a random block and clone it in the same position. */
+		block_length = find_random_block (default_value, default_value_length, &block_start, &block_end);
+
+		fuzzy_string_length = default_value_length + block_length;
+		fuzzy_string = g_malloc (fuzzy_string_length + 1);
+
+		strncpy (fuzzy_string, default_value, block_end - default_value);
+		strncpy (fuzzy_string + (block_end - default_value), block_start, block_length);
+		strncpy (fuzzy_string + (block_end - default_value) + block_length, block_end, default_value + default_value_length - block_end);
+		fuzzy_string[fuzzy_string_length] = '\0';
+	} else if (default_value_length > 0) {
+		const gchar *block1_start, *block2_start, *block1_end, *block2_end;
+		gchar *i;
+		gsize block1_length, block2_length;
+
+		/* Block swapping. Find two random blocks and swap them. We have to be careful to make sure they don't overlap, so we take the
+		 * second block from the larger of the remaining portions after choosing the first block. */
+		block1_length = find_random_block (default_value, default_value_length, &block1_start, &block1_end);
+
+		if (block1_start - default_value > default_value + default_value_length - block1_end) {
+			const gchar *temp_start, *temp_end;
+
+			block2_length = find_random_block (default_value, block1_start - default_value, &temp_start, &temp_end);
+
+			/* Ensure block1 is always < block2. */
+			block2_start = block1_start;
+			block2_end = block1_end;
+			block1_start = temp_start;
+			block1_end = temp_end;
+		} else {
+			block2_length = find_random_block (block1_end, default_value + default_value_length - block1_end, &block2_start, &block2_end);
+		}
+
+		/* Build the output string. */
+		fuzzy_string_length = default_value_length;
+		fuzzy_string = g_malloc (fuzzy_string_length + 1);
+		i = fuzzy_string;
+
+		strncpy (i, default_value, block1_start - default_value);
+		i += block1_start - default_value;
+		strncpy (i, block2_start, block2_length);
+		i += block2_length;
+		strncpy (i, block1_end, block2_start - block1_end);
+		i += block2_start - block1_end;
+		strncpy (i, block1_start, block1_length);
+		i += block1_length;
+		strncpy (i, block2_end, default_value + default_value_length - block2_end);
+
+		fuzzy_string[fuzzy_string_length] = '\0';
+	}
+
+	/* Whitespace addition. */
+	if (g_random_int () < G_MAXUINT32 * 0.2) {
+		gchar *temp;
+		gsize prefix_length = 0, suffix_length = 0;
+
+		if (g_random_boolean () == TRUE) {
+			/* Add whitespace as a prefix. */
+			prefix_length = g_random_int_range (1, 51);
+		}
+
+		if (g_random_boolean () == TRUE) {
+			/* Independently add whitespace to the end of the fuzzy string. */
+			suffix_length = g_random_int_range (1, 51);
+		}
+
+		/* Move the fuzzy string to a larger chunk of memory with space for the whitespace. */
+		temp = g_malloc (prefix_length + fuzzy_string_length + suffix_length + 1);
+		strncpy (temp + prefix_length, fuzzy_string, fuzzy_string_length);
+		temp[prefix_length + fuzzy_string_length + suffix_length] = '\0';
+
+		/* Generate some whitespace to fill the gaps. */
+		if (prefix_length > 0) {
+			generate_whitespace (temp + 0, prefix_length);
+		}
+
+		if (suffix_length > 0) {
+			generate_whitespace (temp + prefix_length + fuzzy_string_length, suffix_length);
+		}
+
+		/* Store the new string. */
+		g_free (fuzzy_string);
+		fuzzy_string = temp;
+		fuzzy_string_length += prefix_length + suffix_length;
+	}
+
+	if (fuzzy_string == NULL) {
+		fuzzy_string = g_strdup (default_value);
+	}
+
+	return fuzzy_string;
+}
+
+static gchar *
+fuzz_object_path (const gchar *default_value)
+{
+	/* For the moment, we treat object paths just like strings. In future, we may want to ensure that any fuzzing we apply maintains the
+	 * validity of the object path, even if it no longer points to a valid object. */
+	return fuzz_string (default_value);
+}
+
+static gchar *
+fuzz_type_signature (const gchar *default_value)
+{
+	/* For the moment, we treat type signatures just like strings. In future, we may want to ensure that any fuzzing we apply maintains the
+	 * validity of the type signature. One example would be to selectively replace types with their supertypes. */
+	return fuzz_string (default_value);
+}
+
+/* Evaluate a data structure, ensuring that it's fuzzed in the process. A bit hacky. */
+static GVariant *
+fuzz_data_structure (DfsmAstDataStructure *data_structure, DfsmEnvironment *environment, GError **error)
+{
+	gdouble old_weight;
+	GVariant *variant;
+
+	/* Temporarily set the child data structure's fuzzing weight to 1.0 (if it's not already) to ensure that evaluating it again will mutate it. */
+	old_weight = data_structure->priv->weight;
+	data_structure->priv->weight = MAX (1.0, old_weight);
+
+	variant = dfsm_ast_data_structure_to_variant (data_structure, environment, error);
+
+	data_structure->priv->weight = old_weight;
+
+	return variant;
+}
+
 /**
  * dfsm_ast_data_structure_to_variant:
  * @self: a #DfsmAstDataStructure
@@ -839,54 +1513,191 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 	 * reference, which in turn probably means deep-copying the variable value. Ouch. */
 
 	switch (priv->data_structure_type) {
-		case DFSM_AST_DATA_BYTE:
-			return g_variant_ref_sink (g_variant_new_byte (priv->byte_val));
-		case DFSM_AST_DATA_BOOLEAN:
-			return g_variant_ref_sink (g_variant_new_boolean (priv->boolean_val));
-		case DFSM_AST_DATA_INT16:
-			return g_variant_ref_sink (g_variant_new_int16 (priv->int16_val));
-		case DFSM_AST_DATA_UINT16:
-			return g_variant_ref_sink (g_variant_new_uint16 (priv->uint16_val));
-		case DFSM_AST_DATA_INT32:
-			return g_variant_ref_sink (g_variant_new_int32 (priv->int32_val));
-		case DFSM_AST_DATA_UINT32:
-			return g_variant_ref_sink (g_variant_new_uint32 (priv->uint32_val));
-		case DFSM_AST_DATA_INT64:
-			return g_variant_ref_sink (g_variant_new_int64 (priv->int64_val));
-		case DFSM_AST_DATA_UINT64:
-			return g_variant_ref_sink (g_variant_new_uint64 (priv->uint64_val));
-		case DFSM_AST_DATA_DOUBLE:
-			return g_variant_ref_sink (g_variant_new_double (priv->double_val));
+		case DFSM_AST_DATA_BYTE: {
+			guchar byte_val = priv->byte_val;
+
+			if (should_be_fuzzed (self) == TRUE) {
+				byte_val = fuzz_unsigned_int (byte_val, 0, UCHAR_MAX);
+			}
+
+			return g_variant_ref_sink (g_variant_new_byte (byte_val));
+		}
+		case DFSM_AST_DATA_BOOLEAN: {
+			gboolean boolean_val = priv->boolean_val;
+
+			if (should_be_fuzzed (self) == TRUE) {
+				/* We use a non-uniform distribution for this:
+				 *  • With probability 0.6 we keep the default value.
+				 *  • With probability 0.4 we flip it.
+				 */
+				if (g_random_int () > G_MAXUINT32 * 0.6) {
+					boolean_val = !boolean_val;
+				}
+			}
+
+			return g_variant_ref_sink (g_variant_new_boolean (boolean_val));
+		}
+		case DFSM_AST_DATA_INT16: {
+			gint16 int16_val = priv->int16_val;
+
+			if (should_be_fuzzed (self) == TRUE) {
+				int16_val = fuzz_signed_int (int16_val, G_MININT16, G_MAXINT16);
+			}
+
+			return g_variant_ref_sink (g_variant_new_int16 (int16_val));
+		}
+		case DFSM_AST_DATA_UINT16: {
+			guint16 uint16_val = priv->uint16_val;
+
+			if (should_be_fuzzed (self) == TRUE) {
+				uint16_val = fuzz_unsigned_int (uint16_val, 0, G_MAXUINT16);
+			}
+
+			return g_variant_ref_sink (g_variant_new_uint16 (uint16_val));
+		}
+		case DFSM_AST_DATA_INT32: {
+			gint32 int32_val = priv->int32_val;
+
+			if (should_be_fuzzed (self) == TRUE) {
+				int32_val = fuzz_signed_int (int32_val, G_MININT32, G_MAXINT32);
+			}
+
+			return g_variant_ref_sink (g_variant_new_int32 (int32_val));
+		}
+		case DFSM_AST_DATA_UINT32: {
+			guint32 uint32_val = priv->uint32_val;
+
+			if (should_be_fuzzed (self) == TRUE) {
+				uint32_val = fuzz_unsigned_int (uint32_val, 0, G_MAXUINT32);
+			}
+
+			return g_variant_ref_sink (g_variant_new_uint32 (uint32_val));
+		}
+		case DFSM_AST_DATA_INT64: {
+			gint64 int64_val = priv->int64_val;
+
+			if (should_be_fuzzed (self) == TRUE) {
+				int64_val = fuzz_signed_int (int64_val, G_MININT64, G_MAXINT64);
+			}
+
+			return g_variant_ref_sink (g_variant_new_int64 (int64_val));
+		}
+		case DFSM_AST_DATA_UINT64: {
+			guint64 uint64_val = priv->uint64_val;
+
+			if (should_be_fuzzed (self) == TRUE) {
+				uint64_val = fuzz_unsigned_int (uint64_val, 0, G_MAXUINT64);
+			}
+
+			return g_variant_ref_sink (g_variant_new_uint64 (uint64_val));
+		}
+		case DFSM_AST_DATA_DOUBLE: {
+			gdouble double_val = priv->double_val;
+
+			if (should_be_fuzzed (self) == TRUE) {
+				guint32 distribution;
+
+				/* We use a non-uniform distribution for this:
+				 *  • With probability 0.3 we get a number in the range [-5.0, 5.0).
+				 *  • With probability 0.3 we keep our default value.
+				 *  • With probability 0.4 we take a random double in the given range.
+				 */
+
+				distribution = g_random_int ();
+
+				if (distribution <= G_MAXUINT32 * 0.3) {
+					/* Number in the range [-5.0, 5.0). */
+					double_val = g_random_double_range (-5.0, 5.0);
+				} else if (distribution <= G_MAXUINT32 * 0.6) {
+					/* Default value. */
+					double_val = priv->double_val;
+				} else {
+					/* Random double in the maximum range. */
+					double_val = g_random_double_range (-G_MAXDOUBLE, G_MAXDOUBLE);
+				}
+			}
+
+			return g_variant_ref_sink (g_variant_new_double (double_val));
+		}
 		case DFSM_AST_DATA_STRING: {
 			GVariantType *data_structure_type;
 			GVariant *variant;
+			gchar *fuzzed_val = priv->string_val;
 
 			data_structure_type = dfsm_ast_data_structure_calculate_type (self, environment);
 
 			/* Slight irregularity: if we've calculated the data structure type to be an object path or D-Bus signature (i.e. because the
 			 * user added a type annotation), we need to create a GVariant of the appropriate type. */
 			if (g_variant_type_equal (data_structure_type, G_VARIANT_TYPE_STRING) == TRUE) {
-				variant = g_variant_new_string (priv->string_val);
+				if (should_be_fuzzed (self) == TRUE) {
+					fuzzed_val = fuzz_string (priv->string_val);
+				}
+
+				variant = g_variant_new_string (fuzzed_val);
 			} else if (g_variant_type_equal (data_structure_type, G_VARIANT_TYPE_OBJECT_PATH) == TRUE) {
-				variant = g_variant_new_object_path (priv->string_val);
+				if (should_be_fuzzed (self) == TRUE) {
+					fuzzed_val = fuzz_object_path (priv->string_val);
+				}
+
+				variant = g_variant_new_object_path (fuzzed_val);
 			} else if (g_variant_type_equal (data_structure_type, G_VARIANT_TYPE_SIGNATURE) == TRUE) {
-				variant = g_variant_new_signature (priv->string_val);
+				if (should_be_fuzzed (self) == TRUE) {
+					fuzzed_val = fuzz_type_signature (priv->string_val);
+				}
+
+				variant = g_variant_new_signature (fuzzed_val);
 			} else {
 				g_assert_not_reached ();
+			}
+
+			if (should_be_fuzzed (self) == TRUE) {
+				g_free (fuzzed_val);
 			}
 
 			g_variant_type_free (data_structure_type);
 
 			return g_variant_ref_sink (variant);
 		}
-		case DFSM_AST_DATA_OBJECT_PATH:
-			return g_variant_ref_sink (g_variant_new_object_path (priv->object_path_val));
-		case DFSM_AST_DATA_SIGNATURE:
-			return g_variant_ref_sink (g_variant_new_signature (priv->signature_val));
+		case DFSM_AST_DATA_OBJECT_PATH: {
+			GVariant *variant;
+
+			if (should_be_fuzzed (self) == TRUE) {
+				gchar *fuzzed_val = fuzz_object_path (priv->object_path_val);
+				variant = g_variant_new_object_path (fuzzed_val);
+				g_free (fuzzed_val);
+			} else {
+				variant = g_variant_new_object_path (priv->object_path_val);
+			}
+
+			return g_variant_ref_sink (variant);
+		}
+		case DFSM_AST_DATA_SIGNATURE: {
+			GVariant *variant;
+
+			if (should_be_fuzzed (self) == TRUE) {
+				gchar *fuzzed_val = fuzz_type_signature (priv->signature_val);
+				variant = g_variant_new_signature (fuzzed_val);
+				g_free (fuzzed_val);
+			} else {
+				variant = g_variant_new_signature (priv->signature_val);
+			}
+
+			return g_variant_ref_sink (variant);
+		}
 		case DFSM_AST_DATA_ARRAY: {
 			GVariantType *data_structure_type;
 			GVariantBuilder builder;
 			guint i;
+
+			/* Fuzzing for arrays takes several forms, each of which are decided by independent probabilities for each array element
+			 * individually:
+			 *  • Cloning array elements happens with probability 0.2.
+			 *  • Deleting array elements happens with probability 0.2.
+			 *  • Cloning and mutating array elements happens with probability 0.4.
+			 *
+			 * Notably, the amount of fuzzing (of any type) on a given array element is affected by the fuzzing weight of the expression
+			 * for the array element.
+			 */
 
 			data_structure_type = dfsm_ast_data_structure_calculate_type (self, environment);
 			g_variant_builder_init (&builder, data_structure_type);
@@ -895,22 +1706,63 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 			for (i = 0; i < priv->array_val->len; i++) {
 				GVariant *child_value;
 				DfsmAstExpression *child_expression;
+				gdouble child_expression_weight;
 				GError *child_error = NULL;
 
 				/* Evaluate the child expression to get a GVariant value. */
 				child_expression = (DfsmAstExpression*) g_ptr_array_index (priv->array_val, i);
+				child_expression_weight = MAX (1.0, dfsm_ast_expression_calculate_weight (child_expression));
+
+				/* Delete this element? */
+				if (should_be_fuzzed (self) && g_random_int () < G_MAXUINT32 * MIN (1.0, 0.2 * child_expression_weight)) {
+					continue;
+				}
+
 				child_value = dfsm_ast_expression_evaluate (child_expression, environment, &child_error);
 
 				if (child_error != NULL) {
 					/* Error! */
 					g_propagate_error (error, child_error);
+
+					g_variant_builder_clear (&builder);
+
 					return NULL;
 				}
 
 				/* Add it to the growing GVariant array. */
 				g_variant_builder_add_value (&builder, child_value);
 
+				/* Clone this element? */
+				if (should_be_fuzzed (self) && g_random_int () < G_MAXUINT32 * MIN (1.0, 0.2 * child_expression_weight)) {
+					g_variant_builder_add_value (&builder, child_value);
+				}
+
 				g_variant_unref (child_value);
+
+				/* Clone and mutate the element?  We can only do this if the child expression is a data structure expression. */
+				if (should_be_fuzzed (self) && DFSM_IS_AST_EXPRESSION_DATA_STRUCTURE (child_expression) &&
+				    g_random_int () < G_MAXUINT32 * MIN (1.0, 0.4 * child_expression_weight)) {
+					DfsmAstDataStructure *child_data_structure;
+
+					child_data_structure =
+						dfsm_ast_expression_data_structure_get_data_structure (
+							DFSM_AST_EXPRESSION_DATA_STRUCTURE (child_expression));
+
+					/* Add the mutated value. */
+					child_value = fuzz_data_structure (child_data_structure, environment, &child_error);
+
+					if (child_error != NULL) {
+						/* Error! */
+						g_propagate_error (error, child_error);
+
+						g_variant_builder_clear (&builder);
+
+						return NULL;
+					}
+
+					g_variant_builder_add_value (&builder, child_value);
+					g_variant_unref (child_value);
+				}
 			}
 
 			return g_variant_ref_sink (g_variant_builder_end (&builder));
@@ -919,6 +1771,8 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 			GVariantType *data_structure_type;
 			GVariantBuilder builder;
 			guint i;
+
+			/* Note: Fuzzing structs doesn't make sense, so we ignore any fuzzing here. */
 
 			data_structure_type = dfsm_ast_data_structure_calculate_type (self, environment);
 			g_variant_builder_init (&builder, data_structure_type);
@@ -951,6 +1805,8 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 			GVariant *expr_value, *variant_value;
 			GError *child_error = NULL;
 
+			/* Note: Fuzzing variants doesn't make sense, so we ignore any fuzzing here. */
+
 			expr_value = dfsm_ast_expression_evaluate (priv->variant_val, environment, &child_error);
 
 			if (child_error != NULL) {
@@ -968,16 +1824,36 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 			GVariantBuilder builder;
 			guint i;
 
+			/* Fuzzing for dictionaries takes several forms, each of which are decided by independent probabilities for each dict. entry
+			 * individually:
+			 *  • Deleting dict. entries happens with probability 0.2.
+			 *  • Cloning and mutating dict. entries (keys only) happens with probability 0.3.
+			 *  • Cloning and mutating dict. entries (keys and values) happens with probability 0.6.
+			 *
+			 * Notably, the amount of fuzzing (of any type) on a given dict. entry is affected by the fuzzing weight of the expression
+			 * for the entry.
+			 */
+
 			data_structure_type = dfsm_ast_data_structure_calculate_type (self, environment);
 			g_variant_builder_init (&builder, data_structure_type);
 
 			for (i = 0; i < priv->dict_val->len; i++) {
 				GVariant *key_value, *value_value;
 				DfsmAstDictionaryEntry *dict_entry;
+				gdouble key_weight, value_weight;
 				GError *child_error = NULL;
 
 				/* Evaluate the child expressions to get GVariant values. */
 				dict_entry = (DfsmAstDictionaryEntry*) g_ptr_array_index (priv->dict_val, i);
+
+				/* Clamp the weights to be positive. */
+				key_weight = MAX (1.0, dfsm_ast_expression_calculate_weight (dict_entry->key));
+				value_weight = MAX (1.0, dfsm_ast_expression_calculate_weight (dict_entry->value));
+
+				/* Delete this entry? */
+				if (should_be_fuzzed (self) && g_random_int () < G_MAXUINT32 * MIN (1.0, 0.2 * key_weight)) {
+					continue;
+				}
 
 				key_value = dfsm_ast_expression_evaluate (dict_entry->key, environment, &child_error);
 
@@ -1008,6 +1884,57 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 				g_variant_builder_add_value (&builder, value_value);
 				g_variant_builder_close (&builder);
 
+				/* Clone and mutate the entry?  We can only do this if the child expressions are data structure expressions. */
+				if (should_be_fuzzed (self) && DFSM_IS_AST_EXPRESSION_DATA_STRUCTURE (dict_entry->key) &&
+				    DFSM_IS_AST_EXPRESSION_DATA_STRUCTURE (dict_entry->value) &&
+				    g_random_int () < G_MAXUINT32 * MIN (1.0, 0.6 * key_weight)) {
+					DfsmAstDataStructure *key_data_structure, *value_data_structure;
+
+					key_data_structure =
+						dfsm_ast_expression_data_structure_get_data_structure (
+							DFSM_AST_EXPRESSION_DATA_STRUCTURE (dict_entry->key));
+					value_data_structure =
+						dfsm_ast_expression_data_structure_get_data_structure (
+							DFSM_AST_EXPRESSION_DATA_STRUCTURE (dict_entry->value));
+
+					g_variant_unref (key_value);
+					key_value = fuzz_data_structure (key_data_structure, environment, &child_error);
+
+					if (child_error != NULL) {
+						/* Error! */
+						g_propagate_error (error, child_error);
+
+						g_variant_builder_clear (&builder);
+						g_variant_unref (value_value);
+						g_variant_type_free (data_structure_type);
+
+						return NULL;
+					}
+
+					if (g_random_int () < G_MAXUINT32 * MIN (1.0, 0.5 * value_weight)) {
+						/* Mutate the value as well as the key. */
+						g_variant_unref (value_value);
+						value_value = fuzz_data_structure (value_data_structure, environment, &child_error);
+
+						if (child_error != NULL) {
+							/* Error! */
+							g_propagate_error (error, child_error);
+
+							g_variant_builder_clear (&builder);
+							g_variant_unref (key_value);
+							g_variant_type_free (data_structure_type);
+
+							return NULL;
+						}
+					}
+
+					/* Add the mutated entry. */
+					g_variant_builder_open (&builder, g_variant_type_element (data_structure_type));
+					g_variant_builder_add_value (&builder, key_value);
+					g_variant_builder_add_value (&builder, value_value);
+					g_variant_builder_close (&builder);
+				}
+
 				g_variant_unref (value_value);
 				g_variant_unref (key_value);
 			}
@@ -1017,10 +1944,14 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 			return g_variant_ref_sink (g_variant_builder_end (&builder));
 		}
 		case DFSM_AST_DATA_UNIX_FD:
+			/* Note: Fuzzing Unix FDs isn't currently supported, so we ignore any fuzzing here. */
 			return g_variant_ref_sink (g_variant_new_uint32 (priv->unix_fd_val));
 		case DFSM_AST_DATA_REGEXP:
+			/* TODO: Fuzz me */
+			/* Note: Fuzzing regular expressions isn't currently supported, so we ignore any fuzzing here. */
 			return g_variant_ref_sink (g_variant_new_string (priv->regexp_val));
 		case DFSM_AST_DATA_VARIABLE:
+			/* Note: Fuzzing variables isn't currently supported, so we ignore any fuzzing here. */
 			return dfsm_ast_variable_to_variant (priv->variable_val, environment, error);
 		default:
 			g_assert_not_reached ();

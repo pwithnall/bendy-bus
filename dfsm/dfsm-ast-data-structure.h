@@ -89,6 +89,8 @@ GType dfsm_ast_data_structure_get_type (void) G_GNUC_CONST;
 DfsmAstDataStructure *dfsm_ast_data_structure_new (DfsmAstDataStructureType data_structure_type, gpointer value, GError **error) DFSM_CONSTRUCTOR;
 
 void dfsm_ast_data_structure_set_weight (DfsmAstDataStructure *self, gdouble weight);
+gdouble dfsm_ast_data_structure_get_weight (DfsmAstDataStructure *self) G_GNUC_PURE;
+
 void dfsm_ast_data_structure_set_type_annotation (DfsmAstDataStructure *self, const gchar *type_annotation);
 
 GVariantType *dfsm_ast_data_structure_calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;

@@ -396,7 +396,7 @@ Variable: VariableName								{ $$ = dfsm_ast_variable_new (DFSM_VARIABLE_SCOPE_
 
 /* Returns a new DfsmAstDataStructure. */
 FuzzyDataStructure: AnnotatedDataStructure					{ $$ = $1; }
-                  | AnnotatedDataStructure FUZZY				{ $$ = $1; dfsm_ast_data_structure_set_weight ($$, NAN); }
+                  | AnnotatedDataStructure FUZZY				{ $$ = $1; dfsm_ast_data_structure_set_weight ($$, 1.0); }
                   | AnnotatedDataStructure FUZZY DOUBLE				{ $$ = $1; dfsm_ast_data_structure_set_weight ($$, $3); }
 ;
 

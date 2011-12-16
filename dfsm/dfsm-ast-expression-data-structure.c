@@ -27,6 +27,7 @@ static void dfsm_ast_expression_data_structure_pre_check_and_register (DfsmAstNo
 static void dfsm_ast_expression_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static GVariantType *dfsm_ast_expression_data_structure_calculate_type (DfsmAstExpression *self, DfsmEnvironment *environment);
 static GVariant *dfsm_ast_expression_data_structure_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment, GError **error);
+static gdouble dfsm_ast_expression_data_structure_calculate_weight (DfsmAstExpression *self);
 
 struct _DfsmAstExpressionDataStructurePrivate {
 	DfsmAstDataStructure *data_structure;
@@ -51,6 +52,7 @@ dfsm_ast_expression_data_structure_class_init (DfsmAstExpressionDataStructureCla
 
 	expression_class->calculate_type = dfsm_ast_expression_data_structure_calculate_type;
 	expression_class->evaluate = dfsm_ast_expression_data_structure_evaluate;
+	expression_class->calculate_weight = dfsm_ast_expression_data_structure_calculate_weight;
 }
 
 static void
@@ -119,6 +121,12 @@ dfsm_ast_expression_data_structure_evaluate (DfsmAstExpression *expression, Dfsm
 	return dfsm_ast_data_structure_to_variant (priv->data_structure, environment, error);
 }
 
+static gdouble
+dfsm_ast_expression_data_structure_calculate_weight (DfsmAstExpression *self)
+{
+	return dfsm_ast_data_structure_get_weight (DFSM_AST_EXPRESSION_DATA_STRUCTURE (self)->priv->data_structure);
+}
+
 /**
  * dfsm_ast_expression_data_structure_new:
  * @data_structure: a #DfsmAstDataStructure to wrap
@@ -179,4 +187,20 @@ dfsm_ast_expression_data_structure_set_from_variant (DfsmAstExpressionDataStruct
                                                      GError **error)
 {
 
+}
+
+/**
+ * dfsm_ast_expression_data_structure_get_data_structure:
+ * @self: a #DfsmAstExpressionDataStructure
+ *
+ * Gets the #DfsmAstDataStructure which forms this expression.
+ *
+ * Return value: (transfer none): the data structure forming the expression
+ */
+DfsmAstDataStructure *
+dfsm_ast_expression_data_structure_get_data_structure (DfsmAstExpressionDataStructure *self)
+{
+	g_return_val_if_fail (DFSM_IS_AST_EXPRESSION_DATA_STRUCTURE (self), NULL);
+
+	return self->priv->data_structure;
 }

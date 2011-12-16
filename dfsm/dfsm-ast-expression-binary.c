@@ -28,6 +28,7 @@ static void dfsm_ast_expression_binary_pre_check_and_register (DfsmAstNode *node
 static void dfsm_ast_expression_binary_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static GVariantType *dfsm_ast_expression_binary_calculate_type (DfsmAstExpression *self, DfsmEnvironment *environment);
 static GVariant *dfsm_ast_expression_binary_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment, GError **error);
+static gdouble dfsm_ast_expression_binary_calculate_weight (DfsmAstExpression *self);
 
 struct _DfsmAstExpressionBinaryPrivate {
 	DfsmAstExpressionBinaryType expression_type;
@@ -54,6 +55,7 @@ dfsm_ast_expression_binary_class_init (DfsmAstExpressionBinaryClass *klass)
 
 	expression_class->calculate_type = dfsm_ast_expression_binary_calculate_type;
 	expression_class->evaluate = dfsm_ast_expression_binary_evaluate;
+	expression_class->calculate_weight = dfsm_ast_expression_binary_calculate_weight;
 }
 
 static void
@@ -368,6 +370,14 @@ dfsm_ast_expression_binary_evaluate (DfsmAstExpression *expression, DfsmEnvironm
 	g_variant_ref_sink (binary_value); /* sink reference */
 
 	return binary_value;
+}
+
+static gdouble
+dfsm_ast_expression_binary_calculate_weight (DfsmAstExpression *self)
+{
+	DfsmAstExpressionBinaryPrivate *priv = DFSM_AST_EXPRESSION_BINARY (self)->priv;
+
+	return MAX (dfsm_ast_expression_calculate_weight (priv->left_node), dfsm_ast_expression_calculate_weight (priv->right_node));
 }
 
 /**

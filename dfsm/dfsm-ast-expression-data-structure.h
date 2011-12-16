@@ -58,6 +58,8 @@ GVariant *dfsm_ast_expression_data_structure_to_variant (DfsmAstExpressionDataSt
 void dfsm_ast_expression_data_structure_set_from_variant (DfsmAstExpressionDataStructure *self, DfsmEnvironment *environment, GVariant *new_value,
                                                           GError **error);
 
+DfsmAstDataStructure *dfsm_ast_expression_data_structure_get_data_structure (DfsmAstExpressionDataStructure *self) G_GNUC_PURE;
+
 G_END_DECLS
 
 #endif /* !DFSM_AST_EXPRESSION_DATA_STRUCTURE_H */

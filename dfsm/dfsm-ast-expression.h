@@ -49,12 +49,14 @@ typedef struct {
 	/* Virtual methods */
 	GVariantType *(*calculate_type) (DfsmAstExpression *self, DfsmEnvironment *environment);
 	GVariant *(*evaluate) (DfsmAstExpression *self, DfsmEnvironment *environment, GError **error /* guaranteed to be non-NULL */);
+	gdouble (*calculate_weight) (DfsmAstExpression *self);
 } DfsmAstExpressionClass;
 
 GType dfsm_ast_expression_get_type (void) G_GNUC_CONST;
 
 GVariantType *dfsm_ast_expression_calculate_type (DfsmAstExpression *self, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
 GVariant *dfsm_ast_expression_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment, GError **error) DFSM_CONSTRUCTOR;
+gdouble dfsm_ast_expression_calculate_weight (DfsmAstExpression *self);
 
 G_END_DECLS
 

@@ -28,6 +28,7 @@ static void dfsm_ast_expression_unary_pre_check_and_register (DfsmAstNode *node,
 static void dfsm_ast_expression_unary_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static GVariantType *dfsm_ast_expression_unary_calculate_type (DfsmAstExpression *self, DfsmEnvironment *environment);
 static GVariant *dfsm_ast_expression_unary_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment, GError **error);
+static gdouble dfsm_ast_expression_unary_calculate_weight (DfsmAstExpression *self);
 
 struct _DfsmAstExpressionUnaryPrivate {
 	DfsmAstExpressionUnaryType expression_type;
@@ -53,6 +54,7 @@ dfsm_ast_expression_unary_class_init (DfsmAstExpressionUnaryClass *klass)
 
 	expression_class->calculate_type = dfsm_ast_expression_unary_calculate_type;
 	expression_class->evaluate = dfsm_ast_expression_unary_evaluate;
+	expression_class->calculate_weight = dfsm_ast_expression_unary_calculate_weight;
 }
 
 static void
@@ -186,6 +188,12 @@ dfsm_ast_expression_unary_evaluate (DfsmAstExpression *expression, DfsmEnvironme
 	g_variant_ref_sink (unary_value); /* sink reference */
 
 	return unary_value;
+}
+
+static gdouble
+dfsm_ast_expression_unary_calculate_weight (DfsmAstExpression *self)
+{
+	return dfsm_ast_expression_calculate_weight (DFSM_AST_EXPRESSION_UNARY (self)->priv->child_node);
 }
 
 /**

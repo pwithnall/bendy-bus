@@ -100,3 +100,33 @@ dfsm_ast_expression_evaluate (DfsmAstExpression *self, DfsmEnvironment *environm
 
 	return return_value;
 }
+
+/**
+ * dfsm_ast_expression_calculate_weight:
+ * @self: a #DfsmAstExpression
+ *
+ * Recursively calculates the weight of the expression and its children for the purposes of fuzzing. The higher the expression's weight, the more
+ * interesting it is to fuzz. For more information on weights, see dfsm_ast_data_structure_set_weight().
+ *
+ * Return value: weight of the expression
+ */
+gdouble
+dfsm_ast_expression_calculate_weight (DfsmAstExpression *self)
+{
+	DfsmAstExpressionClass *klass;
+	gdouble return_value;
+
+	g_return_val_if_fail (DFSM_IS_AST_EXPRESSION (self), 0.0);
+
+	klass = DFSM_AST_EXPRESSION_GET_CLASS (self);
+
+	g_assert (klass->calculate_weight != NULL);
+	return_value = klass->calculate_weight (self);
+
+	/* Normalise the return value. */
+	if (return_value < 0.0) {
+		return_value = 0.0;
+	}
+
+	return return_value;
+}

@@ -29,6 +29,7 @@ static void dfsm_ast_expression_function_call_pre_check_and_register (DfsmAstNod
 static void dfsm_ast_expression_function_call_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static GVariantType *dfsm_ast_expression_function_call_calculate_type (DfsmAstExpression *self, DfsmEnvironment *environment);
 static GVariant *dfsm_ast_expression_function_call_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment, GError **error);
+static gdouble dfsm_ast_expression_function_call_calculate_weight (DfsmAstExpression *self);
 
 struct _DfsmAstExpressionFunctionCallPrivate {
 	gchar *function_name;
@@ -55,6 +56,7 @@ dfsm_ast_expression_function_call_class_init (DfsmAstExpressionFunctionCallClass
 
 	expression_class->calculate_type = dfsm_ast_expression_function_call_calculate_type;
 	expression_class->evaluate = dfsm_ast_expression_function_call_evaluate;
+	expression_class->calculate_weight = dfsm_ast_expression_function_call_calculate_weight;
 }
 
 static void
@@ -178,6 +180,12 @@ dfsm_ast_expression_function_call_evaluate (DfsmAstExpression *expression, DfsmE
 	}
 
 	return function_call_value;
+}
+
+static gdouble
+dfsm_ast_expression_function_call_calculate_weight (DfsmAstExpression *self)
+{
+	return dfsm_ast_expression_calculate_weight (DFSM_AST_EXPRESSION_FUNCTION_CALL (self)->priv->parameters);
 }
 
 /**
