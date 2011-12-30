@@ -20,6 +20,7 @@
 #include <glib.h>
 
 #include "dfsm-ast-expression-data-structure.h"
+#include "dfsm-parser-internal.h"
 
 static void dfsm_ast_expression_data_structure_dispose (GObject *object);
 static void dfsm_ast_expression_data_structure_sanity_check (DfsmAstNode *node);

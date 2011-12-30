@@ -51,8 +51,6 @@ typedef struct {
 
 GType dfsm_ast_expression_function_call_get_type (void) G_GNUC_CONST;
 
-DfsmAstExpression *dfsm_ast_expression_function_call_new (const gchar *function_name, DfsmAstExpression *parameters, GError **error) DFSM_CONSTRUCTOR;
-
 G_END_DECLS
 
 #endif /* !DFSM_AST_EXPRESSION_FUNCTION_CALL_H */

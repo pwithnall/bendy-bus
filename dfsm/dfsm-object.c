@@ -23,6 +23,7 @@
 #include "dfsm-ast.h"
 #include "dfsm-machine.h"
 #include "dfsm-parser.h"
+#include "dfsm-parser-internal.h"
 
 static void dfsm_object_dispose (GObject *object);
 static void dfsm_object_finalize (GObject *object);

@@ -21,6 +21,7 @@
 
 #include "dfsm-ast.h"
 #include "dfsm-parser.h"
+#include "dfsm-parser-internal.h"
 
 GQuark
 dfsm_parse_error_quark (void)
@@ -120,74 +121,4 @@ dfsm_parser_state_pair_free (DfsmParserStatePair *state_pair)
 
 		g_slice_free (DfsmParserStatePair, state_pair);
 	}
-}
-
-static gboolean
-_is_member_name (const gchar *member_name)
-{
-	const gchar *i;
-
-	g_return_val_if_fail (member_name != NULL, FALSE);
-
-	/* Characters outside [A-Za-z0-9_]? */
-	for (i = member_name; *i != '\0'; i++) {
-		if (*i != '_' && g_ascii_isalnum (*i) == FALSE) {
-			return FALSE;
-		}
-	}
-
-	/* Zero-length string? */
-	if (i == member_name) {
-		return FALSE;
-	}
-
-	return TRUE;
-}
-
-/**
- * dfsm_is_variable_name:
- * @variable_name: variable name to check
- *
- * Checks whether @variable_name is a valid variable name in the FSM language. Valid variable names conform to the restrictions on D-Bus member names,
- * as specified in the <ulink url="http://dbus.freedesktop.org/doc/dbus-specification.html#sect3" type="http">D-Bus Specification</ulink>,
- * § Member names.
- *
- * Return value: %TRUE if @variable_name is a valid variable name; %FALSE otherwise
- */
-gboolean
-dfsm_is_variable_name (const gchar *variable_name)
-{
-	return _is_member_name (variable_name);
-}
-
-/**
- * dfsm_is_state_name:
- * @state_name: state name to check
- *
- * Checks whether @state_name is a valid state name in the FSM language. Valid state names conform to the restrictions on D-Bus member names,
- * as specified in the <ulink url="http://dbus.freedesktop.org/doc/dbus-specification.html#sect3" type="http">D-Bus Specification</ulink>,
- * § Member names.
- *
- * Return value: %TRUE if @state_name is a valid state name; %FALSE otherwise
- */
-gboolean
-dfsm_is_state_name (const gchar *state_name)
-{
-	return _is_member_name (state_name);
-}
-
-/**
- * dfsm_is_function_name:
- * @function_name: function name to check
- *
- * Checks whether @function_name is a valid function name in the FSM language. Valid function names conform to the restrictions on D-Bus member names,
- * as specified in the <ulink url="http://dbus.freedesktop.org/doc/dbus-specification.html#sect3" type="http">D-Bus Specification</ulink>,
- * § Member names.
- *
- * Return value: %TRUE if @function_name is a valid function name; %FALSE otherwise
- */
-gboolean
-dfsm_is_function_name (const gchar *function_name)
-{
-	return _is_member_name (function_name);
 }

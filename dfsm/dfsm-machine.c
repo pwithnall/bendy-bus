@@ -25,6 +25,7 @@
 #include "dfsm-machine.h"
 #include "dfsm-marshal.h"
 #include "dfsm-parser.h"
+#include "dfsm-parser-internal.h"
 
 GQuark
 dfsm_simulation_error_quark (void)

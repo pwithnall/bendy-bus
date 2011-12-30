@@ -52,9 +52,6 @@ typedef struct {
 
 GType dfsm_ast_statement_assignment_get_type (void) G_GNUC_CONST;
 
-DfsmAstStatement *dfsm_ast_statement_assignment_new (DfsmAstDataStructure *data_structure,
-                                                     DfsmAstExpression *expression, GError **error) DFSM_CONSTRUCTOR;
-
 G_END_DECLS
 
 #endif /* !DFSM_AST_STATEMENT_ASSIGNMENT_H */

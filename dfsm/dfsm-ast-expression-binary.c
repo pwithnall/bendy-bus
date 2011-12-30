@@ -21,6 +21,7 @@
 
 #include "dfsm-ast-expression-binary.h"
 #include "dfsm-parser.h"
+#include "dfsm-parser-internal.h"
 
 static void dfsm_ast_expression_binary_dispose (GObject *object);
 static void dfsm_ast_expression_binary_sanity_check (DfsmAstNode *node);

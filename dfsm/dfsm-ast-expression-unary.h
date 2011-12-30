@@ -57,9 +57,6 @@ typedef struct {
 
 GType dfsm_ast_expression_unary_get_type (void) G_GNUC_CONST;
 
-DfsmAstExpression *dfsm_ast_expression_unary_new (DfsmAstExpressionUnaryType expression_type, DfsmAstExpression *child_node,
-                                                  GError **error) DFSM_CONSTRUCTOR;
-
 G_END_DECLS
 
 #endif /* !DFSM_AST_EXPRESSION_UNARY_H */

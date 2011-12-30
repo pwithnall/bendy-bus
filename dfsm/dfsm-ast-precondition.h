@@ -49,8 +49,6 @@ typedef struct {
 
 GType dfsm_ast_precondition_get_type (void) G_GNUC_CONST;
 
-DfsmAstPrecondition *dfsm_ast_precondition_new (const gchar *error_name /* nullable */, DfsmAstExpression *condition, GError **error) DFSM_CONSTRUCTOR;
-
 gboolean dfsm_ast_precondition_check_is_satisfied (DfsmAstPrecondition *precondition, DfsmEnvironment *environment, GError **error);
 
 G_END_DECLS

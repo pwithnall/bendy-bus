@@ -20,6 +20,7 @@
 #include <glib.h>
 
 #include "dfsm-ast-statement-reply.h"
+#include "dfsm-parser-internal.h"
 
 static void dfsm_ast_statement_reply_dispose (GObject *object);
 static void dfsm_ast_statement_reply_sanity_check (DfsmAstNode *node);

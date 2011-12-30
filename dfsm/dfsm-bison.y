@@ -18,6 +18,7 @@
 %code requires {
 	#include "dfsm-ast.h"
 	#include "dfsm-parser.h"
+	#include "dfsm-parser-internal.h"
 }
 
 %code {

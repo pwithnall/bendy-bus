@@ -64,12 +64,6 @@ typedef struct {
 
 GType dfsm_ast_object_get_type (void) G_GNUC_CONST;
 
-DfsmAstObject *dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GPtrArray/*<string>*/ *bus_names,
-                                    GPtrArray/*<string>*/ *interface_names,
-                                    GPtrArray/*<GHashTable>*/ *data_blocks, GPtrArray/*<GPtrArray>*/ *state_blocks,
-                                    GPtrArray/*<DfsmParserTransitionBlock>*/ *transition_blocks, GError **error) DFSM_CONSTRUCTOR;
-
-/* TODO: Eliminate these */
 DfsmEnvironment *dfsm_ast_object_get_environment (DfsmAstObject *self) G_GNUC_PURE;
 GPtrArray/*<string>*/ *dfsm_ast_object_get_state_names (DfsmAstObject *self) G_GNUC_PURE;
 GPtrArray/*<DfsmAstObjectTransition>*/ *dfsm_ast_object_get_transitions (DfsmAstObject *self) G_GNUC_PURE;

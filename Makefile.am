@@ -20,6 +20,7 @@ dfsm_public_headers = \
 	dfsm/dfsm-environment.h \
 	dfsm/dfsm-machine.h \
 	dfsm/dfsm-object.h \
+	dfsm/dfsm-parser.h \
 	dfsm/dfsm-utils.h \
 	$(NULL)
 dfsm_sources = \
@@ -59,12 +60,13 @@ dfsm_sources = \
 	dfsm/dfsm-ast-variable.c \
 	dfsm/dfsm-ast-variable.h \
 	dfsm/dfsm-parser.c \
-	dfsm/dfsm-parser.h \
+	dfsm/dfsm-parser-internal.h \
 	dfsm/dfsm-machine.c \
 	dfsm/dfsm-object.c \
 	dfsm/dfsm-environment.c \
 	dfsm/dfsm-internal.c \
 	dfsm/dfsm-internal.h \
+	dfsm/dfsm-utils.c \
 	$(NULL)
 
 dfsmincludedir = $(pkgincludedir)/dfsm
@@ -75,6 +77,7 @@ dfsminclude_HEADERS = \
 
 dfsm_libdfsm_la_SOURCES = \
 	$(dfsm_marshal_sources) \
+	$(dfsm_public_headers) \
 	$(dfsm_sources) \
 	$(NULL)
 

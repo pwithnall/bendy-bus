@@ -32,6 +32,10 @@ G_BEGIN_DECLS
  */
 #define DFSM_CONSTRUCTOR G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC
 
+gboolean dfsm_is_variable_name (const gchar *variable_name) G_GNUC_PURE;
+gboolean dfsm_is_state_name (const gchar *state_name) G_GNUC_PURE;
+gboolean dfsm_is_function_name (const gchar *function_name) G_GNUC_PURE;
+
 G_END_DECLS
 
 #endif /* !DFSM_UTILS_H */

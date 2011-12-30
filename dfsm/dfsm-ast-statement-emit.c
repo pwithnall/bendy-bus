@@ -22,6 +22,7 @@
 #include "dfsm-ast-statement-emit.h"
 #include "dfsm-internal.h"
 #include "dfsm-parser.h"
+#include "dfsm-parser-internal.h"
 
 static void dfsm_ast_statement_emit_dispose (GObject *object);
 static void dfsm_ast_statement_emit_finalize (GObject *object);

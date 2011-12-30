@@ -21,6 +21,7 @@
 
 #include "dfsm-ast-variable.h"
 #include "dfsm-parser.h"
+#include "dfsm-parser-internal.h"
 
 static void dfsm_ast_variable_finalize (GObject *object);
 static void dfsm_ast_variable_sanity_check (DfsmAstNode *node);

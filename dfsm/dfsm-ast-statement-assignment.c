@@ -21,6 +21,7 @@
 
 #include "dfsm-ast-statement-assignment.h"
 #include "dfsm-parser.h"
+#include "dfsm-parser-internal.h"
 
 static void dfsm_ast_statement_assignment_dispose (GObject *object);
 static void dfsm_ast_statement_assignment_sanity_check (DfsmAstNode *node);

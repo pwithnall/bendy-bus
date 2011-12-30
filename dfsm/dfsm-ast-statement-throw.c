@@ -21,6 +21,7 @@
 
 #include "dfsm-ast-statement-throw.h"
 #include "dfsm-parser.h"
+#include "dfsm-parser-internal.h"
 
 static void dfsm_ast_statement_throw_finalize (GObject *object);
 static void dfsm_ast_statement_throw_sanity_check (DfsmAstNode *node);

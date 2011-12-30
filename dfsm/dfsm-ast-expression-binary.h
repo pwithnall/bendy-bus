@@ -81,9 +81,6 @@ typedef struct {
 
 GType dfsm_ast_expression_binary_get_type (void) G_GNUC_CONST;
 
-DfsmAstExpression *dfsm_ast_expression_binary_new (DfsmAstExpressionBinaryType expression_type, DfsmAstExpression *left_node,
-                                                   DfsmAstExpression *right_node, GError **error) DFSM_CONSTRUCTOR;
-
 G_END_DECLS
 
 #endif /* !DFSM_AST_EXPRESSION_BINARY_H */

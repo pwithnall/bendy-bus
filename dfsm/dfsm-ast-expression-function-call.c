@@ -21,6 +21,7 @@
 
 #include "dfsm-ast-expression-function-call.h"
 #include "dfsm-parser.h"
+#include "dfsm-parser-internal.h"
 
 static void dfsm_ast_expression_function_call_dispose (GObject *object);
 static void dfsm_ast_expression_function_call_finalize (GObject *object);

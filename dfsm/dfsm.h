@@ -22,7 +22,7 @@
 #ifndef DFSM_H
 #define DFSM_H
 
-#include <dfsm/dfsm-parser.h> /* TODO: Shouldn't be public */
+#include <dfsm/dfsm-parser.h>
 #include <dfsm/dfsm-ast.h>
 #include <dfsm/dfsm-environment.h>
 #include <dfsm/dfsm-machine.h>

@@ -21,6 +21,7 @@
 
 #include "dfsm-ast-precondition.h"
 #include "dfsm-parser.h"
+#include "dfsm-parser-internal.h"
 
 static void dfsm_ast_precondition_dispose (GObject *object);
 static void dfsm_ast_precondition_finalize (GObject *object);

@@ -24,6 +24,7 @@
 #include "dfsm-ast-statement.h"
 #include "dfsm-ast-transition.h"
 #include "dfsm-parser.h"
+#include "dfsm-parser-internal.h"
 #include "dfsm-utils.h"
 
 static void dfsm_ast_transition_dispose (GObject *object);

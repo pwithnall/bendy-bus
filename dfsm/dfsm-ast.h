@@ -17,7 +17,7 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Private convenience header. */
+/* Public convenience header. */
 
 #include "dfsm-ast-node.h"
 #include "dfsm-ast-object.h"

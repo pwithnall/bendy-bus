@@ -47,8 +47,6 @@ typedef struct {
 
 GType dfsm_ast_statement_throw_get_type (void) G_GNUC_CONST;
 
-DfsmAstStatement *dfsm_ast_statement_throw_new (const gchar *error_name, GError **error) DFSM_CONSTRUCTOR;
-
 G_END_DECLS
 
 #endif /* !DFSM_AST_STATEMENT_THROW_H */

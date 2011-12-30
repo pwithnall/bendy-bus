@@ -24,6 +24,7 @@
 #include "dfsm-ast-object.h"
 #include "dfsm-ast-transition.h"
 #include "dfsm-parser.h"
+#include "dfsm-parser-internal.h"
 
 DfsmAstObjectTransition *
 dfsm_ast_object_transition_new (DfsmMachineStateNumber from_state, DfsmMachineStateNumber to_state, DfsmAstTransition *transition)

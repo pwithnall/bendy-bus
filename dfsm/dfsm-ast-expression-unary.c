@@ -21,6 +21,7 @@
 
 #include "dfsm-ast-expression-unary.h"
 #include "dfsm-parser.h"
+#include "dfsm-parser-internal.h"
 
 static void dfsm_ast_expression_unary_dispose (GObject *object);
 static void dfsm_ast_expression_unary_sanity_check (DfsmAstNode *node);

@@ -48,8 +48,6 @@ typedef struct {
 
 GType dfsm_ast_variable_get_type (void) G_GNUC_CONST;
 
-DfsmAstVariable *dfsm_ast_variable_new (DfsmVariableScope scope, const gchar *variable_name, GError **error) DFSM_CONSTRUCTOR;
-
 GVariantType *dfsm_ast_variable_calculate_type (DfsmAstVariable *self, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
 
 GVariant *dfsm_ast_variable_to_variant (DfsmAstVariable *self, DfsmEnvironment *environment, GError **error) DFSM_CONSTRUCTOR;

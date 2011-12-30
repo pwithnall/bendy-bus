@@ -58,15 +58,9 @@ typedef struct {
 
 GType dfsm_ast_transition_get_type (void) G_GNUC_CONST;
 
-#include <dfsm/dfsm-parser.h>
-
-DfsmAstTransition *dfsm_ast_transition_new (const DfsmParserTransitionDetails *details, GPtrArray/*<DfsmAstPrecondition>*/ *preconditions,
-                                            GPtrArray/*<DfsmAstStatement>*/ *statements, GError **error) DFSM_CONSTRUCTOR;
-
 gboolean dfsm_ast_transition_check_preconditions (DfsmAstTransition *transition, DfsmEnvironment *environment, GError **error);
 GVariant *dfsm_ast_transition_execute (DfsmAstTransition *transition, DfsmEnvironment *environment, GError **error) DFSM_CONSTRUCTOR;
 
-/* TODO: Eliminate these */
 DfsmAstTransitionTrigger dfsm_ast_transition_get_trigger (DfsmAstTransition *self) G_GNUC_PURE;
 const gchar *dfsm_ast_transition_get_trigger_method_name (DfsmAstTransition *self) G_GNUC_PURE;
 const gchar *dfsm_ast_transition_get_trigger_property_name (DfsmAstTransition *self) G_GNUC_PURE;

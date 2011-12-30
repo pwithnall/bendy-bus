@@ -19,33 +19,37 @@
 
 #include <dfsm/dfsm.h>
 
+static gchar *
+load_test_file (const gchar *filename)
+{
+	guint8 *contents = NULL;
+	gsize length;
+	GFile *machine_file;
+	GError *error = NULL;
+
+	machine_file = g_file_new_for_path (filename);
+
+	/* Load the file. */
+	g_file_load_contents (machine_file, NULL, (gchar**) &contents, &length, NULL, &error);
+	g_assert_no_error (error);
+	g_assert_cmpuint (length, >, 0);
+
+	g_object_unref (machine_file);
+
+	return (gchar*) contents; /* assume it's text; g_file_load_contents() guarantees it's nul-terminated */
+}
+
 static void
 test_ast_single_object (void)
 {
-	GPtrArray *object_array;
+	gchar *machine_description, *introspection_xml;
+	GPtrArray/*<DfsmObject>*/ *object_array;
 	GError *error = NULL;
 
-	object_array = dfsm_bison_parse (NULL,
-		"object at /org/freedesktop/Telepathy/ConnectionManager/gabble implements org.freedesktop.Telepathy.ConnectionManager {\n"
-			"data {\n"
-				"_ConnectionObjectPath = /org/example/Test;\n"
-				"_ConnectionBusName = \"foobar\";\n"
-				"_Params = [\n"
-					"(\"foo\", 15u, \"bar\", \"baz\"),"
-					"(\"foo\", 15u, \"bar\", \"baz\"),"
-				"]\n"
-			"}\n"
-			"\n"
-			"states {\n"
-				"Main\n"
-			"}\n"
-			"\n"
-			"transition from Main to Main on method GetParameters {\n"
-				"precondition throwing NotImplemented { Protocol == keys object->Protocols }\n"
-				"\n"
-				"reply object->_Params;\n"
-			"}\n"
-		"}", &error);
+	machine_description = load_test_file ("simple-test.machine");
+	introspection_xml = load_test_file ("simple-test.xml");
+
+	object_array = dfsm_object_factory_from_files (machine_description, introspection_xml, &error);
 
 	g_assert_no_error (error);
 	g_assert (object_array != NULL);
@@ -53,11 +57,18 @@ test_ast_single_object (void)
 	if (object_array != NULL) {
 		g_ptr_array_unref (object_array);
 	}
+
+	g_free (introspection_xml);
+	g_free (machine_description);
 }
 
 int
 main (int argc, char *argv[])
 {
+	g_type_init ();
+#if !GLIB_CHECK_VERSION (2, 31, 0)
+	g_thread_init (NULL);
+#endif
 	g_test_init (&argc, &argv, NULL);
 
 	g_test_add_func ("/ast/single-object", test_ast_single_object);
