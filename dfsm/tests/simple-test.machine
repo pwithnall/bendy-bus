@@ -2,6 +2,7 @@ object at /uk/ac/cam/cl/DBusSimulator/SimpleTest implements uk.ac.cam.cl.DBusSim
 	data {
 		stored_greeting = "Initial";
 		counter = 0u;
+		ArbitraryProperty = "";
 	}
 
 	states {
@@ -10,7 +11,7 @@ object at /uk/ac/cam/cl/DBusSimulator/SimpleTest implements uk.ac.cam.cl.DBusSim
 	}
 
 	transition from Main to Main on method SingleStateEcho {
-		emit SingleStateSignal object->stored_greeting;
+		emit SingleStateSignal (object->stored_greeting);
 		reply greeting;
 	}
 
@@ -24,7 +25,7 @@ object at /uk/ac/cam/cl/DBusSimulator/SimpleTest implements uk.ac.cam.cl.DBusSim
 	}
 
 	transition from Main to Main on random {
-		emit CounterSignal object->counter;
+		emit CounterSignal (object->counter);
 		object->counter = object->counter + 1u;
 	}
 }
