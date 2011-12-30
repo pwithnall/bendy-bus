@@ -53,8 +53,12 @@ static gint run_time = 0;
 static gint run_iters = 0;
 static gboolean run_infinitely = FALSE;
 
-static const GOptionEntry entries[] = {
+static const GOptionEntry main_entries[] = {
 	{ "random-seed", 's', 0, G_OPTION_ARG_INT, &random_seed, N_("Seed value for the simulation’s random number generator"), N_("SEED") },
+	{ NULL }
+};
+
+static const GOptionEntry logging_entries[] = {
 	{ "test-program-log-file", 0, 0, G_OPTION_ARG_FILENAME, &test_program_log_file, N_("URI or path of a file to log test program output to"),
 	  N_("FILE") },
 	{ "test-program-log-fd", 0, 0, G_OPTION_ARG_INT, &test_program_log_fd, N_("Open FD to log test program output to"), N_("FD") },
@@ -64,6 +68,10 @@ static const GOptionEntry entries[] = {
 	{ "simulator-log-file", 0, 0, G_OPTION_ARG_FILENAME, &simulator_log_file, N_("URI or path of a file to log simulator output to"),
 	  N_("FILE") },
 	{ "simulator-log-fd", 0, 0, G_OPTION_ARG_INT, &simulator_log_fd, N_("Open FD to log simulator output to"), N_("FD") },
+	{ NULL }
+};
+
+static const GOptionEntry testing_entries[] = {
 	{ "test-timeout", 't', 0, G_OPTION_ARG_INT, &test_timeout, N_("Timeout (in seconds) for a test run to be aborted if no D-Bus activity occurs"),
 	  N_("SECS") },
 	{ "run-time", 'r', 0, G_OPTION_ARG_INT, &run_time, N_("Maximum time (in seconds) the set of test runs should take"), N_("SECS") },
@@ -487,6 +495,7 @@ int
 main (int argc, char *argv[])
 {
 	GError *error = NULL;
+	GOptionGroup *option_group;
 	GOptionContext *context;
 	const gchar *simulation_filename, *introspection_filename;
 	gchar *simulation_code, *introspection_xml;
@@ -509,7 +518,19 @@ main (int argc, char *argv[])
 	context = g_option_context_new (_("[simulation code file] [introspection XML file] -- [executable-file] [arguments]"));
 	g_option_context_set_translation_domain (context, GETTEXT_PACKAGE);
 	g_option_context_set_summary (context, _("Simulates the server in a D-Bus client–server conversation."));
-	g_option_context_add_main_entries (context, entries, GETTEXT_PACKAGE);
+	g_option_context_add_main_entries (context, main_entries, GETTEXT_PACKAGE);
+
+	/* Logging option group */
+	option_group = g_option_group_new ("logging", _("Logging Options:"), _("Show help options for output logging"), NULL, NULL);
+	g_option_group_set_translation_domain (option_group, GETTEXT_PACKAGE);
+	g_option_group_add_entries (option_group, logging_entries);
+	g_option_context_add_group (context, option_group);
+
+	/* Testing option group */
+	option_group = g_option_group_new ("testing", _("Testing Options:"), _("Show help options for test runs and timeouts"), NULL, NULL);
+	g_option_group_set_translation_domain (option_group, GETTEXT_PACKAGE);
+	g_option_group_add_entries (option_group, testing_entries);
+	g_option_context_add_group (context, option_group);
 
 	if (g_option_context_parse (context, &argc, &argv, &error) == FALSE) {
 		g_printerr (_("Error parsing command line options: %s"), error->message);
