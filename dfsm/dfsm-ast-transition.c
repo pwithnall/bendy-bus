@@ -17,8 +17,11 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
+
 #include <string.h>
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #include "dfsm-ast-precondition.h"
 #include "dfsm-ast-statement.h"
@@ -153,7 +156,7 @@ dfsm_ast_transition_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *
 	switch (priv->trigger) {
 		case DFSM_AST_TRANSITION_METHOD_CALL:
 			if (g_dbus_is_member_name (priv->trigger_params.method_name) == FALSE) {
-				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus method name: %s",
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid D-Bus method name: %s"),
 				             priv->trigger_params.method_name);
 				return;
 			}
@@ -161,7 +164,7 @@ dfsm_ast_transition_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *
 			break;
 		case DFSM_AST_TRANSITION_PROPERTY_SET:
 			if (g_dbus_is_member_name (priv->trigger_params.property_name) == FALSE) {
-				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus property name: %s",
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid D-Bus property name: %s"),
 				             priv->trigger_params.property_name);
 				return;
 			}
@@ -227,7 +230,7 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 			/* Failed to find a suitable interface? */
 			if (method_info == NULL) {
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-				             "Undeclared D-Bus method referenced as a transition trigger: %s", priv->trigger_params.method_name);
+				             _("Undeclared D-Bus method referenced as a transition trigger: %s"), priv->trigger_params.method_name);
 				return;
 			}
 
@@ -268,13 +271,13 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 			/* Failed to find a suitable interface? */
 			if (property_info == NULL) {
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-				             "Undeclared D-Bus property referenced as a transition trigger: %s", priv->trigger_params.property_name);
+				             _("Undeclared D-Bus property referenced as a transition trigger: %s"), priv->trigger_params.property_name);
 				return;
 			}
 
 			/* Warn if the property isn't writeable. */
 			if ((property_info->flags & G_DBUS_PROPERTY_INFO_FLAGS_WRITABLE) == 0) {
-				g_warning ("D-Bus property ‘%s’ referenced as a transition trigger is not writeable.",
+				g_warning (_("D-Bus property ‘%s’ referenced as a transition trigger is not writeable."),
 				           priv->trigger_params.property_name);
 			}
 

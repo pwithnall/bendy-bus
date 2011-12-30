@@ -17,7 +17,10 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
+
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #include "dfsm-object.h"
 #include "dfsm-ast.h"
@@ -435,7 +438,7 @@ dfsm_object_dbus_signal_emission_cb (DfsmMachine *machine, const gchar *signal_n
 	}
 
 	if (interface_name == NULL) {
-		g_warning ("Runtime error in simulation: Couldn't find interface containing signal ‘%s’.", signal_name);
+		g_warning (_("Runtime error in simulation: Couldn't find interface containing signal ‘%s’."), signal_name);
 		return;
 	}
 
@@ -455,7 +458,7 @@ dfsm_object_dbus_signal_emission_cb (DfsmMachine *machine, const gchar *signal_n
 	g_variant_unref (tuple_parameters);
 
 	if (child_error != NULL) {
-		g_warning ("Runtime error in simulation while emitting D-Bus signal ‘%s’: %s", signal_name, child_error->message);
+		g_warning (_("Runtime error in simulation while emitting D-Bus signal ‘%s’: %s"), signal_name, child_error->message);
 		g_clear_error (&child_error);
 	}
 }
@@ -493,7 +496,7 @@ dfsm_object_dbus_method_call (GDBusConnection *connection, const gchar *sender, 
 		} else {
 			/* Runtime error. Replace it with a generic D-Bus error so as not to expose internals of the
 			 * simulator to programs under test. */
-			g_warning ("Runtime error in simulation while handling D-Bus method call ‘%s’: %s", method_name, child_error->message);
+			g_warning (_("Runtime error in simulation while handling D-Bus method call ‘%s’: %s"), method_name, child_error->message);
 			g_dbus_method_invocation_return_dbus_error (invocation, "org.freedesktop.DBus.Error.Failed", child_error->message);
 		}
 
@@ -552,7 +555,7 @@ dfsm_object_dbus_get_property (GDBusConnection *connection, const gchar *sender,
 
 	if (value == NULL) {
 		/* Variable wasn't found. This shouldn't ever happen, since it's checked for in the checking stage of interpretation. */
-		g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED, "Runtime error in simulation: Variable ‘%s’ could not be found.", property_name);
+		g_set_error (error, G_IO_ERROR, G_IO_ERROR_FAILED, _("Runtime error in simulation: Variable ‘%s’ could not be found."), property_name);
 	}
 
 	return value;
@@ -587,7 +590,7 @@ dfsm_object_dbus_set_property (GDBusConnection *connection, const gchar *sender,
 		                               g_variant_new ("(sa{sv}as)", interface_name, builder, NULL), &signal_error);
 
 		if (signal_error != NULL) {
-			g_warning ("Runtime error in simulation while notifying of update to D-Bus property ‘%s’: %s", property_name,
+			g_warning (_("Runtime error in simulation while notifying of update to D-Bus property ‘%s’: %s"), property_name,
 			           child_error->message);
 			g_clear_error (&signal_error);
 		}
@@ -652,7 +655,7 @@ dfsm_object_register_on_bus (DfsmObject *self, GDBusConnection *connection, GErr
 		if (interface_info == NULL) {
 			/* Unknown interface! */
 			g_set_error (&child_error, DFSM_SIMULATION_ERROR, DFSM_SIMULATION_ERROR_UNKNOWN_INTERFACE,
-			             "D-Bus interface ‘%s’ not found in introspection XML.", interface_name);
+			             _("D-Bus interface ‘%s’ not found in introspection XML."), interface_name);
 			goto error;
 		}
 

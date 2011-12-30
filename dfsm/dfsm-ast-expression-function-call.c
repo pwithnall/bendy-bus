@@ -17,7 +17,10 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
+
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #include "dfsm-ast-expression-function-call.h"
 #include "dfsm-parser.h"
@@ -105,7 +108,7 @@ dfsm_ast_expression_function_call_pre_check_and_register (DfsmAstNode *node, Dfs
 	DfsmAstExpressionFunctionCallPrivate *priv = DFSM_AST_EXPRESSION_FUNCTION_CALL (node)->priv;
 
 	if (dfsm_environment_function_exists (priv->function_name) == FALSE || dfsm_is_function_name (priv->function_name) == FALSE) {
-		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid function name: %s", priv->function_name);
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid function name: %s"), priv->function_name);
 		return;
 	}
 

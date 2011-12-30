@@ -17,8 +17,11 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
+
 #include <string.h>
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #include "dfsm-ast-data-structure.h"
 #include "dfsm-ast-object.h"
@@ -244,7 +247,7 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 	GHashTable/*<string, DfsmMachineStateNumber>*/ *state_numbers = NULL;
 
 	if (g_variant_is_object_path (priv->object_path) == FALSE) {
-		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus object path: %s", priv->object_path);
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid D-Bus object path: %s"), priv->object_path);
 		goto done;
 	}
 
@@ -254,7 +257,7 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 		bus_name = g_ptr_array_index (priv->bus_names, i);
 
 		if (g_dbus_is_name (bus_name) == FALSE || g_dbus_is_unique_name (bus_name) == TRUE) {
-			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus well-known bus name: %s", bus_name);
+			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid D-Bus well-known bus name: %s"), bus_name);
 			goto done;
 		}
 	}
@@ -269,14 +272,14 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 
 		/* Valid interface name? */
 		if (g_dbus_is_interface_name (interface_name) == FALSE) {
-			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus interface name: %s", interface_name);
+			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid D-Bus interface name: %s"), interface_name);
 			goto done;
 		}
 
 		/* Duplicates? */
 		for (f = i + 1; f < priv->interface_names->len; f++) {
 			if (strcmp (interface_name, g_ptr_array_index (priv->interface_names, f)) == 0) {
-				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Duplicate D-Bus interface name: %s",
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Duplicate D-Bus interface name: %s"),
 				             interface_name);
 				goto done;
 			}
@@ -284,7 +287,7 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 
 		/* Defined in the node info? */
 		if (g_dbus_node_info_lookup_interface (node_info, interface_name) == NULL) {
-			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Unknown D-Bus interface name: %s", interface_name);
+			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Unknown D-Bus interface name: %s"), interface_name);
 			goto done;
 		}
 	}
@@ -302,13 +305,13 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 		while (g_hash_table_iter_next (&iter, (gpointer*) &key, (gpointer*) &value_data_structure) == TRUE) {
 			/* Valid variable name? */
 			if (dfsm_is_variable_name (key) == FALSE) {
-				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid variable name: %s", key);
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid variable name: %s"), key);
 				goto done;
 			}
 
 			/* Check for duplicates */
 			if (dfsm_environment_has_variable (priv->environment, DFSM_VARIABLE_SCOPE_OBJECT, key) == TRUE) {
-				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Duplicate variable name: %s", key);
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Duplicate variable name: %s"), key);
 				goto done;
 			}
 
@@ -324,7 +327,7 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 	/* States. Add the last state of the first state block to the priv->states array first, since it's the first state listed in the source
 	 * file (it just appears in a different position due to the way the parser's recursion is implemented). i.e. It's the main state. */
 	if (priv->state_blocks->len == 0 || ((GPtrArray*) g_ptr_array_index (priv->state_blocks, 0))->len == 0) {
-		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "A default state is required.");
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("A default state is required."));
 		goto done;
 	}
 
@@ -353,13 +356,13 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 
 			/* Valid state name? */
 			if (dfsm_is_state_name (state_name) == FALSE) {
-				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid state name: %s", state_name);
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid state name: %s"), state_name);
 				goto done;
 			}
 
 			/* Check for duplicates */
 			if (g_hash_table_lookup_extended (state_numbers, state_name, NULL, NULL) == TRUE) {
-				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Duplicate state name: %s", state_name);
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Duplicate state name: %s"), state_name);
 				goto done;
 			}
 
@@ -395,18 +398,18 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 
 			/* Validate the state names. */
 			if (dfsm_is_state_name (state_pair->from_state_name) == FALSE) {
-				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid ‘from’ state name: %s",
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid ‘from’ state name: %s"),
 				             state_pair->from_state_name);
 				goto done;
 			} else if (dfsm_is_state_name (state_pair->to_state_name) == FALSE) {
-				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid ‘to’ state name: %s",
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid ‘to’ state name: %s"),
 				             state_pair->to_state_name);
 				goto done;
 			}
 
 			/* Look up the allocated numbers of these state names. */
 			if (g_hash_table_lookup_extended (state_numbers, state_pair->from_state_name, NULL, &state_number_ptr) == FALSE) {
-				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Unknown ‘from’ state name: %s",
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Unknown ‘from’ state name: %s"),
 				             state_pair->from_state_name);
 				goto done;
 			} else {
@@ -414,7 +417,7 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 			}
 
 			if (g_hash_table_lookup_extended (state_numbers, state_pair->to_state_name, NULL, &state_number_ptr) == FALSE) {
-				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Unknown ‘to’ state name: %s",
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Unknown ‘to’ state name: %s"),
 				             state_pair->to_state_name);
 				goto done;
 			} else {
@@ -471,7 +474,7 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
 
 			if (child_error != NULL) {
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-				             "Couldn't evaluate default value for variable ‘%s’: %s", key, child_error->message);
+				             _("Couldn't evaluate default value for variable ‘%s’: %s"), key, child_error->message);
 				g_error_free (child_error);
 
 				return;
@@ -510,7 +513,7 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
 			/* Variable exists for the property? */
 			if (dfsm_environment_has_variable (environment, DFSM_VARIABLE_SCOPE_OBJECT, (*property_infos)->name) == FALSE) {
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-				             "D-Bus property without corresponding object variable: %s", (*property_infos)->name);
+				             _("D-Bus property without corresponding object variable: %s"), (*property_infos)->name);
 				return;
 			}
 
@@ -524,7 +527,7 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
 
 				expected_type_string = g_variant_type_dup_string (environment_type);
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-				             "Incorrect type for object variable ‘%s’ corresponding to D-Bus property: expected ‘%s’ but got ‘%s’.",
+				             _("Incorrect type for object variable ‘%s’ corresponding to D-Bus property: expected ‘%s’ but got ‘%s’."),
 				             (*property_infos)->name, (*property_infos)->signature, expected_type_string);
 				g_free (expected_type_string);
 

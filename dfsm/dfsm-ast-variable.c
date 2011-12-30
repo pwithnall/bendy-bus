@@ -17,7 +17,10 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
+
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #include "dfsm-ast-variable.h"
 #include "dfsm-parser.h"
@@ -90,7 +93,7 @@ dfsm_ast_variable_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *en
 	DfsmAstVariablePrivate *priv = DFSM_AST_VARIABLE (node)->priv;
 
 	if (dfsm_is_variable_name (priv->variable_name) == FALSE) {
-		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid variable name: %s", priv->variable_name);
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid variable name: %s"), priv->variable_name);
 		return;
 	}
 }
@@ -102,7 +105,7 @@ dfsm_ast_variable_check (DfsmAstNode *node, DfsmEnvironment *environment, GError
 
 	/* Check the variable exists in this scope. */
 	if (dfsm_environment_has_variable (environment, priv->scope, priv->variable_name) == FALSE) {
-		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Undeclared variable referenced: %s", priv->variable_name);
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Undeclared variable referenced: %s"), priv->variable_name);
 		return;
 	}
 }

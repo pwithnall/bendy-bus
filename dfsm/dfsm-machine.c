@@ -17,8 +17,11 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
+
 #include <string.h>
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #include "dfsm-ast.h"
 #include "dfsm-environment.h"
@@ -658,7 +661,7 @@ dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const 
 	/* Can't call a method if the simulation isn't running. */
 	if (priv->simulation_status != DFSM_SIMULATION_STATUS_STARTED) {
 		g_set_error (error, DFSM_SIMULATION_ERROR, DFSM_SIMULATION_ERROR_INVALID_STATUS,
-		             "Can't call a D-Bus method if the simulation isn't running.");
+		             _("Can't call a D-Bus method if the simulation isn't running."));
 		goto done;
 	}
 
@@ -668,7 +671,7 @@ dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const 
 	if (possible_transitions == NULL || possible_transitions->len == 0) {
 		/* Unknown method call. Spit out a warning and then return the unit tuple. If this is of the wrong type, then tough. We don't want
 		 * to start trying to make up arbitrary data structures to match a given method return type. */
-		g_warning ("Unrecognized method call to ‘%s’ on DFSM. Ignoring method call.", method_name);
+		g_warning (_("Unrecognized method call to ‘%s’ on DFSM. Ignoring method call."), method_name);
 		goto done;
 	}
 
@@ -678,14 +681,14 @@ dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const 
 	interface_info = g_dbus_node_info_lookup_interface (node_info, interface_name);
 
 	if (interface_info == NULL) {
-		g_warning ("Runtime error in simulation: Couldn't find interface containing method ‘%s’.", method_name);
+		g_warning (_("Runtime error in simulation: Couldn't find interface containing method ‘%s’."), method_name);
 		goto done;
 	}
 
 	method_info = g_dbus_interface_info_lookup_method (interface_info, method_name);
 
 	if (method_info == NULL) {
-		g_warning ("Runtime error in simulation: Couldn't find interface containing method ‘%s’.", method_name);
+		g_warning (_("Runtime error in simulation: Couldn't find interface containing method ‘%s’."), method_name);
 		goto done;
 	}
 
@@ -709,7 +712,7 @@ dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const 
 	}
 
 	if (method_info->in_args[i] != NULL || i < g_variant_n_children (parameters)) {
-		g_warning ("Runtime error in simulation: mismatch between interface and input of in-args for method ‘%s’. Continuing.", method_name);
+		g_warning (_("Runtime error in simulation: mismatch between interface and input of in-args for method ‘%s’. Continuing."), method_name);
 	}
 
 	/* Find and potentially execute a transition from the array. */
@@ -726,7 +729,7 @@ dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const 
 done:
 	/* If we failed to execute a transition, warn and return the unit tuple. */
 	if (executed_transition == FALSE && child_error == NULL) {
-		g_warning ("Failed to execute any DFSM transitions as a result of method call ‘%s’. Ignoring method call.", method_name);
+		g_warning (_("Failed to execute any DFSM transitions as a result of method call ‘%s’. Ignoring method call."), method_name);
 		return_value = g_variant_ref_sink (g_variant_new_tuple (NULL, 0));
 	} else if (executed_transition == FALSE || return_value == NULL) {
 		/* Error or precondition failure */
@@ -773,7 +776,7 @@ dfsm_machine_set_property (DfsmMachine *self, const gchar *interface_name, const
 	/* Can't set a property if the simulation isn't running. */
 	if (priv->simulation_status != DFSM_SIMULATION_STATUS_STARTED) {
 		g_set_error (error, DFSM_SIMULATION_ERROR, DFSM_SIMULATION_ERROR_INVALID_STATUS,
-		             "Can't set a D-Bus property if the simulation isn't running.");
+		             _("Can't set a D-Bus property if the simulation isn't running."));
 		goto done;
 	}
 

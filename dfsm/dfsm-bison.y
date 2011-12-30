@@ -10,9 +10,12 @@
 %expect 13 /* shift-reduce conflicts */
 
 %code top {
+	#include "config.h"
+
 	#include <stdio.h>
 	#include <math.h>
 	#include <glib.h>
+	#include <glib/gi18n-lib.h>
 }
 
 %code requires {
@@ -505,7 +508,7 @@ dfsm_bison_parse (GDBusNodeInfo *dbus_node_info, const gchar *source_buf, GError
 
 		/* If an error had already been set, return that; otherwise report the OOM. */
 		if (child_error == NULL) {
-			g_set_error (&child_error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_OOM, "Out of memory.");
+			g_set_error (&child_error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_OOM, _("Out of memory."));
 		}
 	} else {
 		g_assert_not_reached ();
@@ -531,7 +534,7 @@ dfsm_bison_parse (GDBusNodeInfo *dbus_node_info, const gchar *source_buf, GError
 static void
 yyerror (YYLTYPE *yylloc, DfsmParserData *parser_data, GError **error, const char *message)
 {
-	g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_SYNTAX, "Syntax error at %u:%u–%u:%u: %s",
+	g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_SYNTAX, _("Syntax error at %u:%u–%u:%u: %s"),
 	             yylloc->first_line, yylloc->first_column + 1 /* zero-based */,
 	             yylloc->last_line, yylloc->last_column + 1 /* zero-based */, message);
 }

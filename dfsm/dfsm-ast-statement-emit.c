@@ -17,7 +17,10 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
+
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #include "dfsm-ast-statement-emit.h"
 #include "dfsm-internal.h"
@@ -102,7 +105,7 @@ dfsm_ast_statement_emit_pre_check_and_register (DfsmAstNode *node, DfsmEnvironme
 	DfsmAstStatementEmitPrivate *priv = DFSM_AST_STATEMENT_EMIT (node)->priv;
 
 	if (g_dbus_is_member_name (priv->signal_name) == FALSE) {
-		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus signal name: %s", priv->signal_name);
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid D-Bus signal name: %s"), priv->signal_name);
 		return;
 	}
 
@@ -146,7 +149,7 @@ dfsm_ast_statement_emit_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 	/* TODO: This doesn't check the interfaces against what the object actually declares it implements. */
 	if (signal_info == NULL) {
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-		             "Undeclared D-Bus signal referenced by an ‘emit’ statement: %s", priv->signal_name);
+		             _("Undeclared D-Bus signal referenced by an ‘emit’ statement: %s"), priv->signal_name);
 		return;
 	}
 
@@ -164,7 +167,7 @@ dfsm_ast_statement_emit_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 		g_variant_type_free (expr_parameters_type);
 
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-		             "Type mismatch between formal and actual parameters to D-Bus signal ‘%s’: expects type ‘%s’ but received type ‘%s’.",
+		             _("Type mismatch between formal and actual parameters to D-Bus signal ‘%s’: expects type ‘%s’ but received type ‘%s’."),
 		             priv->signal_name, signal_parameters_type_string, expr_parameters_type_string);
 
 		g_free (signal_parameters_type_string);

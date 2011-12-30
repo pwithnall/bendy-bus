@@ -17,7 +17,10 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
+
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #include "dfsm-ast-precondition.h"
 #include "dfsm-parser.h"
@@ -95,7 +98,7 @@ dfsm_ast_precondition_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment
 	DfsmAstPreconditionPrivate *priv = DFSM_AST_PRECONDITION (node)->priv;
 
 	if (priv->error_name != NULL && g_dbus_is_member_name (priv->error_name) == FALSE) {
-		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid D-Bus error name: %s", priv->error_name);
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid D-Bus error name: %s"), priv->error_name);
 		return;
 	}
 
@@ -129,7 +132,7 @@ dfsm_ast_precondition_check (DfsmAstNode *node, DfsmEnvironment *environment, GE
 		g_variant_type_free (condition_type);
 
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-		             "Incorrect type for precondition expression: expects type ‘%s’ but received type ‘%s’.",
+		             _("Incorrect type for precondition expression: expects type ‘%s’ but received type ‘%s’."),
 		             "b", condition_type_string);
 
 		g_free (condition_type_string);
@@ -205,7 +208,7 @@ dfsm_ast_precondition_check_is_satisfied (DfsmAstPrecondition *self, DfsmEnviron
 	condition_holds = g_variant_get_boolean (condition_value);
 
 	if (condition_holds == FALSE && priv->error_name != NULL) {
-		g_dbus_error_set_dbus_error (error, priv->error_name, "Precondition failed.", NULL);
+		g_dbus_error_set_dbus_error (error, priv->error_name, _("Precondition failed."), NULL);
 	}
 
 	g_variant_unref (condition_value);

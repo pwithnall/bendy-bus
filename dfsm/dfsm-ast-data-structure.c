@@ -17,9 +17,12 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
+
 #include <limits.h>
 #include <string.h>
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #include "dfsm-ast-data-structure.h"
 #include "dfsm-ast-expression-data-structure.h"
@@ -230,7 +233,7 @@ dfsm_ast_data_structure_pre_check_and_register (DfsmAstNode *node, DfsmEnvironme
 
 	/* See if our type annotation is sane (if we have one). */
 	if (priv->type_annotation != NULL && g_variant_type_string_is_valid (priv->type_annotation) == FALSE) {
-		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid type annotation: %s", priv->type_annotation);
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid type annotation: %s"), priv->type_annotation);
 		return;
 	}
 
@@ -250,7 +253,7 @@ dfsm_ast_data_structure_pre_check_and_register (DfsmAstNode *node, DfsmEnvironme
 			/* Valid UTF-8? */
 			if (g_utf8_validate (priv->string_val, -1, NULL) == FALSE) {
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-				             "Invalid UTF-8 in string: %s", priv->string_val);
+				             _("Invalid UTF-8 in string: %s"), priv->string_val);
 				return;
 			}
 
@@ -259,7 +262,7 @@ dfsm_ast_data_structure_pre_check_and_register (DfsmAstNode *node, DfsmEnvironme
 			/* Valid object path? */
 			if (g_variant_is_object_path (priv->object_path_val) == FALSE) {
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-				             "Invalid D-Bus object path: %s", priv->object_path_val);
+				             _("Invalid D-Bus object path: %s"), priv->object_path_val);
 				return;
 			}
 
@@ -268,7 +271,7 @@ dfsm_ast_data_structure_pre_check_and_register (DfsmAstNode *node, DfsmEnvironme
 			/* Valid signature? */
 			if (g_variant_type_string_is_valid ((gchar*) priv->signature_val) == FALSE) {
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-				             "Invalid D-Bus type signature: %s", priv->signature_val);
+				             _("Invalid D-Bus type signature: %s"), priv->signature_val);
 				return;
 			}
 
@@ -540,7 +543,7 @@ _calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment, GErro
 				calculated_type_string = g_variant_type_dup_string (calculated_type);
 
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-				             "Type mismatch between type annotation (‘%s’) and data structure type (‘%s’).", annotated_type_string,
+				             _("Type mismatch between type annotation (‘%s’) and data structure type (‘%s’)."), annotated_type_string,
 				             calculated_type_string);
 
 				g_free (calculated_type_string);
@@ -808,19 +811,19 @@ dfsm_ast_data_structure_set_weight (DfsmAstDataStructure *self, gdouble weight)
 				/* No problems with fuzzing these. */
 				break;
 			case DFSM_AST_DATA_STRUCT:
-				g_warning ("Can't fuzz structures. Ignoring the indication to fuzz %p.", self);
+				g_warning (_("Can't fuzz structures. Ignoring the indication to fuzz %p."), self);
 				return;
 			case DFSM_AST_DATA_VARIANT:
-				g_warning ("Can't fuzz variants. Ignoring the indication to fuzz %p.", self);
+				g_warning (_("Can't fuzz variants. Ignoring the indication to fuzz %p."), self);
 				return;
 			case DFSM_AST_DATA_UNIX_FD:
-				g_warning ("Can't fuzz Unix FDs. Ignoring the indication to fuzz %p.", self);
+				g_warning (_("Can't fuzz Unix FDs. Ignoring the indication to fuzz %p."), self);
 				return;
 			case DFSM_AST_DATA_REGEXP:
-				g_warning ("Can't fuzz regular expressions. Ignoring the indication to fuzz %p.", self);
+				g_warning (_("Can't fuzz regular expressions. Ignoring the indication to fuzz %p."), self);
 				return;
 			case DFSM_AST_DATA_VARIABLE:
-				g_warning ("Can't fuzz variables. Ignoring the indication to fuzz %p.", self);
+				g_warning (_("Can't fuzz variables. Ignoring the indication to fuzz %p."), self);
 				return;
 			default:
 				g_assert_not_reached ();
@@ -2008,7 +2011,7 @@ dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnviro
 		case DFSM_AST_DATA_VARIANT:
 		case DFSM_AST_DATA_UNIX_FD:
 		case DFSM_AST_DATA_REGEXP:
-			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, "Invalid assignment to a basic data structure.");
+			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid assignment to a basic data structure."));
 			break;
 		case DFSM_AST_DATA_ARRAY: {
 			guint i;

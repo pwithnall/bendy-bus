@@ -17,7 +17,10 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
+
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #include "dfsm-ast-expression-unary.h"
 #include "dfsm-parser.h"
@@ -136,7 +139,7 @@ dfsm_ast_expression_unary_check (DfsmAstNode *node, DfsmEnvironment *environment
 		g_variant_type_free (child_type);
 
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-		             "Type mismatch between the formal and actual parameter to unary operator %u: expects type %s but received type %s.",
+		             _("Type mismatch between the formal and actual parameter to unary operator %u: expects type %s but received type %s."),
 		             priv->expression_type, formal, actual);
 		return;
 	}

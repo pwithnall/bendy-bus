@@ -17,7 +17,10 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
+
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #include "dfsm-ast-expression-binary.h"
 #include "dfsm-parser.h"
@@ -198,7 +201,7 @@ dfsm_ast_expression_binary_check (DfsmAstNode *node, DfsmEnvironment *environmen
 		g_variant_type_free (lvalue_type);
 
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-		             "Type mismatch between parameters to binary operator %u: received left type %s and right type %s.",
+		             _("Type mismatch between parameters to binary operator %u: received left type %s and right type %s."),
 		             priv->expression_type, left, right);
 		return;
 	}

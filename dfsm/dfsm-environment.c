@@ -17,8 +17,11 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
+
 #include <string.h>
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #include "dfsm-environment.h"
 #include "dfsm-marshal.h"
@@ -496,7 +499,7 @@ func_set_calculate_type_error (GError **error, const gchar *function_name, const
 	parameters_type_string = g_variant_type_dup_string (parameters_type);
 
 	g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-	             "Type mismatch between formal and actual parameters to function ‘%s’: expects type ‘%s’ but received type ‘%s’.",
+	             _("Type mismatch between formal and actual parameters to function ‘%s’: expects type ‘%s’ but received type ‘%s’."),
 	             function_name, parameters_supertype_string, parameters_type_string);
 
 	g_free (parameters_type_string);
@@ -616,8 +619,8 @@ _in_array_calculate_type (const GVariantType *parameters_type, GError **error)
 		parameters_type_string = g_variant_type_dup_string (parameters_type);
 
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-		             "Type mismatch between formal and actual parameters to function ‘%s’: expects type ‘%s’ with the first item a subtype "
-		             "of the element type of the second item, but received type ‘%s’.",
+		             _("Type mismatch between formal and actual parameters to function ‘%s’: expects type ‘%s’ with the first item a subtype "
+		               "of the element type of the second item, but received type ‘%s’."),
 		             "inArray", parameters_supertype_string, parameters_type_string);
 
 		g_free (parameters_type_string);

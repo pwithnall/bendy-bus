@@ -17,7 +17,10 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "config.h"
+
 #include <glib.h>
+#include <glib/gi18n-lib.h>
 
 #include "dfsm-ast-statement-assignment.h"
 #include "dfsm-parser.h"
@@ -133,7 +136,7 @@ dfsm_ast_statement_assignment_check (DfsmAstNode *node, DfsmEnvironment *environ
 		g_variant_type_free (rvalue_type);
 
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-		             "Type mismatch for assignment: expected l-value type %s but received r-value type %s.", expected, received);
+		             _("Type mismatch for assignment: expected l-value type %s but received r-value type %s."), expected, received);
 
 		return;
 	}
