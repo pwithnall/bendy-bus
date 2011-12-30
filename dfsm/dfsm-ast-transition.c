@@ -114,9 +114,6 @@ dfsm_ast_transition_sanity_check (DfsmAstNode *node)
 	DfsmAstTransitionPrivate *priv = DFSM_AST_TRANSITION (node)->priv;
 	guint i;
 
-	g_assert (priv->preconditions != NULL);
-	g_assert (priv->statements != NULL);
-
 	switch (priv->trigger) {
 		case DFSM_AST_TRANSITION_METHOD_CALL:
 			g_assert (priv->trigger_params.method_name != NULL);
@@ -131,12 +128,18 @@ dfsm_ast_transition_sanity_check (DfsmAstNode *node)
 			g_assert_not_reached ();
 	}
 
+	g_assert (priv->preconditions != NULL);
+
 	for (i = 0; i < priv->preconditions->len; i++) {
 		g_assert (g_ptr_array_index (priv->preconditions, i) != NULL);
+		dfsm_ast_node_sanity_check (DFSM_AST_NODE (g_ptr_array_index (priv->preconditions, i)));
 	}
+
+	g_assert (priv->statements != NULL);
 
 	for (i = 0; i < priv->statements->len; i++) {
 		g_assert (g_ptr_array_index (priv->statements, i) != NULL);
+		dfsm_ast_node_sanity_check (DFSM_AST_NODE (g_ptr_array_index (priv->statements, i)));
 	}
 }
 

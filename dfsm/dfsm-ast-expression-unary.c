@@ -88,6 +88,7 @@ dfsm_ast_expression_unary_sanity_check (DfsmAstNode *node)
 	}
 
 	g_assert (priv->child_node != NULL);
+	dfsm_ast_node_sanity_check (DFSM_AST_NODE (priv->child_node));
 }
 
 static void

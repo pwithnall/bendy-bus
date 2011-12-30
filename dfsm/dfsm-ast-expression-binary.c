@@ -102,7 +102,10 @@ dfsm_ast_expression_binary_sanity_check (DfsmAstNode *node)
 	}
 
 	g_assert (priv->left_node != NULL);
+	dfsm_ast_node_sanity_check (DFSM_AST_NODE (priv->left_node));
+
 	g_assert (priv->right_node != NULL);
+	dfsm_ast_node_sanity_check (DFSM_AST_NODE (priv->right_node));
 }
 
 static void

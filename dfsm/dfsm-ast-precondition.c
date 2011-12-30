@@ -85,6 +85,7 @@ dfsm_ast_precondition_sanity_check (DfsmAstNode *node)
 	DfsmAstPreconditionPrivate *priv = DFSM_AST_PRECONDITION (node)->priv;
 
 	g_assert (priv->condition != NULL);
+	dfsm_ast_node_sanity_check (DFSM_AST_NODE (priv->condition));
 }
 
 static void

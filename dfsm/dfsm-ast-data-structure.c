@@ -177,6 +177,7 @@ dfsm_ast_data_structure_sanity_check (DfsmAstNode *node)
 
 			for (i = 0; i < priv->array_val->len; i++) {
 				g_assert (g_ptr_array_index (priv->array_val, i) != NULL);
+				dfsm_ast_node_sanity_check (DFSM_AST_NODE (g_ptr_array_index (priv->array_val, i)));
 			}
 
 			break;
@@ -185,17 +186,23 @@ dfsm_ast_data_structure_sanity_check (DfsmAstNode *node)
 
 			for (i = 0; i < priv->struct_val->len; i++) {
 				g_assert (g_ptr_array_index (priv->struct_val, i) != NULL);
+				dfsm_ast_node_sanity_check (DFSM_AST_NODE (g_ptr_array_index (priv->struct_val, i)));
 			}
 
 			break;
 		case DFSM_AST_DATA_VARIANT:
 			g_assert (DFSM_IS_AST_EXPRESSION (priv->variant_val));
+			dfsm_ast_node_sanity_check (DFSM_AST_NODE (priv->variant_val));
 			break;
 		case DFSM_AST_DATA_DICT:
 			g_assert (priv->dict_val != NULL);
 
 			for (i = 0; i < priv->dict_val->len; i++) {
-				g_assert (g_ptr_array_index (priv->dict_val, i) != NULL);
+				DfsmAstDictionaryEntry *dict_val = (DfsmAstDictionaryEntry*) g_ptr_array_index (priv->dict_val, i);
+
+				g_assert (dict_val != NULL);
+				dfsm_ast_node_sanity_check (DFSM_AST_NODE (dict_val->key));
+				dfsm_ast_node_sanity_check (DFSM_AST_NODE (dict_val->value));
 			}
 
 			break;
@@ -207,6 +214,7 @@ dfsm_ast_data_structure_sanity_check (DfsmAstNode *node)
 			break;
 		case DFSM_AST_DATA_VARIABLE:
 			g_assert (priv->variable_val != NULL);
+			dfsm_ast_node_sanity_check (DFSM_AST_NODE (priv->variable_val));
 			break;
 		default:
 			g_assert_not_reached ();

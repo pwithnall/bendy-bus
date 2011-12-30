@@ -74,6 +74,7 @@ dfsm_ast_statement_reply_sanity_check (DfsmAstNode *node)
 	DfsmAstStatementReplyPrivate *priv = DFSM_AST_STATEMENT_REPLY (node)->priv;
 
 	g_assert (priv->expression != NULL);
+	dfsm_ast_node_sanity_check (DFSM_AST_NODE (priv->expression));
 }
 
 static void

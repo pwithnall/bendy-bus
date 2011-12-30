@@ -90,7 +90,9 @@ dfsm_ast_statement_emit_sanity_check (DfsmAstNode *node)
 	DfsmAstStatementEmitPrivate *priv = DFSM_AST_STATEMENT_EMIT (node)->priv;
 
 	g_assert (priv->signal_name != NULL);
+
 	g_assert (priv->expression != NULL);
+	dfsm_ast_node_sanity_check (DFSM_AST_NODE (priv->expression));
 }
 
 static void

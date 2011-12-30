@@ -168,11 +168,8 @@ dfsm_ast_object_sanity_check (DfsmAstNode *node)
 	guint i;
 
 	g_assert (priv->object_path != NULL);
+
 	g_assert (priv->bus_names != NULL);
-	g_assert (priv->interface_names != NULL);
-	g_assert (DFSM_IS_ENVIRONMENT (priv->environment));
-	g_assert (priv->states != NULL);
-	g_assert (priv->transitions != NULL);
 
 	for (i = 0; i < priv->bus_names->len; i++) {
 		const gchar *bus_name;
@@ -181,6 +178,8 @@ dfsm_ast_object_sanity_check (DfsmAstNode *node)
 		g_assert (bus_name != NULL && *bus_name != '\0');
 	}
 
+	g_assert (priv->interface_names != NULL);
+
 	for (i = 0; i < priv->interface_names->len; i++) {
 		const gchar *interface_name;
 
@@ -188,7 +187,10 @@ dfsm_ast_object_sanity_check (DfsmAstNode *node)
 		g_assert (interface_name != NULL);
 	}
 
+	g_assert (DFSM_IS_ENVIRONMENT (priv->environment));
 	/* TODO: Check all variable names and values in ->environment are non-NULL */
+
+	g_assert (priv->states != NULL);
 
 	for (i = 0; i < priv->states->len; i++) {
 		const gchar *state_name;
@@ -197,6 +199,19 @@ dfsm_ast_object_sanity_check (DfsmAstNode *node)
 		g_assert (state_name != NULL);
 	}
 
+	g_assert (priv->transitions != NULL);
+
+	for (i = 0; i < priv->transitions->len; i++) {
+		DfsmAstObjectTransition *object_transition;
+
+		object_transition = g_ptr_array_index (priv->transitions, i);
+
+		g_assert (object_transition != NULL);
+		g_assert (DFSM_IS_AST_TRANSITION (object_transition->transition));
+	}
+
+	/* TODO: data_blocks and state_blocks */
+
 	if (priv->transition_blocks != NULL) {
 		for (i = 0; i < priv->transition_blocks->len; i++) {
 			guint j;
@@ -204,6 +219,8 @@ dfsm_ast_object_sanity_check (DfsmAstNode *node)
 
 			g_assert (transition_block != NULL);
 			g_assert (DFSM_IS_AST_TRANSITION (transition_block->transition));
+			dfsm_ast_node_sanity_check (DFSM_AST_NODE (transition_block->transition));
+
 			g_assert (transition_block->state_pairs != NULL);
 			g_assert (transition_block->state_pairs->len > 0);
 
@@ -213,15 +230,6 @@ dfsm_ast_object_sanity_check (DfsmAstNode *node)
 				g_assert (state_pair->to_state_name != NULL);
 			}
 		}
-	}
-
-	for (i = 0; i < priv->transitions->len; i++) {
-		DfsmAstObjectTransition *object_transition;
-
-		object_transition = g_ptr_array_index (priv->transitions, i);
-
-		g_assert (object_transition != NULL);
-		g_assert (DFSM_IS_AST_TRANSITION (object_transition->transition));
 	}
 }
 

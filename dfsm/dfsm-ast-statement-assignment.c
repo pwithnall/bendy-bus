@@ -77,7 +77,10 @@ dfsm_ast_statement_assignment_sanity_check (DfsmAstNode *node)
 	DfsmAstStatementAssignmentPrivate *priv = DFSM_AST_STATEMENT_ASSIGNMENT (node)->priv;
 
 	g_assert (priv->data_structure != NULL);
+	dfsm_ast_node_sanity_check (DFSM_AST_NODE (priv->data_structure));
+
 	g_assert (priv->expression != NULL);
+	dfsm_ast_node_sanity_check (DFSM_AST_NODE (priv->expression));
 }
 
 static void

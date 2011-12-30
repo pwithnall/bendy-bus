@@ -78,6 +78,7 @@ dfsm_ast_expression_data_structure_sanity_check (DfsmAstNode *node)
 	DfsmAstExpressionDataStructurePrivate *priv = DFSM_AST_EXPRESSION_DATA_STRUCTURE (node)->priv;
 
 	g_assert (priv->data_structure != NULL);
+	dfsm_ast_node_sanity_check (DFSM_AST_NODE (priv->data_structure));
 }
 
 static void

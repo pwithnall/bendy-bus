@@ -93,7 +93,9 @@ dfsm_ast_expression_function_call_sanity_check (DfsmAstNode *node)
 	DfsmAstExpressionFunctionCallPrivate *priv = DFSM_AST_EXPRESSION_FUNCTION_CALL (node)->priv;
 
 	g_assert (priv->function_name != NULL);
+
 	g_assert (priv->parameters != NULL);
+	dfsm_ast_node_sanity_check (DFSM_AST_NODE (priv->parameters));
 }
 
 static void
