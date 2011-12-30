@@ -223,7 +223,7 @@ dsim_logging_finalise (void)
 static const gchar *logging_domain_names[] = {
 	"test-program", /* DSIM_LOG_TEST_PROGRAM */
 	"dbus-daemon", /* DSIM_LOG_DBUS_DAEMON */
-	"dbus-simulator", /* DSIM_LOG_SIMULATOR */
+	"bendy-bus", /* DSIM_LOG_SIMULATOR */
 	"libdfsm", /* DSIM_LOG_SIMULATOR_LIBRARY */
 };
 

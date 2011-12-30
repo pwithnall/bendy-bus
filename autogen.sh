@@ -4,7 +4,7 @@
 srcdir=`dirname $0`
 test -z "$srcdir" && srcdir=.
 
-PKG_NAME="dbus-simulator"
+PKG_NAME="bendy-bus"
 
 (test -f $srcdir/configure.ac) || {
 	echo -n "**Error**: Directory ‘$srcdir’ does not look like the top-level $PKG_NAME directory"

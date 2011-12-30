@@ -4,7 +4,7 @@ m4_define(version_minor, 1)
 m4_define(version_micro, 0)
 
 # autofoo
-AC_INIT([D-Bus simulator],[version_major.version_minor.version_micro],[],[dbus-simulator],[])
+AC_INIT([Bendy Bus],[version_major.version_minor.version_micro],[],[bendy-bus],[])
 AM_INIT_AUTOMAKE([check-news dist-bzip2 no-dist-gzip])
 
 AC_CONFIG_MACRO_DIR([m4])
@@ -24,7 +24,7 @@ LT_INIT
 AC_PATH_PROG([GLIB_GENMARSHAL],[glib-genmarshal])
 
 # Internationalisation
-GETTEXT_PACKAGE=dbus-simulator
+GETTEXT_PACKAGE=bendy-bus
 AC_SUBST(GETTEXT_PACKAGE)
 AC_DEFINE_UNQUOTED(GETTEXT_PACKAGE,["$GETTEXT_PACKAGE"],[Define to the Gettext package name])
 IT_PROG_INTLTOOL([0.40.0])

@@ -177,38 +177,38 @@ GITIGNOREFILES += \
 	dfsm/tests/.dirstamp \
 	$(NULL)
 
-# dbus-simulator
-bin_PROGRAMS += dbus-simulator/dbus-simulator
+# bendy-bus
+bin_PROGRAMS += bendy-bus/bendy-bus
 
-dbus_simulator_dbus_simulator_SOURCES = \
-	$(dbus_simulator_marshal_sources) \
-	dbus-simulator/main.c \
-	dbus-simulator/program-wrapper.c \
-	dbus-simulator/program-wrapper.h \
-	dbus-simulator/dbus-daemon.c \
-	dbus-simulator/dbus-daemon.h \
-	dbus-simulator/test-program.c \
-	dbus-simulator/test-program.h \
-	dbus-simulator/logging.c \
-	dbus-simulator/logging.h \
+bendy_bus_bendy_bus_SOURCES = \
+	$(bendy_bus_marshal_sources) \
+	bendy-bus/main.c \
+	bendy-bus/program-wrapper.c \
+	bendy-bus/program-wrapper.h \
+	bendy-bus/dbus-daemon.c \
+	bendy-bus/dbus-daemon.h \
+	bendy-bus/test-program.c \
+	bendy-bus/test-program.h \
+	bendy-bus/logging.c \
+	bendy-bus/logging.h \
 	$(NULL)
 
-dbus_simulator_dbus_simulator_CPPFLAGS = \
+bendy_bus_bendy_bus_CPPFLAGS = \
 	-I$(top_srcdir) \
 	-DPACKAGE_LOCALE_DIR=\""$(datadir)/locale"\" \
-	-DG_LOG_DOMAIN=\"dbus-simulator\" \
+	-DG_LOG_DOMAIN=\"bendy-bus\" \
 	$(DISABLE_DEPRECATED) \
 	$(AM_CPPFLAGS) \
 	$(NULL)
 
-dbus_simulator_dbus_simulator_CFLAGS = \
+bendy_bus_bendy_bus_CFLAGS = \
 	$(WARN_CFLAGS) \
 	$(GLIB_CFLAGS) \
 	$(GIO_CFLAGS) \
 	$(AM_CFLAGS) \
 	$(NULL)
 
-dbus_simulator_dbus_simulator_LDADD = \
+bendy_bus_bendy_bus_LDADD = \
 	$(top_builddir)/dfsm/libdfsm.la \
 	$(GLIB_LIBS) \
 	$(GIO_LIBS) \
@@ -217,33 +217,33 @@ dbus_simulator_dbus_simulator_LDADD = \
 
 # git.mk can't handle non-recursive automake so well
 GITIGNOREFILES += \
-	dbus-simulator/.dirstamp \
-	dbus-simulator/.libs/ \
+	bendy-bus/.dirstamp \
+	bendy-bus/.libs/ \
 	$(NULL)
 
-# dbus-simulator-lint
-bin_PROGRAMS += dbus-simulator-lint/dbus-simulator-lint
+# bendy-bus-lint
+bin_PROGRAMS += bendy-bus-lint/bendy-bus-lint
 
-dbus_simulator_lint_dbus_simulator_lint_SOURCES = \
-	dbus-simulator-lint/main.c \
+bendy_bus_lint_bendy_bus_lint_SOURCES = \
+	bendy-bus-lint/main.c \
 	$(NULL)
 
-dbus_simulator_lint_dbus_simulator_lint_CPPFLAGS = \
+bendy_bus_lint_bendy_bus_lint_CPPFLAGS = \
 	-I$(top_srcdir) \
 	-DPACKAGE_LOCALE_DIR=\""$(datadir)/locale"\" \
-	-DG_LOG_DOMAIN=\"dbus-simulator-lint\" \
+	-DG_LOG_DOMAIN=\"bendy-bus-lint\" \
 	$(DISABLE_DEPRECATED) \
 	$(AM_CPPFLAGS) \
 	$(NULL)
 
-dbus_simulator_lint_dbus_simulator_lint_CFLAGS = \
+bendy_bus_lint_bendy_bus_lint_CFLAGS = \
 	$(WARN_CFLAGS) \
 	$(GLIB_CFLAGS) \
 	$(GIO_CFLAGS) \
 	$(AM_CFLAGS) \
 	$(NULL)
 
-dbus_simulator_lint_dbus_simulator_lint_LDADD = \
+bendy_bus_lint_bendy_bus_lint_LDADD = \
 	$(top_builddir)/dfsm/libdfsm.la \
 	$(GLIB_LIBS) \
 	$(GIO_LIBS) \
@@ -252,23 +252,23 @@ dbus_simulator_lint_dbus_simulator_lint_LDADD = \
 
 # git.mk can't handle non-recursive automake so well
 GITIGNOREFILES += \
-	dbus-simulator-lint/.dirstamp \
-	dbus-simulator-lint/.libs/ \
+	bendy-bus-lint/.dirstamp \
+	bendy-bus-lint/.libs/ \
 	$(NULL)
 
 # Marshalling
-dbus_simulator_marshal_sources = \
-	dbus-simulator/marshal.c \
-	dbus-simulator/marshal.h \
+bendy_bus_marshal_sources = \
+	bendy-bus/marshal.c \
+	bendy-bus/marshal.h \
 	$(NULL)
 
-dbus-simulator/marshal.h: $(top_srcdir)/dbus-simulator/marshal.list
+bendy-bus/marshal.h: $(top_srcdir)/bendy-bus/marshal.list
 	$(AM_V_GEN) $(GLIB_GENMARSHAL) --prefix=dsim_marshal --header $< > $@
-dbus-simulator/marshal.c: $(top_srcdir)/dbus-simulator/marshal.list dbus-simulator/marshal.h
+bendy-bus/marshal.c: $(top_srcdir)/bendy-bus/marshal.list bendy-bus/marshal.h
 	$(AM_V_GEN) $(GLIB_GENMARSHAL) --prefix=dsim_marshal --header --body $< > $@
 
-EXTRA_DIST += $(top_srcdir)/dbus-simulator/marshal.list
-CLEANFILES += $(dbus_simulator_marshal_sources)
+EXTRA_DIST += $(top_srcdir)/bendy-bus/marshal.list
+CLEANFILES += $(bendy_bus_marshal_sources)
 
 # Gubbins
 ACLOCAL_AMFLAGS = -I m4
