@@ -281,9 +281,17 @@ static void
 dbus_daemon_died_cb (DsimProgramWrapper *wrapper, gint status, MainData *data)
 {
 	/* This should never happen. We assume the dbus-daemon is rock solid. */
-	if (!WIFEXITED (status)) {
+	if (WIFEXITED (status)) {
+		g_debug ("Stopping simulation due to dbus-daemon exiting (status: %i).", status);
+	} else {
 		g_debug ("Stopping simulation due to dbus-daemon crashing (status: %i).", status);
+	}
+
+	/* Have we created/spawned the test program yet? If not, we don't have much cleaning up to do. */
+	if (data->test_program != NULL) {
 		stop_simulation (data);
+	} else {
+		g_main_loop_quit (data->main_loop);
 	}
 }
 
@@ -300,7 +308,6 @@ static void
 start_simulation (MainData *data)
 {
 	g_signal_connect (data->test_program, "process-died", (GCallback) test_program_died_cb, data);
-	g_signal_connect (data->dbus_daemon, "process-died", (GCallback) dbus_daemon_died_cb, data);
 
 	/* Spawn the program under test. */
 	spawn_test_program (data);
@@ -642,9 +649,12 @@ main (int argc, char *argv[])
 	/* Prepare the main data struct, which will last for the lifetime of the program. */
 	data.main_loop = g_main_loop_new (NULL, FALSE);
 	data.exit_status = STATUS_SUCCESS;
+	data.test_program = NULL;
+	data.connection = NULL;
 	data.simulated_objects = g_ptr_array_ref (simulated_objects);
 	data.bus_name_ids = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
 	data.outstanding_bus_ownership_callbacks = 0;
+	data.test_run_inactivity_timeout_id = 0;
 
 	if (run_infinitely == TRUE || (run_iters == 0 && run_time == 0)) {
 		data.num_test_runs_remaining = -1;
@@ -664,6 +674,8 @@ main (int argc, char *argv[])
 	/* TODO */
 	data.dbus_daemon = dsim_dbus_daemon_new (g_file_new_for_path ("/tmp/dbus"), g_file_new_for_path ("/tmp/dbus/config.xml"));
 	data.dbus_address = NULL;
+
+	g_signal_connect (data.dbus_daemon, "process-died", (GCallback) dbus_daemon_died_cb, &data);
 	g_signal_connect (data.dbus_daemon, "notify::bus-address", (GCallback) dbus_daemon_notify_bus_address_cb, &data);
 
 	dsim_program_wrapper_spawn (DSIM_PROGRAM_WRAPPER (data.dbus_daemon), &error);
