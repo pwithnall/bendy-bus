@@ -169,17 +169,29 @@ test_inactivity_timeout_cb (MainData *data)
 }
 
 static void
-simulated_object_dbus_activity_count_notify_cb (GObject *obj, GParamSpec *pspec, MainData *data)
+remove_inactivity_timeout (MainData *data)
 {
-	/* Reset our inactivity timeout. */
+	/* Remove our inactivity timeout. */
 	if (data->test_run_inactivity_timeout_id != 0) {
 		g_source_remove (data->test_run_inactivity_timeout_id);
 		data->test_run_inactivity_timeout_id = 0;
 	}
+}
 
+static void
+set_inactivity_timeout (MainData *data)
+{
+	/* Set up the timeout. */
 	if (test_timeout > 0) {
 		data->test_run_inactivity_timeout_id = g_timeout_add_seconds (test_timeout, (GSourceFunc) test_inactivity_timeout_cb, data);
 	}
+}
+
+static void
+simulated_object_dbus_activity_count_notify_cb (GObject *obj, GParamSpec *pspec, MainData *data)
+{
+	remove_inactivity_timeout (data);
+	set_inactivity_timeout (data);
 }
 
 static void
@@ -187,6 +199,12 @@ stop_simulation (MainData *data)
 {
 	guint i, bus_name_id;
 	GHashTableIter iter;
+
+	/* Stop timers. */
+	if (data->test_run_inactivity_timeout_id != 0) {
+		g_source_remove (data->test_run_inactivity_timeout_id);
+		data->test_run_inactivity_timeout_id = 0;
+	}
 
 	/* Simulation's finished, so kill the test program. */
 	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program));
@@ -257,10 +275,6 @@ restart_simulation (MainData *data)
 
 	/* Re-spawn the program under test. */
 	spawn_test_program (data);
-
-	if (test_timeout > 0) {
-		data->test_run_inactivity_timeout_id = g_timeout_add_seconds (test_timeout, (GSourceFunc) test_inactivity_timeout_cb, data);
-	}
 }
 
 static void
@@ -305,8 +319,19 @@ simulation_timeout_cb (MainData *data)
 }
 
 static void
+test_program_spawn_end_cb (DsimProgramWrapper *program_wrapper, GPid pid, MainData *data)
+{
+	if (run_time > 0) {
+		g_timeout_add_seconds (run_time, (GSourceFunc) simulation_timeout_cb, data);
+	}
+
+	set_inactivity_timeout (data);
+}
+
+static void
 start_simulation (MainData *data)
 {
+	g_signal_connect (data->test_program, "spawn-end", (GCallback) test_program_spawn_end_cb, data);
 	g_signal_connect (data->test_program, "process-died", (GCallback) test_program_died_cb, data);
 
 	/* Spawn the program under test. */
@@ -321,14 +346,9 @@ start_simulation (MainData *data)
 	 * A single test run is finished when either:
 	 *  • We go without D-Bus activity for at least test_timeout seconds.
 	 *  • The test program exits normally.
+	 *
+	 * All applicable timers start from after the (first) spawning of the test program is complete.
 	 */
-	if (run_time > 0) {
-		g_timeout_add_seconds (run_time, (GSourceFunc) simulation_timeout_cb, data);
-	}
-
-	if (test_timeout > 0) {
-		data->test_run_inactivity_timeout_id = g_timeout_add_seconds (test_timeout, (GSourceFunc) test_inactivity_timeout_cb, data);
-	}
 }
 
 static void
