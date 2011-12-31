@@ -259,11 +259,13 @@ restart_simulation (MainData *data)
 
 	/* Have we finished? */
 	if (data->num_test_runs_remaining == 0) {
-		g_debug ("Stopping simulation due to performing the desired number of test runs.");
+		g_message (_("Stopping simulation due to performing the desired number of test runs."));
 
 		stop_simulation (data);
 		return;
 	}
+
+	g_message (_("Restarting simulation."));
 
 	/* Stop the test program and reset all our simulation objects. */
 	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program));
@@ -285,7 +287,7 @@ test_program_died_cb (DsimProgramWrapper *wrapper, gint status, MainData *data)
 		restart_simulation (data);
 	} else {
 		/* Crashed: stop the entire simulation. */
-		g_debug ("Stopping simulation due to test program crashing (status: %i).", status);
+		g_message (_("Stopping simulation due to test program crashing (status: %i)."), status);
 
 		stop_simulation (data);
 	}
@@ -296,9 +298,9 @@ dbus_daemon_died_cb (DsimProgramWrapper *wrapper, gint status, MainData *data)
 {
 	/* This should never happen. We assume the dbus-daemon is rock solid. */
 	if (WIFEXITED (status)) {
-		g_debug ("Stopping simulation due to dbus-daemon exiting (status: %i).", status);
+		g_message (_("Stopping simulation due to dbus-daemon exiting (status: %i)."), status);
 	} else {
-		g_debug ("Stopping simulation due to dbus-daemon crashing (status: %i).", status);
+		g_message (_("Stopping simulation due to dbus-daemon crashing (status: %i)."), status);
 	}
 
 	/* Have we created/spawned the test program yet? If not, we don't have much cleaning up to do. */
@@ -312,7 +314,7 @@ dbus_daemon_died_cb (DsimProgramWrapper *wrapper, gint status, MainData *data)
 static gboolean
 simulation_timeout_cb (MainData *data)
 {
-	g_debug ("Stopping simulation due to simulation timeout being reached.");
+	g_message (_("Stopping simulation due to simulation timeout being reached."));
 	stop_simulation (data);
 
 	return FALSE;
@@ -331,6 +333,8 @@ test_program_spawn_end_cb (DsimProgramWrapper *program_wrapper, GPid pid, MainDa
 static void
 start_simulation (MainData *data)
 {
+	g_message (_("Starting simulation."));
+
 	g_signal_connect (data->test_program, "spawn-end", (GCallback) test_program_spawn_end_cb, data);
 	g_signal_connect (data->test_program, "process-died", (GCallback) test_program_died_cb, data);
 
@@ -486,6 +490,8 @@ dbus_daemon_notify_bus_address_cb (GObject *gobject, GParamSpec *pspec, MainData
 
 	g_assert (data->dbus_address == NULL);
 	data->dbus_address = g_strdup (dsim_dbus_daemon_get_bus_address (data->dbus_daemon));
+
+	g_message (_("Note: Simulated bus has address: %s"), data->dbus_address);
 
 	/* Set up the test program ready for spawning. */
 	test_program_envp = g_ptr_array_new_with_free_func (g_free);
