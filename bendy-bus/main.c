@@ -282,7 +282,7 @@ restart_simulation (MainData *data)
 static void
 test_program_died_cb (DsimProgramWrapper *wrapper, gint status, MainData *data)
 {
-	if (WIFEXITED (status)) {
+	if (WIFEXITED (status) || (WIFSIGNALED (status) && WTERMSIG (status) == SIGTERM)) {
 		/* Exited normally: proceed to the next test run. */
 		restart_simulation (data);
 	} else {
@@ -297,7 +297,7 @@ static void
 dbus_daemon_died_cb (DsimProgramWrapper *wrapper, gint status, MainData *data)
 {
 	/* This should never happen. We assume the dbus-daemon is rock solid. */
-	if (WIFEXITED (status)) {
+	if (WIFEXITED (status) || (WIFSIGNALED (status) && WTERMSIG (status) == SIGTERM)) {
 		g_message (_("Stopping simulation due to dbus-daemon exiting (status: %i)."), status);
 	} else {
 		g_message (_("Stopping simulation due to dbus-daemon crashing (status: %i)."), status);
