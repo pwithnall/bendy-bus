@@ -1085,7 +1085,7 @@ find_random_block (const gchar *input, gsize input_length /* bytes */, const gch
 		} else {
 			find_random_block_with_separator (input, input_length, ',', &block_start, &block_end);
 		}
-	} else if (distribution < 2 * G_MAXUINT32 / num_characters_found) {
+	} else if (distribution < 2 * (G_MAXUINT32 / num_characters_found)) {
 		// Can't be the first character.
 		if (has_dot == TRUE) {
 			find_random_block_with_separator (input, input_length, '.', &block_start, &block_end);
@@ -1094,7 +1094,7 @@ find_random_block (const gchar *input, gsize input_length /* bytes */, const gch
 		} else {
 			find_random_block_with_separator (input, input_length, ',', &block_start, &block_end);
 		}
-	} else if (distribution < 3 * G_MAXUINT32 / num_characters_found) {
+	} else if (distribution < 3 * (G_MAXUINT32 / num_characters_found)) {
 		// Can't be the second character.
 		if (has_colon == TRUE) {
 			find_random_block_with_separator (input, input_length, ':', &block_start, &block_end);
