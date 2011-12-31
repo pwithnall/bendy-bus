@@ -256,6 +256,41 @@ GITIGNOREFILES += \
 	bendy-bus-lint/.libs/ \
 	$(NULL)
 
+# bendy-bus-viz
+bin_PROGRAMS += bendy-bus-viz/bendy-bus-viz
+
+bendy_bus_viz_bendy_bus_viz_SOURCES = \
+	bendy-bus-viz/main.c \
+	$(NULL)
+
+bendy_bus_viz_bendy_bus_viz_CPPFLAGS = \
+	-I$(top_srcdir) \
+	-DPACKAGE_LOCALE_DIR=\""$(datadir)/locale"\" \
+	-DG_LOG_DOMAIN=\"bendy-bus-viz\" \
+	$(DISABLE_DEPRECATED) \
+	$(AM_CPPFLAGS) \
+	$(NULL)
+
+bendy_bus_viz_bendy_bus_viz_CFLAGS = \
+	$(WARN_CFLAGS) \
+	$(GLIB_CFLAGS) \
+	$(GIO_CFLAGS) \
+	$(AM_CFLAGS) \
+	$(NULL)
+
+bendy_bus_viz_bendy_bus_viz_LDADD = \
+	$(top_builddir)/dfsm/libdfsm.la \
+	$(GLIB_LIBS) \
+	$(GIO_LIBS) \
+	$(AM_LDADD) \
+	$(NULL)
+
+# git.mk can't handle non-recursive automake so well
+GITIGNOREFILES += \
+	bendy-bus-viz/.dirstamp \
+	bendy-bus-viz/.libs/ \
+	$(NULL)
+
 # Marshalling
 bendy_bus_marshal_sources = \
 	bendy-bus/marshal.c \

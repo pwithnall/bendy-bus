@@ -47,6 +47,8 @@ typedef struct {
 
 GType dfsm_object_get_type (void) G_GNUC_CONST;
 
+GPtrArray/*<DfsmAstObject>*/ *dfsm_object_factory_asts_from_files (const gchar *simulation_code, const gchar *introspection_xml,
+                                                                   GError **error) DFSM_CONSTRUCTOR;
 GPtrArray/*<DfsmObject>*/ *dfsm_object_factory_from_files (const gchar *simulation_code, const gchar *introspection_xml,
                                                            GError **error) DFSM_CONSTRUCTOR;
 

@@ -1,4 +1,5 @@
 bendy-bus-lint/main.c
+bendy-bus-viz/main.c
 bendy-bus/dbus-daemon.c
 bendy-bus/logging.c
 bendy-bus/main.c

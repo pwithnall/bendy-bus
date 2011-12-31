@@ -301,22 +301,21 @@ _dfsm_object_new (DfsmMachine *machine, const gchar *object_path, GPtrArray/*<st
 }
 
 /**
- * dfsm_object_factory_from_files:
+ * dfsm_object_factory_asts_from_files:
  * @simulation_code: code describing the DFSM of one or more D-Bus objects to be simulated
  * @introspection_xml: D-Bus introspection XML describing all the interfaces referenced by @simulation_code
  * @error: (allow-none): a #GError, or %NULL
  *
- * Parses the given @simulation_code and constructs one or more #DfsmObject<!-- -->s from it, each of which will simulate a single D-Bus object on the
- * bus once started using dfsm_object_register_on_bus(). The given @introspection_xml should be a fully formed introspection XML
- * document which, at a minimum, describes all the D-Bus interfaces implemented by all the objects defined in @simulation_code.
+ * Parses the given @simulation_code and constructs one or more #DfsmAstObject<!-- -->s from it, each of which is the AST of the code representing that
+ * simulated D-Bus object. The given @introspection_xml should be a fully formed introspection XML document which, at a minimum, describes all the
+ * D-Bus interfaces implemented by all the objects defined in @simulation_code.
  *
- * Return value: (transfer full): an array of #DfsmObject<!-- -->s, each of which must be freed using g_object_unref()
+ * Return value: (transfer full): an array of #DfsmAstObject<!-- -->s, each of which must be freed using g_object_unref()
  */
-GPtrArray/*<DfsmObject>*/ *
-dfsm_object_factory_from_files (const gchar *simulation_code, const gchar *introspection_xml, GError **error)
+GPtrArray/*<DfsmAstObject>*/ *
+dfsm_object_factory_asts_from_files (const gchar *simulation_code, const gchar *introspection_xml, GError **error)
 {
 	GPtrArray/*<DfsmAstObject>*/ *ast_object_array;
-	GPtrArray/*<DfsmObject>*/ *object_array;
 	guint i;
 	GDBusNodeInfo *dbus_node_info;
 	GError *child_error = NULL;
@@ -380,6 +379,41 @@ dfsm_object_factory_from_files (const gchar *simulation_code, const gchar *intro
 
 			return NULL;
 		}
+	}
+
+	return ast_object_array;
+}
+
+/**
+ * dfsm_object_factory_from_files:
+ * @simulation_code: code describing the DFSM of one or more D-Bus objects to be simulated
+ * @introspection_xml: D-Bus introspection XML describing all the interfaces referenced by @simulation_code
+ * @error: (allow-none): a #GError, or %NULL
+ *
+ * Parses the given @simulation_code and constructs one or more #DfsmObject<!-- -->s from it, each of which will simulate a single D-Bus object on the
+ * bus once started using dfsm_object_register_on_bus(). The given @introspection_xml should be a fully formed introspection XML
+ * document which, at a minimum, describes all the D-Bus interfaces implemented by all the objects defined in @simulation_code.
+ *
+ * Return value: (transfer full): an array of #DfsmObject<!-- -->s, each of which must be freed using g_object_unref()
+ */
+GPtrArray/*<DfsmObject>*/ *
+dfsm_object_factory_from_files (const gchar *simulation_code, const gchar *introspection_xml, GError **error)
+{
+	GPtrArray/*<DfsmAstObject>*/ *ast_object_array;
+	GPtrArray/*<DfsmObject>*/ *object_array;
+	guint i;
+	GError *child_error = NULL;
+
+	g_return_val_if_fail (simulation_code != NULL, NULL);
+	g_return_val_if_fail (introspection_xml != NULL, NULL);
+	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
+
+	/* Load and parse the files into DfsmAstObjects. */
+	ast_object_array = dfsm_object_factory_asts_from_files (simulation_code, introspection_xml, &child_error);
+
+	if (child_error != NULL) {
+		/* Error! */
+		return NULL;
 	}
 
 	/* For each of the AST objects, build a proper DfsmObject. */
