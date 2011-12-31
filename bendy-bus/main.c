@@ -531,6 +531,8 @@ main (int argc, char *argv[])
 	const gchar *test_program_name;
 	GPtrArray/*<string>*/ *test_program_argv;
 	guint i;
+	gchar *time_str, *command_line, *log_header;
+	GDateTime *date_time;
 
 	/* Set up localisation. */
 	setlocale (LC_ALL, "");
@@ -540,6 +542,9 @@ main (int argc, char *argv[])
 
 	g_type_init ();
 	g_set_application_name (_("D-Bus Simulator"));
+
+	/* Take a copy of the command line, for use in printing the log headers later. */
+	command_line = g_strjoinv (" ", argv);
 
 	/* Parse command line options */
 	context = g_option_context_new (_("[simulation code file] [introspection XML file] -- [executable-file] [arguments]"));
@@ -567,6 +572,7 @@ main (int argc, char *argv[])
 
 		g_error_free (error);
 		g_option_context_free (context);
+		g_free (command_line);
 
 		exit (STATUS_INVALID_OPTIONS);
 	}
@@ -579,6 +585,7 @@ main (int argc, char *argv[])
 		print_help_text (context);
 
 		g_option_context_free (context);
+		g_free (command_line);
 
 		exit (STATUS_INVALID_OPTIONS);
 	}
@@ -592,6 +599,9 @@ main (int argc, char *argv[])
 		g_printerr ("\n");
 
 		print_help_text (context);
+
+		g_option_context_free (context);
+		g_free (command_line);
 
 		exit (STATUS_INVALID_OPTIONS);
 	}
@@ -614,9 +624,24 @@ main (int argc, char *argv[])
 		g_printerr ("\n");
 
 		g_error_free (error);
+		g_free (command_line);
 
 		exit (STATUS_LOGGING_PROBLEM);
 	}
+
+	/* Output a log header to each of the log streams. */
+	date_time = g_date_time_new_now_utc ();
+	time_str = g_date_time_format (date_time, "%F %TZ");
+	g_date_time_unref (date_time);
+
+	log_header = g_strdup_printf (_("Bendy Bus left the depot at %s using command line: %s"), time_str, command_line);
+
+	g_log (G_LOG_DOMAIN, G_LOG_LEVEL_MESSAGE, "%s", log_header);
+	g_log (dsim_logging_get_domain_name (DSIM_LOG_DBUS_DAEMON), G_LOG_LEVEL_MESSAGE, "%s", log_header);
+	g_log (dsim_logging_get_domain_name (DSIM_LOG_TEST_PROGRAM), G_LOG_LEVEL_MESSAGE, "%s", log_header);
+
+	g_free (log_header);
+	g_free (command_line);
 
 	/* Set up the random number generator. */
 	if (random_seed == 0) {
