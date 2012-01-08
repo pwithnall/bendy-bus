@@ -252,8 +252,8 @@ DataList: /* empty */
 			$$ = $5;
 			g_hash_table_insert ($$, $1 /* steal ownership from flex */, $3);
 		}
-        | error ';' DataList
-		{ $$ = $3; YYABORT; }
+        | error ';'
+		{ $$ = NULL; YYABORT; }
 ;
 
 /* Returns a new GPtrArray of the state names. */
