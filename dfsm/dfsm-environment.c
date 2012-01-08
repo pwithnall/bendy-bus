@@ -658,6 +658,418 @@ _in_array_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmE
 	return g_variant_ref_sink (g_variant_new_boolean (found));
 }
 
+static GVariantType *
+_array_insert_calculate_type (const GVariantType *parameters_type, GError **error)
+{
+	const GVariantType *parameters_supertype = (const GVariantType*) "(a*u*)";
+	const GVariantType *array_type, *third_type;
+
+	/* As well as conforming to the supertype, the two *s have to be in a subtype relationship. */
+	if (g_variant_type_is_subtype_of (parameters_type, parameters_supertype) == FALSE) {
+		/* Error */
+		func_set_calculate_type_error (error, "arrayInsert", parameters_supertype, parameters_type);
+		return NULL;
+	}
+
+	array_type = g_variant_type_first (parameters_type);
+	third_type = g_variant_type_next (g_variant_type_next (array_type));
+
+	if (g_variant_type_is_subtype_of (third_type, g_variant_type_element (array_type)) == FALSE) {
+		gchar *parameters_supertype_string, *parameters_type_string;
+
+		/* Error */
+		parameters_supertype_string = g_variant_type_dup_string (parameters_supertype);
+		parameters_type_string = g_variant_type_dup_string (parameters_type);
+
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+		             _("Type mismatch between formal and actual parameters to function ‘%s’: expects type ‘%s’ with the third item a subtype "
+		               "of the element type of the first item, but received type ‘%s’."),
+		             "arrayInsert", parameters_supertype_string, parameters_type_string);
+
+		g_free (parameters_type_string);
+		g_free (parameters_supertype_string);
+
+		return NULL;
+	}
+
+	/* Always return an array of the same type. */
+	return g_variant_type_copy (array_type);
+}
+
+static GVariant *
+_array_insert_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment, GError **error)
+{
+	GVariantIter iter;
+	GVariantBuilder builder;
+	GVariant *new_value, *old_array, *child_variant;
+	guint array_index;
+
+	old_array = g_variant_get_child_value (parameters, 0);
+	g_variant_get_child (parameters, 1, "u", &array_index);
+	new_value = g_variant_get_child_value (parameters, 2);
+
+	/* Silently clamp the insertion index to the size of the input array. */
+	array_index = MIN (array_index, g_variant_n_children (old_array));
+
+	/* Copy the old array, inserting the new value. */
+	g_variant_builder_init (&builder, return_type);
+	g_variant_iter_init (&iter, old_array);
+
+	while ((child_variant = g_variant_iter_next_value (&iter)) != NULL) {
+		/* Insert the new value if we're at the right place.
+		 * The array_index will then wrap around to G_MAXUINT so we won't consider it again. */
+		if (array_index-- == 0) {
+			g_variant_builder_add_value (&builder, new_value);
+		}
+
+		/* Insert an existing value. */
+		g_variant_builder_add_value (&builder, child_variant);
+
+		g_variant_unref (child_variant);
+	}
+
+	/* If the new value is being appended, append it. */
+	if (array_index == 0) {
+		g_variant_builder_add_value (&builder, new_value);
+	}
+
+	g_variant_unref (old_array);
+	g_variant_unref (new_value);
+
+	/* Return the new array. */
+	return g_variant_ref_sink (g_variant_builder_end (&builder));
+}
+
+static GVariantType *
+_array_remove_calculate_type (const GVariantType *parameters_type, GError **error)
+{
+	const GVariantType *parameters_supertype = (const GVariantType*) "(a*u)";
+
+	if (g_variant_type_is_subtype_of (parameters_type, parameters_supertype) == FALSE) {
+		/* Error */
+		func_set_calculate_type_error (error, "arrayRemove", parameters_supertype, parameters_type);
+		return NULL;
+	}
+
+	/* Always return an array of the same type */
+	return g_variant_type_copy (g_variant_type_first (parameters_type));
+}
+
+static GVariant *
+_array_remove_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment, GError **error)
+{
+	GVariantIter iter;
+	GVariantBuilder builder;
+	GVariant *old_array, *child_variant;
+	guint array_index;
+
+	old_array = g_variant_get_child_value (parameters, 0);
+	g_variant_get_child (parameters, 1, "u", &array_index);
+
+	/* Silently clamp the removal index to the size of the input array. */
+	array_index = MIN (array_index, g_variant_n_children (old_array) - 1);
+
+	/* Copy the old array, removing the old value. */
+	g_variant_builder_init (&builder, return_type);
+	g_variant_iter_init (&iter, old_array);
+
+	while ((child_variant = g_variant_iter_next_value (&iter)) != NULL) {
+		/* Insert an existing value, unless it's the one to remove. */
+		if (array_index-- != 0) {
+			g_variant_builder_add_value (&builder, child_variant);
+		}
+
+		g_variant_unref (child_variant);
+	}
+
+	g_variant_unref (old_array);
+
+	/* Return the new array. */
+	return g_variant_ref_sink (g_variant_builder_end (&builder));
+}
+
+static GVariantType *
+_dict_set_calculate_type (const GVariantType *parameters_type, GError **error)
+{
+	const GVariantType *parameters_supertype = (const GVariantType*) "(a{?*}?*)";
+	const GVariantType *dict_type, *key_type, *value_type;
+
+	/* As well as conforming to the supertype, the two *s have to be in a subtype relationship, as do the two ?s. */
+	if (g_variant_type_is_subtype_of (parameters_type, parameters_supertype) == FALSE) {
+		/* Error */
+		func_set_calculate_type_error (error, "dictSet", parameters_supertype, parameters_type);
+		return NULL;
+	}
+
+	dict_type = g_variant_type_first (parameters_type);
+	key_type = g_variant_type_next (dict_type);
+	value_type = g_variant_type_next (key_type);
+
+	if (g_variant_type_is_subtype_of (key_type, g_variant_type_key (g_variant_type_element (dict_type))) == FALSE) {
+		gchar *parameters_supertype_string, *parameters_type_string;
+
+		/* Error */
+		parameters_supertype_string = g_variant_type_dup_string (parameters_supertype);
+		parameters_type_string = g_variant_type_dup_string (parameters_type);
+
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+		             _("Type mismatch between formal and actual parameters to function ‘%s’: expects type ‘%s’ with the second item a subtype "
+		               "of the key type of the first item, but received type ‘%s’."),
+		             "dictSet", parameters_supertype_string, parameters_type_string);
+
+		g_free (parameters_type_string);
+		g_free (parameters_supertype_string);
+
+		return NULL;
+	} else if (g_variant_type_is_subtype_of (value_type, g_variant_type_value (g_variant_type_element (dict_type))) == FALSE) {
+		gchar *parameters_supertype_string, *parameters_type_string;
+
+		/* Error */
+		parameters_supertype_string = g_variant_type_dup_string (parameters_supertype);
+		parameters_type_string = g_variant_type_dup_string (parameters_type);
+
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+		             _("Type mismatch between formal and actual parameters to function ‘%s’: expects type ‘%s’ with the third item a subtype "
+		               "of the value type of the first item, but received type ‘%s’."),
+		             "dictSet", parameters_supertype_string, parameters_type_string);
+
+		g_free (parameters_type_string);
+		g_free (parameters_supertype_string);
+
+		return NULL;
+	}
+
+	/* Always return a dict of the same type. */
+	return g_variant_type_copy (dict_type);
+}
+
+static GVariant *
+_dict_set_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment, GError **error)
+{
+	GVariantIter iter;
+	GVariantBuilder builder;
+	GVariant *new_key, *new_value, *old_dict, *child_entry;
+	gboolean found = FALSE;
+
+	old_dict = g_variant_get_child_value (parameters, 0);
+	new_key = g_variant_get_child_value (parameters, 1);
+	new_value = g_variant_get_child_value (parameters, 2);
+
+	/* Copy the old dict, inserting the new key-value pair. */
+	g_variant_builder_init (&builder, return_type);
+	g_variant_iter_init (&iter, old_dict);
+
+	while ((child_entry = g_variant_iter_next_value (&iter)) != NULL) {
+		GVariant *current_key;
+
+		/* If the current key matches the new key, replace the current value with the new value.
+		 * Otherwise, just insert the current key-value pair. */
+		current_key = g_variant_get_child_value (child_entry, 0);
+
+		if (g_variant_compare (current_key, new_key) == 0) {
+			g_assert (found == FALSE);
+			found = TRUE;
+
+			/* Replace existing pair. */
+			g_variant_builder_open (&builder, g_variant_type_element (return_type));
+
+			g_variant_builder_add_value (&builder, new_key);
+			g_variant_builder_add_value (&builder, new_value);
+
+			g_variant_builder_close (&builder);
+		} else {
+			/* Insert existing pair. */
+			g_variant_builder_add_value (&builder, child_entry);
+		}
+
+		g_variant_unref (current_key);
+		g_variant_unref (child_entry);
+	}
+
+	/* If the new pair wasn't already in the dict, add it to the end */
+	if (found == FALSE) {
+		g_variant_builder_open (&builder, g_variant_type_element (return_type));
+
+		g_variant_builder_add_value (&builder, new_key);
+		g_variant_builder_add_value (&builder, new_value);
+
+		g_variant_builder_close (&builder);
+	}
+
+	g_variant_unref (new_value);
+	g_variant_unref (new_key);
+	g_variant_unref (old_dict);
+
+	/* Return the new dict. */
+	return g_variant_ref_sink (g_variant_builder_end (&builder));
+}
+
+static GVariantType *
+_dict_unset_calculate_type (const GVariantType *parameters_type, GError **error)
+{
+	const GVariantType *parameters_supertype = (const GVariantType*) "(a{?*}?)";
+	const GVariantType *dict_type, *key_type;
+
+	if (g_variant_type_is_subtype_of (parameters_type, parameters_supertype) == FALSE) {
+		/* Error */
+		func_set_calculate_type_error (error, "dictUnset", parameters_supertype, parameters_type);
+		return NULL;
+	}
+
+	dict_type = g_variant_type_first (parameters_type);
+	key_type = g_variant_type_next (dict_type);
+
+	if (g_variant_type_is_subtype_of (key_type, g_variant_type_key (g_variant_type_element (dict_type))) == FALSE) {
+		gchar *parameters_supertype_string, *parameters_type_string;
+
+		/* Error */
+		parameters_supertype_string = g_variant_type_dup_string (parameters_supertype);
+		parameters_type_string = g_variant_type_dup_string (parameters_type);
+
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+		             _("Type mismatch between formal and actual parameters to function ‘%s’: expects type ‘%s’ with the second item a subtype "
+		               "of the key type of the first item, but received type ‘%s’."),
+		             "dictUnset", parameters_supertype_string, parameters_type_string);
+
+		g_free (parameters_type_string);
+		g_free (parameters_supertype_string);
+
+		return NULL;
+	}
+
+	/* Always return a dict of the same type */
+	return g_variant_type_copy (dict_type);
+}
+
+static GVariant *
+_dict_unset_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment, GError **error)
+{
+	GVariantIter iter;
+	GVariantBuilder builder;
+	GVariant *old_key, *old_dict, *child_entry;
+
+	old_dict = g_variant_get_child_value (parameters, 0);
+	old_key = g_variant_get_child_value (parameters, 1);
+
+	/* Copy the old dict, removing the old key if it exists. */
+	g_variant_builder_init (&builder, return_type);
+	g_variant_iter_init (&iter, old_dict);
+
+	while ((child_entry = g_variant_iter_next_value (&iter)) != NULL) {
+		GVariant *current_key;
+
+		/* Insert an existing value, unless it's the one to remove. */
+		current_key = g_variant_get_child_value (child_entry, 0);
+
+		if (g_variant_compare (current_key, old_key) != 0) {
+			g_variant_builder_add_value (&builder, child_entry);
+		}
+
+		g_variant_unref (current_key);
+		g_variant_unref (child_entry);
+	}
+
+	g_variant_unref (old_key);
+	g_variant_unref (old_dict);
+
+	/* Return the new dict. */
+	return g_variant_ref_sink (g_variant_builder_end (&builder));
+}
+
+static GVariantType *
+_dict_get_calculate_type (const GVariantType *parameters_type, GError **error)
+{
+	const GVariantType *parameters_supertype = (const GVariantType*) "(a{?*}?*)";
+	const GVariantType *dict_type, *key_type, *value_type;
+
+	/* As well as conforming to the supertype, the two *s have to be in a subtype relationship, as do the two ?s. */
+	if (g_variant_type_is_subtype_of (parameters_type, parameters_supertype) == FALSE) {
+		/* Error */
+		func_set_calculate_type_error (error, "dictGet", parameters_supertype, parameters_type);
+		return NULL;
+	}
+
+	dict_type = g_variant_type_first (parameters_type);
+	key_type = g_variant_type_next (dict_type);
+	value_type = g_variant_type_next (key_type);
+
+	if (g_variant_type_is_subtype_of (key_type, g_variant_type_key (g_variant_type_element (dict_type))) == FALSE) {
+		gchar *parameters_supertype_string, *parameters_type_string;
+
+		/* Error */
+		parameters_supertype_string = g_variant_type_dup_string (parameters_supertype);
+		parameters_type_string = g_variant_type_dup_string (parameters_type);
+
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+		             _("Type mismatch between formal and actual parameters to function ‘%s’: expects type ‘%s’ with the second item a subtype "
+		               "of the key type of the first item, but received type ‘%s’."),
+		             "dictGet", parameters_supertype_string, parameters_type_string);
+
+		g_free (parameters_type_string);
+		g_free (parameters_supertype_string);
+
+		return NULL;
+	} else if (g_variant_type_is_subtype_of (value_type, g_variant_type_value (g_variant_type_element (dict_type))) == FALSE) {
+		gchar *parameters_supertype_string, *parameters_type_string;
+
+		/* Error */
+		parameters_supertype_string = g_variant_type_dup_string (parameters_supertype);
+		parameters_type_string = g_variant_type_dup_string (parameters_type);
+
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+		             _("Type mismatch between formal and actual parameters to function ‘%s’: expects type ‘%s’ with the third item a subtype "
+		               "of the value type of the first item, but received type ‘%s’."),
+		             "dictGet", parameters_supertype_string, parameters_type_string);
+
+		g_free (parameters_type_string);
+		g_free (parameters_supertype_string);
+
+		return NULL;
+	}
+
+	/* Always return the value of the dict. */
+	return g_variant_type_copy (value_type);
+}
+
+static GVariant *
+_dict_get_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment, GError **error)
+{
+	GVariantIter iter;
+	GVariant *key, *dict, *default_value, *output_value = NULL, *child_entry;
+
+	dict = g_variant_get_child_value (parameters, 0);
+	key = g_variant_get_child_value (parameters, 1);
+	default_value = g_variant_get_child_value (parameters, 2);
+
+	/* Search through the dict for the given key. If it doesn't exist, return the default value (third parameter). */
+	g_variant_iter_init (&iter, dict);
+
+	while (output_value == NULL && (child_entry = g_variant_iter_next_value (&iter)) != NULL) {
+		GVariant *current_key;
+
+		current_key = g_variant_get_child_value (child_entry, 0);
+
+		if (g_variant_compare (current_key, key) == 0) {
+			output_value = g_variant_get_child_value (child_entry, 1);
+		}
+
+		g_variant_unref (current_key);
+		g_variant_unref (child_entry);
+	}
+
+	/* Default value. */
+	if (output_value == NULL) {
+		output_value = g_variant_ref (default_value);
+	}
+
+	g_variant_unref (key);
+	g_variant_unref (dict);
+	g_variant_unref (default_value);
+
+	/* Return the found or default value. */
+	return output_value;
+}
+
 typedef struct {
 	const gchar *name;
 	GVariantType *(*calculate_type_func) (const GVariantType *parameters_type, GError **error);
@@ -666,10 +1078,15 @@ typedef struct {
 } DfsmFunctionInfo;
 
 static const DfsmFunctionInfo _function_info[] = {
-	/* Name,	Calculate type func,		Evaluate func. */
-	{ "keys",	_keys_calculate_type,		_keys_evaluate },
-	{ "pairKeys",	_pair_keys_calculate_type,	_pair_keys_evaluate },
-	{ "inArray",	_in_array_calculate_type,	_in_array_evaluate },
+	/* Name,		Calculate type func,		Evaluate func. */
+	{ "keys",		_keys_calculate_type,		_keys_evaluate },
+	{ "pairKeys",		_pair_keys_calculate_type,	_pair_keys_evaluate },
+	{ "inArray",		_in_array_calculate_type,	_in_array_evaluate },
+	{ "arrayInsert",	_array_insert_calculate_type,	_array_insert_evaluate },
+	{ "arrayRemove",	_array_remove_calculate_type,	_array_remove_evaluate },
+	{ "dictSet",		_dict_set_calculate_type,	_dict_set_evaluate },
+	{ "dictUnset",		_dict_unset_calculate_type,	_dict_unset_evaluate },
+	{ "dictGet",		_dict_get_calculate_type,	_dict_get_evaluate },
 };
 
 /*
