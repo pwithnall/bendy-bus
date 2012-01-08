@@ -52,6 +52,34 @@ static gint test_timeout = 0;
 static gint run_time = 0;
 static gint run_iters = 0;
 static gboolean run_infinitely = FALSE;
+static GPtrArray *test_program_environment = NULL;
+static gboolean pass_through_environment = FALSE;
+
+static gboolean
+option_env_parse_cb (const gchar *option_name, const gchar *value, gpointer data, GError **error)
+{
+	gchar **parts;
+
+	/* Parse the key-value pair. */
+	/* TODO: This could be done without allocations. */
+	parts = g_strsplit (value, "=", 2);
+
+	if (parts[0] == NULL || parts[1] == NULL || parts[2] != NULL || *parts[0] == '\0') {
+		g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_BAD_VALUE, _("Invalid key-value pair (should be of the form: ‘KEY=VALUE’): %s"),
+		             value);
+		return FALSE;
+	}
+
+	/* Lazily create the array. */
+	if (test_program_environment == NULL) {
+		test_program_environment = g_ptr_array_new_with_free_func (g_free);
+	}
+
+	/* Set the pair. */
+	g_ptr_array_add (test_program_environment, g_strdup (value));
+
+	return TRUE;
+}
 
 static const GOptionEntry main_entries[] = {
 	{ "random-seed", 's', 0, G_OPTION_ARG_INT64, &random_seed, N_("Seed value for the simulation’s random number generator"), N_("SEED") },
@@ -77,6 +105,14 @@ static const GOptionEntry testing_entries[] = {
 	{ "run-time", 'r', 0, G_OPTION_ARG_INT, &run_time, N_("Maximum time (in seconds) the set of test runs should take"), N_("SECS") },
 	{ "run-iters", 'n', 0, G_OPTION_ARG_INT, &run_iters, N_("Maximum number of test runs which should be performed"), N_("COUNT") },
 	{ "run-infinitely", 'i', 0, G_OPTION_ARG_NONE, &run_infinitely, N_("Run test runs in an infinite loop (default)"), NULL },
+	{ NULL }
+};
+
+static const GOptionEntry test_program_entries[] = {
+	{ "env", 'E', 0, G_OPTION_ARG_CALLBACK, option_env_parse_cb, N_("Define an environment key-value pair for the program under test"),
+	  N_("KEY=VALUE") },
+	{ "pass-through-environment", 0, 0, G_OPTION_ARG_NONE, &pass_through_environment,
+	  N_("Pass through the environment from the simulator to the program under test"), NULL },
 	{ NULL }
 };
 
@@ -496,19 +532,47 @@ dbus_daemon_notify_bus_address_cb (GObject *gobject, GParamSpec *pspec, MainData
 	/* Set up the test program ready for spawning. */
 	test_program_envp = g_ptr_array_new_with_free_func (g_free);
 
+	if (pass_through_environment == FALSE) {
+		/* Set up a minimal environment with just the necessary environment variables required for things to function.
+		 * Note that this list of necessary environment variables is probably incomplete, and is built on the basis of
+		 * trial and error rather than research or standards. */
+		forward_envp_pair (test_program_envp, "DISPLAY");
+		forward_envp_pair (test_program_envp, "XDG_DATA_HOME");
+		forward_envp_pair (test_program_envp, "XDG_CACHE_HOME");
+		forward_envp_pair (test_program_envp, "XDG_CONFIG_HOME");
+		forward_envp_pair (test_program_envp, "HOME");
+		forward_envp_pair (test_program_envp, "USER");
+		forward_envp_pair (test_program_envp, "HOSTNAME");
+		forward_envp_pair (test_program_envp, "SSH_CLIENT");
+		forward_envp_pair (test_program_envp, "SSH_TTY");
+		forward_envp_pair (test_program_envp, "SSH_CONNECTION");
+	} else {
+		/* Forward everything from the simulator's environment to the test program's environment. This might make the test
+		 * results slightly less reliable. */
+		gchar **env_variable_names;
+		const gchar * const *i;
+
+		env_variable_names = g_listenv ();
+
+		for (i = (const gchar * const *) env_variable_names; *i != NULL; i++) {
+			forward_envp_pair (test_program_envp, *i);
+		}
+
+		g_strfreev (env_variable_names);
+	}
+
 	envp_pair = g_strdup_printf ("DBUS_SESSION_BUS_ADDRESS=%s", data->dbus_address);
 	g_ptr_array_add (test_program_envp, envp_pair);
 
-	forward_envp_pair (test_program_envp, "DISPLAY");
-	forward_envp_pair (test_program_envp, "XDG_DATA_HOME");
-	forward_envp_pair (test_program_envp, "XDG_CACHE_HOME");
-	forward_envp_pair (test_program_envp, "XDG_CONFIG_HOME");
-	forward_envp_pair (test_program_envp, "HOME");
-	forward_envp_pair (test_program_envp, "USER");
-	forward_envp_pair (test_program_envp, "HOSTNAME");
-	forward_envp_pair (test_program_envp, "SSH_CLIENT");
-	forward_envp_pair (test_program_envp, "SSH_TTY");
-	forward_envp_pair (test_program_envp, "SSH_CONNECTION");
+	/* Copy the environment pairs set on the command line. */
+	if (test_program_environment != NULL) {
+		guint i;
+
+		for (i = 0; i < test_program_environment->len; i++) {
+			envp_pair = g_ptr_array_index (test_program_environment, i);
+			g_ptr_array_add (test_program_envp, g_strdup (envp_pair));
+		}
+	}
 
 	data->test_program = dsim_test_program_new (g_file_new_for_path ("/tmp/test"), data->test_program_name, data->test_program_argv,
 	                                            test_program_envp);
@@ -568,6 +632,12 @@ main (int argc, char *argv[])
 	option_group = g_option_group_new ("testing", _("Testing Options:"), _("Show help options for test runs and timeouts"), NULL, NULL);
 	g_option_group_set_translation_domain (option_group, GETTEXT_PACKAGE);
 	g_option_group_add_entries (option_group, testing_entries);
+	g_option_context_add_group (context, option_group);
+
+	/* Testing option group */
+	option_group = g_option_group_new ("test-program", _("Test Program Options:"), _("Show help options for the program under test"), NULL, NULL);
+	g_option_group_set_translation_domain (option_group, GETTEXT_PACKAGE);
+	g_option_group_add_entries (option_group, test_program_entries);
 	g_option_context_add_group (context, option_group);
 
 	if (g_option_context_parse (context, &argc, &argv, &error) == FALSE) {
