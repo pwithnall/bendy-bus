@@ -37,7 +37,7 @@ static void dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *e
 
 struct _DfsmAstDataStructurePrivate {
 	DfsmAstDataStructureType data_structure_type;
-	GVariantType *variant_type; /* gets set by _calculate_type(); NULL beforehand */
+	GVariantType *variant_type; /* gets set by _calculate_type(); NULL beforehand; always a definite type when set */
 	gdouble weight;
 	gchar *type_annotation; /* may not match the actual data in the structure until after dfsm_ast_data_structure_check() is called */
 	union {
@@ -523,6 +523,8 @@ _calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment, GErro
 {
 	/* Cache the type. */
 	if (self->priv->variant_type == NULL) {
+		GVariantType *new_type = NULL;
+
 		/* If we have a type annotation, take that under consideration. Explode if the type we calculate doesn't match it. */
 		if (self->priv->type_annotation != NULL) {
 			GVariantType *calculated_type, *annotated_type;
@@ -554,13 +556,31 @@ _calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment, GErro
 				return NULL;
 			}
 
-			self->priv->variant_type = annotated_type;
+			new_type = annotated_type;
 
 			g_variant_type_free (calculated_type);
 		} else {
 			/* Just calculate the type. */
-			self->priv->variant_type = __calculate_type (self, environment);
+			new_type = __calculate_type (self, environment);
 		}
+
+		/* Check it's a definite type. */
+		if (g_variant_type_is_definite (new_type) == FALSE) {
+			gchar *calculated_type_string;
+
+			calculated_type_string = g_variant_type_dup_string (new_type);
+
+			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+			             _("Indefinitely typed data structure (probably needs a type annotation added): %s"), calculated_type_string);
+
+			g_free (calculated_type_string);
+			g_variant_type_free (new_type);
+
+			return NULL;
+		}
+
+		/* Success! */
+		self->priv->variant_type = new_type;
 	}
 
 	return g_variant_type_copy (self->priv->variant_type);
