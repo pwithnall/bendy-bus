@@ -437,7 +437,7 @@ __calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment)
 
 			/* Empty structs need special-casing. */
 			if (priv->struct_val->len == 0) {
-				return g_variant_type_copy (G_VARIANT_TYPE_TUPLE);
+				return g_variant_type_copy (G_VARIANT_TYPE_UNIT);
 			}
 
 			/* Build an array of the types of the struct elements. */
