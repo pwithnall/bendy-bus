@@ -41,7 +41,7 @@ enum StatusCodes {
 	STATUS_LOGGING_PROBLEM = 7,
 };
 
-static gint random_seed = 0;
+static gint64 random_seed = 0;
 static gchar *test_program_log_file = NULL;
 static gint test_program_log_fd = 0;
 static gchar *dbus_daemon_log_file = NULL;
@@ -54,7 +54,7 @@ static gint run_iters = 0;
 static gboolean run_infinitely = FALSE;
 
 static const GOptionEntry main_entries[] = {
-	{ "random-seed", 's', 0, G_OPTION_ARG_INT, &random_seed, N_("Seed value for the simulation’s random number generator"), N_("SEED") },
+	{ "random-seed", 's', 0, G_OPTION_ARG_INT64, &random_seed, N_("Seed value for the simulation’s random number generator"), N_("SEED") },
 	{ NULL }
 };
 
@@ -537,7 +537,7 @@ main (int argc, char *argv[])
 	const gchar *test_program_name;
 	GPtrArray/*<string>*/ *test_program_argv;
 	guint i;
-	gchar *time_str, *command_line, *log_header;
+	gchar *time_str, *command_line, *log_header, *seed_str;
 	GDateTime *date_time;
 
 	/* Set up localisation. */
@@ -651,10 +651,12 @@ main (int argc, char *argv[])
 
 	/* Set up the random number generator. */
 	if (random_seed == 0) {
-		random_seed = (guint32) g_get_real_time ();
+		random_seed = g_get_real_time ();
 	}
 
-	g_message (_("Note: Setting random number generator seed to %u."), random_seed);
+	seed_str = g_strdup_printf ("%" G_GINT64_FORMAT, random_seed);
+	g_message (_("Note: Setting random number generator seed to %s."), seed_str);
+	g_free (seed_str);
 
 	g_random_set_seed ((guint32) random_seed);
 
