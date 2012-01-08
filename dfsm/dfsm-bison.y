@@ -7,7 +7,8 @@
 %parse-param {DfsmParserData *parser_data}
 %parse-param {GError **error}
 
-%expect 13 /* shift-reduce conflicts */
+%expect 0 /* shift-reduce conflicts */
+%expect-rr 0 /* reduce-reduce conflicts */
 
 %code top {
 	#include "config.h"
@@ -123,14 +124,16 @@
 %token R_ANGLE
 %token FUZZY
 %token DOT
+%token FUNC /* not actually a real token; just for expression precedence */
 
-%right NOT
-%left TIMES DIVIDE MODULUS
-%left PLUS MINUS
-%left LT LTE GT GTE
-%left EQ NEQ
-%left AND
 %left OR
+%left AND
+%left EQ NEQ
+%left LT LTE GT GTE
+%left PLUS MINUS
+%left TIMES DIVIDE MODULUS
+%right NOT
+%right FUNC
 
 %start Input
 
@@ -360,7 +363,7 @@ Statement: DataStructure '=' Expression					{ $$ = dfsm_ast_statement_assignment
 /* Returns a new DfsmAstExpression. */
 Expression: L_ANGLE Expression R_ANGLE		{ $$ = $2; }
           | L_ANGLE error R_ANGLE		{ $$ = NULL; YYABORT; }
-          | FunctionName Expression		{ $$ = dfsm_ast_expression_function_call_new ($1, $2, ERROR); ABORT_ON_ERROR; }
+          | FunctionName Expression %prec FUNC	{ $$ = dfsm_ast_expression_function_call_new ($1, $2, ERROR); ABORT_ON_ERROR; }
           | FuzzyDataStructure			{ $$ = dfsm_ast_expression_data_structure_new ($1, ERROR); ABORT_ON_ERROR; }
           | NOT Expression			{ $$ = dfsm_ast_expression_unary_new (DFSM_AST_EXPRESSION_UNARY_NOT, $2, ERROR); ABORT_ON_ERROR; }
           | Expression TIMES Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_TIMES, $1, $3, ERROR);
