@@ -413,6 +413,8 @@ dfsm_object_factory_from_files (const gchar *simulation_code, const gchar *intro
 
 	if (child_error != NULL) {
 		/* Error! */
+		g_propagate_error (error, child_error);
+
 		return NULL;
 	}
 
