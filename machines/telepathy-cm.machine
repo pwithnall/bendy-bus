@@ -152,20 +152,23 @@ object at /org/freedesktop/Telepathy/ConnectionManager/cmname, org.freedesktop.T
 	}
 }
 
-object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freedesktop.Telepathy.Connection.cmname.proto.account implements org.freedesktop.Telepathy.Connection, org.freedesktop.Telepathy.Connection.Interface.Contacts, org.freedesktop.Telepathy.Connection.Interface.Requests {
+object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freedesktop.Telepathy.Connection.cmname.proto.account implements org.freedesktop.Telepathy.Connection, org.freedesktop.Telepathy.Connection.Interface.Contacts, org.freedesktop.Telepathy.Connection.Interface.Requests, org.freedesktop.Telepathy.Connection.Interface.Aliasing {
 	data {
 		/* Properties */
 		Interfaces = @as [
 			"org.freedesktop.Telepathy.Connection",
 			"org.freedesktop.Telepathy.Connection.Interface.Contacts",
 			"org.freedesktop.Telepathy.Connection.Interface.Requests",
+			"org.freedesktop.Telepathy.Connection.Interface.Aliasing",
 		];
 		SelfHandle = 1u;
 		Status = 1u; /* HACK */
 		HasImmortalHandles = true;
 
+		/* Conn.I.Contacts */
 		ContactAttributeInterfaces = @as [
 			"org.freedesktop.Telepathy.Connection",
+			"org.freedesktop.Telepathy.Connection.Interface.Aliasing",
 		];
 
 		/* Conn.I.Requests. */
@@ -288,6 +291,14 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 	/*transition inside Connecting, inside Connected on method EnsureChannel {
 		throw Disconnected; TODO: other errors
 	}*/
+
+	transition inside Disconnected on method GetAliasFlags {
+		throw Disconnected;
+	}
+
+	transition inside Connecting, inside Connected on method GetAliasFlags {
+		reply 0u?;
+	}
 }
 
 object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe implements org.freedesktop.Telepathy.Channel, org.freedesktop.Telepathy.Channel.Type.ContactList, org.freedesktop.Telepathy.Channel.Interface.Group {
