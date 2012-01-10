@@ -354,6 +354,8 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstObject
 	if (precondition_error != NULL) {
 		child_error = precondition_error;
 		precondition_error = NULL;
+
+		g_propagate_error (error, child_error);
 	}
 
 done:
