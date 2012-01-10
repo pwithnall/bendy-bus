@@ -305,6 +305,12 @@ bendy-bus/marshal.c: $(top_srcdir)/bendy-bus/marshal.list bendy-bus/marshal.h
 EXTRA_DIST += $(top_srcdir)/bendy-bus/marshal.list
 CLEANFILES += $(bendy_bus_marshal_sources)
 
+# Example machines
+EXTRA_DIST += \
+	machines/telepathy-cm.machine \
+	machines/telepathy-cm.xml \
+	$(NULL)
+
 # Gubbins
 ACLOCAL_AMFLAGS = -I m4
 

@@ -1,0 +1,361 @@
+object at /org/freedesktop/Telepathy/AccountManager, org.freedesktop.Telepathy.AccountManager implements org.freedesktop.Telepathy.AccountManager {
+	data {
+		/* Properties */
+		Interfaces = @as [
+			"org.freedesktop.Telepathy.AccountManager",
+		];
+		ValidAccounts = @ao [
+			@o "/org/freedesktop/Telepathy/Account/cmname/proto/account",
+		];
+		InvalidAccounts = @ao [];
+		SupportedAccountProperties = @as [
+			"org.freedesktop.Telepathy.Account.Enabled",
+			"org.freedesktop.Telepathy.Account.ConnectAutomatically",
+			"org.freedesktop.Telepathy.Account.RequestedPresence",
+		];
+	}
+
+	states {
+		Main
+	}
+}
+
+object at /org/freedesktop/Telepathy/Account/cmname/proto/account implements org.freedesktop.Telepathy.Account {
+	data {
+		/* Properties */
+		Interfaces = @as [
+			"org.freedesktop.Telepathy.Account",
+		];
+		DisplayName = "Test Account"?;
+		Icon = ""?;
+		Valid = true;
+		Enabled = true;
+		Nickname = "John Smith"?;
+		Service = ""?;
+		Parameters = @a{sv} {};
+		AutomaticPresence = (2u?, "available"?, ""?);
+		ConnectAutomatically = true?;
+		Connection = @o "/";
+		ConnectionStatus = 2u;
+		ConnectionStatusReason = 0u;
+		ConnectionError = "";
+		ConnectionErrorDetails = @a{sv} {};
+		CurrentPresence = (1u?, ""?, ""?);
+		RequestedPresence = (1u?, ""?, ""?);
+		ChangingPresence = false?;
+		NormalizedName = "account";
+		HasBeenOnline = false?;
+	}
+
+	states {
+		Disconnected;
+		Connecting;
+		Connected;
+	}
+
+	transition from Disconnected to Connecting on property RequestedPresence {
+		object->RequestedPresence = value;
+		object->ChangingPresence = true;
+		object->ConnectionStatus = 1u;
+		object->ConnectionStatusReason = 1u;
+
+		emit AccountPropertyChanged ({
+			"RequestedPresence" : <object->RequestedPresence>,
+			"ChangingPresence" : <object->ChangingPresence>,
+			"ConnectionStatus" : <object->ConnectionStatus>,
+			"ConnectionStatusReason" : <object->ConnectionStatusReason>,
+		});
+	}
+
+	transition from Connecting to Connected on random {
+		object->CurrentPresence = object->RequestedPresence;
+		object->ChangingPresence = false;
+		object->ConnectionStatus = 0u;
+		object->ConnectionStatusReason = 1u;
+		object->Connection = @o "/org/freedesktop/Telepathy/Connection/cmname/proto/account";
+		object->HasBeenOnline = true;
+
+		emit AccountPropertyChanged ({
+			"CurrentPresence" : <object->CurrentPresence>,
+			"ChangingPresence" : <object->ChangingPresence>,
+			"ConnectionStatus" : <object->ConnectionStatus>,
+			"ConnectionStatusReason" : <object->ConnectionStatusReason>,
+			"Connection" : <object->Connection>,
+			"HasBeenOnline" : <object->HasBeenOnline>,
+		});
+	}
+
+	transition from Connecting to Disconnected on random {
+		object->CurrentPresence = (1u, "", "");
+		object->ChangingPresence = false;
+		object->ConnectionStatus = 2u;
+		object->ConnectionStatusReason = 2u?;
+		object->Connection = @o "/";
+		object->ConnectionError = ""?;
+		object->ConnectionErrorDetails = @a{sv} {}?;
+
+		emit AccountPropertyChanged ({
+			"CurrentPresence" : <object->CurrentPresence>,
+			"ChangingPresence" : <object->ChangingPresence>,
+			"ConnectionStatus" : <object->ConnectionStatus>,
+			"ConnectionStatusReason" : <object->ConnectionStatusReason>,
+			"Connection" : <object->Connection>,
+			"ConnectionError" : <object->ConnectionError>,
+			"ConnectionErrorDetails" : <object->ConnectionErrorDetails>,
+		});
+	}
+}
+
+object at /org/freedesktop/Telepathy/ConnectionManager/cmname, org.freedesktop.Telepathy.ConnectionManager.cmname implements org.freedesktop.Telepathy.ConnectionManager {
+	data {
+		/* Properties */
+		Protocols = @a{sa{sv}} {};
+
+		Interfaces = @as [
+			"org.freedesktop.Telepathy.ConnectionManager",
+		];
+
+		/* Other variables */
+		_ConnectionObjectPath = @o "/org/freedesktop/Telepathy/ConnectionManager/cmname"; /* nonsensical default value */
+		_ConnectionBusName = "org.freedesktop.Telepathy.ConnectionManager.cmname";
+		_Params = @a(suv) [];
+	}
+
+	states {
+		Main
+	}
+
+	transition inside Main on method GetParameters {
+		precondition throwing NotImplemented { inArray(Protocol, keys object->Protocols) }
+
+		reply object->_Params;
+	}
+
+	transition inside Main on method ListProtocols {
+		reply keys object->Protocols;
+	}
+
+	transition inside Main on method RequestConnection {
+		precondition throwing NotImplemented { inArray(Protocol, keys object->Protocols) }
+		precondition throwing NotAvailable { object->_ConnectionBusName == "" }
+
+		emit NewConnection (object->_ConnectionBusName, object->_ConnectionObjectPath, Protocol);
+		reply (object->_ConnectionBusName, object->_ConnectionObjectPath);
+	}
+
+	transition inside Main on method RequestConnection {
+		throw NetworkError; /* Error messages are fuzzed */
+	}
+
+	transition inside Main on method RequestConnection {
+		throw InvalidArgument;
+	}
+}
+
+object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freedesktop.Telepathy.Connection.cmname.proto.account implements org.freedesktop.Telepathy.Connection, org.freedesktop.Telepathy.Connection.Interface.Contacts, org.freedesktop.Telepathy.Connection.Interface.Requests {
+	data {
+		/* Properties */
+		Interfaces = @as [
+			"org.freedesktop.Telepathy.Connection",
+			"org.freedesktop.Telepathy.Connection.Interface.Contacts",
+			"org.freedesktop.Telepathy.Connection.Interface.Requests",
+		];
+		SelfHandle = 1u;
+		Status = 1u; /* HACK */
+		HasImmortalHandles = true;
+
+		ContactAttributeInterfaces = @as [
+			"org.freedesktop.Telepathy.Connection",
+		];
+
+		/* Conn.I.Requests. */
+		Channels = @a(oa{sv}) [];
+		RequestableChannelClasses = @a(a{sv}as) [];
+
+		_Protocol = "protocol";
+		_Handles = {
+			1u : "John",
+			2u : "James",
+			3u : "Brian",
+			4u : "Sam",
+		}?;
+		/*_ClientInterests : TODO*/
+		_DesiredStatus = 0u; /* HACK */
+		/*_Channels : TODO*/
+	}
+
+	states {
+		/*Disconnected;*/
+		Connecting;
+		Disconnected; /* HACK */
+		Connected;
+	}
+
+	transition inside Disconnected, inside Connecting, inside Connected on method GetInterfaces {
+		reply object->Interfaces;
+	}
+
+	/* Potentially simulate an older CM */
+	transition inside Disconnected on method GetInterfaces {
+		throw Disconnected;
+	}
+
+	transition inside Disconnected on method GetProtocol {
+		reply object->_Protocol;
+	}
+
+	/* Deprecated. Empathy keeps calling it, though, which may be a bug. TODO: Investigate. */
+	transition inside Disconnected on method GetSelfHandle {
+		reply 0u;
+	}
+	transition inside Connecting, inside Connected on method GetSelfHandle {
+		reply object->SelfHandle;
+	}
+
+	transition inside Disconnected, inside Connecting, inside Connected on method GetStatus {
+		reply object->Status;
+	}
+
+	transition inside Disconnected on method HoldHandles {
+		throw Disconnected;
+	}
+
+	transition inside Disconnected on method InspectHandles {
+		throw Disconnected;
+	}
+
+	transition inside Disconnected on method ReleaseHandles {
+		throw Disconnected;
+	}
+
+	transition inside Disconnected on method RequestHandles {
+		throw Disconnected;
+	}
+
+	/* TODO: transition inside Disconnected on method AddClientInterest {
+		TODO: Worth implementing?
+	} */
+
+	transition inside Disconnected on method Connect {
+		object->_DesiredStatus = 0u;
+		/* Status change is effected as a random transition */
+	}
+
+	/* TODO: transition inside Disconnected on method Disconnect {} */
+
+	transition from Disconnected to Connecting on random {
+		precondition { object->_DesiredStatus != 2u }
+
+		object->Status = 1u;
+		emit StatusChanged (object->Status, 0u?);
+	}
+
+	transition from Connecting to Connected on random {
+		precondition { object->_DesiredStatus == 0u }
+
+		object->Status = 0u;
+		emit StatusChanged (object->Status, 0u?);
+	}
+
+	transition inside Disconnected on random {
+		emit ConnectionError (#[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z0-9_][a-zA-Z0-9]*(\.[a-zA-Z0-9_][a-zA-Z0-9]*)*#?, {
+			"debug-message" : <""?>,
+			"server-message" : <""?>,
+			"user-requested" : <true?>,
+			"expected-hostname" : <""?>,
+			"certificate-hostname" : <""?>,
+		}?);
+	}
+
+	transition inside Connecting, inside Connected on method GetContactAttributes {
+		reply pairKeys (Handles, { /* TODO: Hacky */
+			"org.freedesktop.Telepathy.Connection/contact-id" : <""?>,
+			"org.freedesktop.Telepathy.Connection.Interface.Aliasing/alias" : <""?>,
+			#[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z0-9_][a-zA-Z0-9]*(\.[a-zA-Z0-9_][a-zA-Z0-9]*)*# : <""?>,
+			/* etc. */
+		}?);
+	}
+
+	transition inside Connecting, inside Connected on method EnsureChannel {
+		precondition throwing NotImplemented {
+			dictGet (Request, "org.freedesktop.Telepathy.Channel.ChannelType", <"">) == <"org.freedesktop.Telepathy.Channel.Type.ContactList"> &&
+			dictGet (Request, "org.freedesktop.Telepathy.Channel.TargetID", <"">) == <"subscribe">
+		}
+
+		reply (true, @o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe", @a{sv} []);
+	}
+
+	/*transition inside Connecting, inside Connected on method EnsureChannel {
+		throw Disconnected; TODO: other errors
+	}*/
+}
+
+object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe implements org.freedesktop.Telepathy.Channel, org.freedesktop.Telepathy.Channel.Type.ContactList, org.freedesktop.Telepathy.Channel.Interface.Group {
+	data {
+		/* Channel */
+		ChannelType = "org.freedesktop.Telepathy.Channel.Type.ContactList";
+		Interfaces = [
+			"org.freedesktop.Telepathy.Channel.Type.ContactList",
+			"org.freedesktop.Telepathy.Channel",
+			"org.freedesktop.Telepathy.Channel.Interface.Group",
+		]?;
+		TargetHandle = 0u?;
+		TargetID = "subscribe";
+		TargetHandleType = 3u?;
+		Requested = false?;
+		InitiatorHandle = 0u?;
+		InitiatorID = "baz"?;
+
+		/* Channel.I.Group */
+		GroupFlags = 4096u; /* Members_Changed_Detailed */
+		HandleOwners = @a{uu} {};
+		LocalPendingMembers = @a(uuus) [];
+		Members = @au [];
+		RemotePendingMembers = @au [];
+		SelfHandle = 0u;
+		MemberIdentifiers = @a{us} {};
+
+		/* Temporaries */
+		_MemberCount = 0u;
+	}
+
+	states {
+		Open;
+		Closed;
+	}
+
+	transition from Open to Closed on method Close {
+		emit Closed ();
+	}
+
+	transition inside Open on random {
+		object->Members = arrayInsert (object->Members, 0u?, object->_MemberCount);
+		object->MemberIdentifiers = dictSet (object->MemberIdentifiers, object->_MemberCount, "foo@example.com"?);
+
+		emit MembersChangedDetailed ([object->_MemberCount], @au [], @au [], @au [], @a{sv} {});
+
+		object->_MemberCount = object->_MemberCount + 1u;
+	}
+
+	transition inside Open on method GetHandle {
+		reply (object->TargetHandleType, object->TargetHandle);
+	}
+
+	transition inside Open on method GetGroupFlags {
+		reply (object->GroupFlags);
+	}
+
+	transition inside Open on method GetSelfHandle {
+		reply (object->SelfHandle);
+	}
+
+	transition inside Open on method GetAllMembers {
+		reply (object->Members, @au [] /* TODO */, object->RemotePendingMembers);
+	}
+
+	transition inside Open on method GetLocalPendingMembersWithInfo {
+		reply (object->LocalPendingMembers);
+	}
+}
+
+/* TODO: More channels. Announce them with: http://telepathy.freedesktop.org/spec/Connection_Interface_Requests.html#Signal:NewChannels */
