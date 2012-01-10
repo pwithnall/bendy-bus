@@ -2,6 +2,7 @@ SUBDIRS = po
 
 # Setup
 bin_PROGRAMS =
+dist_bin_SCRIPTS =
 noinst_PROGRAMS =
 lib_LTLIBRARIES =
 EXTRA_DIST =
@@ -220,6 +221,9 @@ GITIGNOREFILES += \
 	bendy-bus/.dirstamp \
 	bendy-bus/.libs/ \
 	$(NULL)
+
+# bendy-bus-lcov
+dist_bin_SCRIPTS += bendy-bus/bendy-bus-lcov
 
 # bendy-bus-lint
 bin_PROGRAMS += bendy-bus-lint/bendy-bus-lint

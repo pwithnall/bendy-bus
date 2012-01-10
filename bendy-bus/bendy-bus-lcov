@@ -1,0 +1,50 @@
+#!/bin/sh
+
+# Option parsing.
+function usage() {
+	echo "Usage: $0 SIMULATION-CODE-FILE INTROSPECTION-XML-FILE LCOV-DIRECTORY [RESULTS-DIRECTORY/]TEST-NAME BASELINE-INFO-FILE -- [BENDY-BUS-OPTIONS] -- EXECUTABLE-FILE [ARGUMENTS]" 1>&2
+	exit 1
+}
+
+if [ $# -le 7 ]; then
+	usage
+fi
+
+simulation_code_filename=$1
+introspection_xml_filename=$2
+lcov_directory=$3
+test_name="${4##*/}"
+results_directory=$(dirname "$4")
+baseline_info_filename=$5
+shift 5
+
+if [ "$1" != "--" -o "${test_name}" == "" ]; then
+	usage
+fi
+shift 1
+
+bendy_bus_command_line="$@"
+
+# Check we're not going to overwrite old results.
+info_filename="${results_directory}/bendy-bus-lcov_${test_name}.info"
+
+if [ -f $info_filename ]; then
+	echo "${info_filename} already exists!" 1>&2
+	exit 2
+fi
+
+# Reset lcov counters.
+lcov --directory ${lcov_directory} --zerocounters || exit 3
+
+# Run the test.
+bendy-bus "${simulation_code_filename}" "${introspection_xml_filename}" ${bendy_bus_command_line} || exit 3
+
+# Capture and process the results.
+lcov --directory ${lcov_directory} --capture --output-file "${info_filename}.tmp" || exit 3
+lcov --directory ${lcov_directory} --add-tracefile "${baseline_info_filename}" --add-tracefile "${info_filename}.tmp" --output-file "${info_filename}" || exit 3
+rm "${info_filename}.tmp"
+
+# Output a completion message.
+echo ""
+echo "Generate a HTML report using the command:"
+echo "genhtml --output-directory \"${results_directory}/bendy-bus-lcov_${test_name}\" \"${info_filename}\""
