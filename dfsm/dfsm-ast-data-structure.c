@@ -973,7 +973,9 @@ fuzz_unsigned_int (guint64 default_value, guint64 min_value, guint64 max_value)
 	} else {
 		/* Random int in the given range. If the range is large, we'll have to combine two g_random_int() calls to get a 64-bit integer,
 		 * since g_random_int() only returns 32-bit integers. */
-		if (/*min_value >= 0 && */ max_value <= G_MAXUINT32) {
+		if (/*min_value >= 0 && */ max_value <= G_MAXINT32) {
+			return g_random_int_range (min_value, max_value);
+		} else if (/*min_value >= 0 && */ max_value <= G_MAXUINT32) {
 			g_assert (min_value == 0 && max_value == G_MAXUINT32);
 
 			return g_random_int ();
