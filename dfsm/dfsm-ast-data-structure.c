@@ -1448,12 +1448,12 @@ fuzz_string (const gchar *default_value)
 
 		if (g_random_boolean () == TRUE) {
 			/* Add whitespace as a prefix. */
-			prefix_length = g_random_int_range (1, 51);
+			prefix_length = g_random_int_range (1, 6);
 		}
 
 		if (g_random_boolean () == TRUE) {
 			/* Independently add whitespace to the end of the fuzzy string. */
-			suffix_length = g_random_int_range (1, 51);
+			suffix_length = g_random_int_range (1, 6);
 		}
 
 		/* Move the fuzzy string to a larger chunk of memory with space for the whitespace. */
