@@ -1165,24 +1165,24 @@ generate_character (void)
 	guint32 distribution;
 
 	/* We use a non-uniform distribution for this.
-	 *  • With probability 0.5 we choose an ASCII character.
-	 *  • With probability 0.4 we choose any other valid Unicode character.
+	 *  • With probability 0.5 we choose an ASCII character (except NUL).
+	 *  • With probability 0.4 we choose any other valid Unicode character (except NUL).
 	 *  • With probability 0.1 we choose any invalid Unicode character (such as the replacement character).
 	 */
 	distribution = g_random_int ();
 
 	if (distribution < G_MAXUINT32 * 0.5) {
 		/* ASCII. */
-		return g_random_int_range (0x00, 0xFF + 1);
+		return g_random_int_range (0x01, 0xFF + 1); /* anything except NUL */
 	} else if (distribution < G_MAXUINT32 * 0.9) {
 		gunichar output;
 
 		/* Valid Unicode. It would be impractical to list all assigned and valid code points here such that they all have a uniform
 		 * probability of being chosen. Consequently, we just choose a random code point from planes 0, 1 and 2, and check whether it's
-		 * assigned. If not, we choose another. */
-		output = g_random_int_range (0x00, 0x2FFFF + 1);
+		 * assigned. If not, we choose another. Note that we never choose NUL. */
+		output = g_random_int_range (0x01, 0x2FFFF + 1);
 		while (g_unichar_isdefined (output) == FALSE) {
-			output = g_random_int_range (0x00, 0x2FFFF + 1);
+			output = g_random_int_range (0x01, 0x2FFFF + 1);
 		}
 
 		return output;
