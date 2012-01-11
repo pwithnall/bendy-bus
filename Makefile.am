@@ -315,6 +315,21 @@ EXTRA_DIST += \
 	machines/telepathy-cm.xml \
 	$(NULL)
 
+# Version header (see git-version-gen)
+EXTRA_DIST += git-version-gen
+
+BUILT_SOURCES += $(top_srcdir)/.version
+
+$(top_srcdir)/.version:
+	echo $(VERSION) > $@-t && mv $@-t $@
+dist-hook:
+	echo $(VERSION) > $(distdir)/.tarball-version
+
+GITIGNOREFILES += \
+	.tarball-version \
+	.version \
+	$(NULL)
+
 # Gubbins
 ACLOCAL_AMFLAGS = -I m4
 

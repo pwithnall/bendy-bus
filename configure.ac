@@ -1,10 +1,5 @@
-# Release version
-m4_define(version_major, 0)
-m4_define(version_minor, 1)
-m4_define(version_micro, 0)
-
 # autofoo
-AC_INIT([Bendy Bus],[version_major.version_minor.version_micro],[],[bendy-bus],[])
+AC_INIT([Bendy Bus],m4_esyscmd([./git-version-gen .tarball-version]),[],[bendy-bus],[])
 AM_INIT_AUTOMAKE([check-news dist-bzip2 no-dist-gzip])
 
 AC_CONFIG_MACRO_DIR([m4])
