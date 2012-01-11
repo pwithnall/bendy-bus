@@ -457,12 +457,23 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe i
 	}
 
 	transition inside Open on random {
-		object->Members = arrayInsert (object->Members, 0u?, object->_MemberCount);
+		object->Members = arrayInsert (object->Members, 0u, object->_MemberCount);
 		object->MemberIdentifiers = dictSet (object->MemberIdentifiers, object->_MemberCount, "foo@example.com"?);
 
 		emit MembersChangedDetailed ([object->_MemberCount], @au [], @au [], @au [], @a{sv} {});
 
 		object->_MemberCount = object->_MemberCount + 1u;
+	}
+
+	transition inside Open on random {
+		precondition { object->_MemberCount >= 1u }
+
+		object->_MemberCount = object->_MemberCount - 1u;
+
+		object->Members = arrayRemove (object->Members, 0u);
+		object->MemberIdentifiers = dictUnset (object->MemberIdentifiers, object->_MemberCount);
+
+		emit MembersChangedDetailed (@au [], [object->_MemberCount], @au [], @au [], @a{sv} {});
 	}
 
 	transition inside Open on method GetHandle {
@@ -525,12 +536,23 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/group1 impl
 	}
 
 	transition inside Open on random {
-		object->Members = arrayInsert (object->Members, 0u?, object->_MemberCount);
+		object->Members = arrayInsert (object->Members, 0u, object->_MemberCount);
 		object->MemberIdentifiers = dictSet (object->MemberIdentifiers, object->_MemberCount, "foo@example.com"?);
 
 		emit MembersChangedDetailed ([object->_MemberCount], @au [], @au [], @au [], @a{sv} {});
 
 		object->_MemberCount = object->_MemberCount + 1u;
+	}
+
+	transition inside Open on random {
+		precondition { object->_MemberCount >= 1u }
+
+		object->_MemberCount = object->_MemberCount - 1u;
+
+		object->Members = arrayRemove (object->Members, 0u);
+		object->MemberIdentifiers = dictUnset (object->MemberIdentifiers, object->_MemberCount);
+
+		emit MembersChangedDetailed (@au [], [object->_MemberCount], @au [], @au [], @a{sv} {});
 	}
 
 	transition inside Open on method GetHandle {
