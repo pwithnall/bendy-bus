@@ -309,12 +309,52 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 			dictGet (Request, "org.freedesktop.Telepathy.Channel.TargetID", <"">) == <"subscribe">
 		}
 
+		object->Channels = arrayInsert (object->Channels, 0u, (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe", {
+			"org.freedesktop.Telepathy.Channel.ChannelType" : <"org.freedesktop.Telepathy.Channel.Type.ContactList">,
+			"org.freedesktop.Telepathy.Channel.TargetHandleType" : <3u>,
+			"org.freedesktop.Telepathy.Channel.TargetHandle" : <0u?>,
+			"org.freedesktop.Telepathy.Channel.TargetID"  : <"subscribe">,
+			"org.freedesktop.Telepathy.Channel.Requested" : <false?>,
+		}));
+
 		reply (true, @o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe", @a{sv} []);
 	}
 
 	/*transition inside Connecting, inside Connected on method EnsureChannel {
 		throw Disconnected; TODO: other errors
 	}*/
+
+	data {
+		_NotifiedGroup1 = false;
+	}
+
+	transition inside Connecting, inside Connected on random {
+		precondition { object->_NotifiedGroup1 == false }
+
+		object->Channels = arrayInsert (object->Channels, 0u, (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/group1", {
+			"org.freedesktop.Telepathy.Channel.ChannelType" : <"org.freedesktop.Telepathy.Channel.Type.ContactList">,
+			"org.freedesktop.Telepathy.Channel.TargetHandleType" : <4u>,
+			"org.freedesktop.Telepathy.Channel.TargetHandle" : <0u?>,
+			"org.freedesktop.Telepathy.Channel.TargetID"  : <"group1">,
+			"org.freedesktop.Telepathy.Channel.Requested" : <false?>,
+		}));
+
+		emit NewChannels ([arrayGet (object->Channels, 0u)]);
+		emit NewChannel (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/group1",
+		                 "org.freedesktop.Telepathy.Channel.Type.ContactList", 3u?, 0u?, false?);
+
+		object->_NotifiedGroup1 = true;
+	}
+
+	transition inside Connecting, inside Connected on random {
+		precondition {object->_NotifiedGroup1 == true }
+
+		object->Channels = arrayRemove (object->Channels, 0u);
+
+		emit ChannelClosed (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/group1");
+
+		object->_NotifiedGroup1 = false;
+	}
 
 	transition inside Disconnected on method GetAliasFlags {
 		throw Disconnected;
@@ -359,10 +399,78 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe i
 		]?;
 		TargetHandle = 0u?;
 		TargetID = "subscribe";
-		TargetHandleType = 3u?;
+		TargetHandleType = 3u;
 		Requested = false?;
 		InitiatorHandle = 0u?;
-		InitiatorID = "baz"?;
+		InitiatorID = ""?;
+
+		/* Channel.I.Group */
+		GroupFlags = 4096u; /* Members_Changed_Detailed */
+		HandleOwners = @a{uu} {};
+		LocalPendingMembers = @a(uuus) [];
+		Members = @au [];
+		RemotePendingMembers = @au [];
+		SelfHandle = 0u;
+		MemberIdentifiers = @a{us} {};
+
+		/* Temporaries */
+		_MemberCount = 0u;
+	}
+
+	states {
+		Open;
+		Closed;
+	}
+
+	transition from Open to Closed on method Close {
+		emit Closed ();
+	}
+
+	transition inside Open on random {
+		object->Members = arrayInsert (object->Members, 0u?, object->_MemberCount);
+		object->MemberIdentifiers = dictSet (object->MemberIdentifiers, object->_MemberCount, "foo@example.com"?);
+
+		emit MembersChangedDetailed ([object->_MemberCount], @au [], @au [], @au [], @a{sv} {});
+
+		object->_MemberCount = object->_MemberCount + 1u;
+	}
+
+	transition inside Open on method GetHandle {
+		reply (object->TargetHandleType, object->TargetHandle);
+	}
+
+	transition inside Open on method GetGroupFlags {
+		reply (object->GroupFlags);
+	}
+
+	transition inside Open on method GetSelfHandle {
+		reply (object->SelfHandle);
+	}
+
+	transition inside Open on method GetAllMembers {
+		reply (object->Members, @au [] /* TODO */, object->RemotePendingMembers);
+	}
+
+	transition inside Open on method GetLocalPendingMembersWithInfo {
+		reply (object->LocalPendingMembers);
+	}
+}
+
+object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/group1 implements org.freedesktop.Telepathy.Channel, org.freedesktop.Telepathy.Channel.Type.ContactList, org.freedesktop.Telepathy.Channel.Interface.Group {
+	data {
+		/* Channel */
+		ChannelType = "org.freedesktop.Telepathy.Channel.Type.ContactList";
+		Interfaces = [
+			"org.freedesktop.Telepathy.Channel.Type.ContactList",
+			"org.freedesktop.Telepathy.Channel",
+			"org.freedesktop.Telepathy.Channel.Interface.Group",
+		]?;
+		TargetHandle = 0u?;
+		TargetID = "group1";
+		TargetHandleType = 4u;
+		Requested = false?;
+		InitiatorHandle = 0u?;
+		InitiatorID = ""?;
 
 		/* Channel.I.Group */
 		GroupFlags = 4096u; /* Members_Changed_Detailed */
