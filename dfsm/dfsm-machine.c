@@ -662,7 +662,7 @@ dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const 
 
 	/* Can't call a method if the simulation isn't running. */
 	if (priv->simulation_status != DFSM_SIMULATION_STATUS_STARTED) {
-		g_set_error (error, DFSM_SIMULATION_ERROR, DFSM_SIMULATION_ERROR_INVALID_STATUS,
+		g_set_error (&child_error, DFSM_SIMULATION_ERROR, DFSM_SIMULATION_ERROR_INVALID_STATUS,
 		             _("Can't call a D-Bus method if the simulation isn't running."));
 		goto done;
 	}
