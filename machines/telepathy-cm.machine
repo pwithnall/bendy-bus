@@ -331,17 +331,21 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 		reply (true, @o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe", @a{sv} []);
 	}
 
-	/*transition inside Connecting, inside Connected on method EnsureChannel {
-		throw Disconnected; TODO: other errors
-	}*/
+	transition inside Connecting, inside Connected on random {
+		object->Channels = arrayInsert (object->Channels, 0u, (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe", {
+			"org.freedesktop.Telepathy.Channel.ChannelType" : <"org.freedesktop.Telepathy.Channel.Type.ContactList">,
+			"org.freedesktop.Telepathy.Channel.TargetHandleType" : <3u>,
+			"org.freedesktop.Telepathy.Channel.TargetHandle" : <0u?>,
+			"org.freedesktop.Telepathy.Channel.TargetID"  : <"subscribe">,
+			"org.freedesktop.Telepathy.Channel.Requested" : <false?>,
+		}));
 
-	data {
-		_NotifiedGroup1 = false;
+		emit NewChannels ([arrayGet (object->Channels, 0u, (@o "/p", @a{sv} {}))]);
+		emit NewChannel (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe",
+		                 "org.freedesktop.Telepathy.Channel.Type.ContactList", 3u, 0u?, false?);
 	}
 
 	transition inside Connecting, inside Connected on random {
-		precondition { object->_NotifiedGroup1 == false }
-
 		object->Channels = arrayInsert (object->Channels, 0u, (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/group1", {
 			"org.freedesktop.Telepathy.Channel.ChannelType" : <"org.freedesktop.Telepathy.Channel.Type.ContactList">,
 			"org.freedesktop.Telepathy.Channel.TargetHandleType" : <4u>,
@@ -352,20 +356,19 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 
 		emit NewChannels ([arrayGet (object->Channels, 0u, (@o "/p", @a{sv} {}))]);
 		emit NewChannel (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/group1",
-		                 "org.freedesktop.Telepathy.Channel.Type.ContactList", 3u?, 0u?, false?);
-
-		object->_NotifiedGroup1 = true;
+		                 "org.freedesktop.Telepathy.Channel.Type.ContactList", 4u, 0u?, false?);
 	}
 
 	transition inside Connecting, inside Connected on random {
-		precondition {object->_NotifiedGroup1 == true }
+		precondition { arrayGet (object->Channels, 0u, (@o "/p", @a{sv} {})) != (@o "/p", @a{sv} {}) }
 
+		emit ChannelClosed (structHead (arrayGet (object->Channels, 0u, (@o "/p", @a{sv} {}))));
 		object->Channels = arrayRemove (object->Channels, 0u);
-
-		emit ChannelClosed (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/group1");
-
-		object->_NotifiedGroup1 = false;
 	}
+
+	/*transition inside Connecting, inside Connected on method EnsureChannel {
+		throw Disconnected; TODO: other errors
+	}*/
 
 	transition inside Disconnected on method GetAliasFlags {
 		throw Disconnected;
@@ -547,4 +550,3 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/group1 impl
 	}
 }
 
-/* TODO: More channels. Announce them with: http://telepathy.freedesktop.org/spec/Connection_Interface_Requests.html#Signal:NewChannels */
