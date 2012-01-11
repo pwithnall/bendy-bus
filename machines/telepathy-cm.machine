@@ -350,7 +350,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 			"org.freedesktop.Telepathy.Channel.Requested" : <false?>,
 		}));
 
-		emit NewChannels ([arrayGet (object->Channels, 0u)]);
+		emit NewChannels ([arrayGet (object->Channels, 0u, (@o "/p", @a{sv} {}))]);
 		emit NewChannel (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/group1",
 		                 "org.freedesktop.Telepathy.Channel.Type.ContactList", 3u?, 0u?, false?);
 

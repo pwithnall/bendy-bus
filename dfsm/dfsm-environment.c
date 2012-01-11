@@ -661,34 +661,60 @@ _in_array_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmE
 static GVariantType *
 _array_get_calculate_type (const GVariantType *parameters_type, GError **error)
 {
-	const GVariantType *parameters_supertype = (const GVariantType*) "(a*u)";
+	const GVariantType *parameters_supertype = (const GVariantType*) "(a*u*)";
+	const GVariantType *array_type, *element_type;
 
-	/* The parameters merely have to conform to the supertype. */
+	/* As well as conforming to the supertype, the two *s have to be in a subtype relationship. */
 	if (g_variant_type_is_subtype_of (parameters_type, parameters_supertype) == FALSE) {
 		/* Error */
 		func_set_calculate_type_error (error, "arrayGet", parameters_supertype, parameters_type);
 		return NULL;
 	}
 
-	/* Return the type of the array elements. */
-	return g_variant_type_copy (g_variant_type_element (g_variant_type_first (parameters_type)));
+	array_type = g_variant_type_first (parameters_type);
+	element_type = g_variant_type_next (g_variant_type_next (array_type));
+
+	if (g_variant_type_is_subtype_of (element_type, g_variant_type_element (array_type)) == FALSE) {
+		gchar *parameters_supertype_string, *parameters_type_string;
+
+		/* Error */
+		parameters_supertype_string = g_variant_type_dup_string (parameters_supertype);
+		parameters_type_string = g_variant_type_dup_string (parameters_type);
+
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+		             _("Type mismatch between formal and actual parameters to function ‘%s’: expects type ‘%s’ with the third item a subtype "
+		               "of the element type of the first item, but received type ‘%s’."),
+		             "arrayGet", parameters_supertype_string, parameters_type_string);
+
+		g_free (parameters_type_string);
+		g_free (parameters_supertype_string);
+
+		return NULL;
+	}
+
+	/* Always return the element of the array. */
+	return g_variant_type_copy (element_type);
 }
 
 static GVariant *
 _array_get_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment, GError **error)
 {
-	GVariant *haystack, *child_variant;
+	GVariant *haystack, *default_value, *child_variant;
 	guint array_index;
 
 	haystack = g_variant_get_child_value (parameters, 0);
 	g_variant_get_child (parameters, 1, "u", &array_index);
+	default_value = g_variant_get_child_value (parameters, 2);
 
-	/* Silently clamp the insertion index to the size of the input array. */
-	array_index = MIN (array_index, g_variant_n_children (haystack));
+	if (array_index >= g_variant_n_children (haystack)) {
+		/* If the index is out of bounds, return the default value. */
+		child_variant = g_variant_ref (default_value);
+	} else {
+		/* Get the child value. */
+		child_variant = g_variant_get_child_value (haystack, array_index);
+	}
 
-	/* Get the child value. */
-	child_variant = g_variant_get_child_value (haystack, array_index);
-
+	g_variant_unref (default_value);
 	g_variant_unref (haystack);
 
 	/* Return the child. */
