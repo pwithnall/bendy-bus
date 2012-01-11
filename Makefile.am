@@ -176,6 +176,7 @@ dfsm_tests_ast_LDADD = $(test_ldadd)
 
 GITIGNOREFILES += \
 	dfsm/tests/.dirstamp \
+	dfsm/tests/.libs/ \
 	$(NULL)
 
 # bendy-bus
