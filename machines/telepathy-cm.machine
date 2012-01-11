@@ -309,7 +309,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 			dictGet (Request, "org.freedesktop.Telepathy.Channel.TargetID", <"">) == <"subscribe">
 		}
 
-		object->Channels = arrayInsert (object->Channels, 0u, (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe", {
+		object->Channels = arrayInsert (object->Channels, 1u, (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe", {
 			"org.freedesktop.Telepathy.Channel.ChannelType" : <"org.freedesktop.Telepathy.Channel.Type.ContactList">,
 			"org.freedesktop.Telepathy.Channel.TargetHandleType" : <3u>,
 			"org.freedesktop.Telepathy.Channel.TargetHandle" : <0u?>,
