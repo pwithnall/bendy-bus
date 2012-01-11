@@ -710,7 +710,7 @@ main (int argc, char *argv[])
 	time_str = g_date_time_format (date_time, "%F %TZ");
 	g_date_time_unref (date_time);
 
-	log_header = g_strdup_printf (_("Bendy Bus left the depot at %s using command line: %s"), time_str, command_line);
+	log_header = g_strdup_printf (_("Bendy Bus (number %s) left the depot at %s using command line: %s"), PACKAGE_VERSION, time_str, command_line);
 
 	g_log (G_LOG_DOMAIN, G_LOG_LEVEL_MESSAGE, "%s", log_header);
 	g_log (dsim_logging_get_domain_name (DSIM_LOG_DBUS_DAEMON), G_LOG_LEVEL_MESSAGE, "%s", log_header);
