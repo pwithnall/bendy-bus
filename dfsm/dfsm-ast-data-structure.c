@@ -1408,14 +1408,17 @@ fuzz_string (const gchar *default_value)
 
 		if (block1_start - default_value > default_value + default_value_length - block1_end) {
 			const gchar *temp_start, *temp_end;
+			gsize temp_length;
 
-			block2_length = find_random_block (default_value, block1_start - default_value, &temp_start, &temp_end);
+			temp_length = find_random_block (default_value, block1_start - default_value, &temp_start, &temp_end);
 
 			/* Ensure block1 is always < block2. */
 			block2_start = block1_start;
 			block2_end = block1_end;
+			block2_length = block1_length;
 			block1_start = temp_start;
 			block1_end = temp_end;
+			block1_length = temp_length;
 		} else {
 			block2_length = find_random_block (block1_end, default_value + default_value_length - block1_end, &block2_start, &block2_end);
 		}
