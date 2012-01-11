@@ -257,6 +257,22 @@ dfsm_ast_data_structure_pre_check_and_register (DfsmAstNode *node, DfsmEnvironme
 				return;
 			}
 
+			/* If we have a type annotation marking us as an object path, check the string constant is a valid object path. */
+			if (priv->type_annotation != NULL) {
+				GVariantType *annotated_type;
+				gboolean is_object_path;
+
+				annotated_type = g_variant_type_new (priv->type_annotation);
+				is_object_path = g_variant_type_equal (annotated_type, G_VARIANT_TYPE_OBJECT_PATH);
+				g_variant_type_free (annotated_type);
+
+				if (is_object_path == TRUE && g_variant_is_object_path (priv->object_path_val) == FALSE) {
+					g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+					             _("Invalid D-Bus object path: %s"), priv->string_val);
+					return;
+				}
+			}
+
 			break;
 		case DFSM_AST_DATA_OBJECT_PATH:
 			/* Valid object path? */
