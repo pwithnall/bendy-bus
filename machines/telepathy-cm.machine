@@ -152,7 +152,7 @@ object at /org/freedesktop/Telepathy/ConnectionManager/cmname, org.freedesktop.T
 	}
 }
 
-object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freedesktop.Telepathy.Connection.cmname.proto.account implements org.freedesktop.Telepathy.Connection, org.freedesktop.Telepathy.Connection.Interface.Contacts, org.freedesktop.Telepathy.Connection.Interface.Requests, org.freedesktop.Telepathy.Connection.Interface.Aliasing, org.freedesktop.Telepathy.Connection.Interface.Avatars, org.freedesktop.Telepathy.Connection.Interface.SimplePresence {
+object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freedesktop.Telepathy.Connection.cmname.proto.account implements org.freedesktop.Telepathy.Connection, org.freedesktop.Telepathy.Connection.Interface.Contacts, org.freedesktop.Telepathy.Connection.Interface.Requests, org.freedesktop.Telepathy.Connection.Interface.Aliasing, org.freedesktop.Telepathy.Connection.Interface.Avatars, org.freedesktop.Telepathy.Connection.Interface.SimplePresence, org.freedesktop.Telepathy.Connection.Interface.ContactCapabilities {
 	data {
 		/* Properties */
 		Interfaces = @as [
@@ -162,6 +162,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 			"org.freedesktop.Telepathy.Connection.Interface.Aliasing",
 			"org.freedesktop.Telepathy.Connection.Interface.Avatars",
 			"org.freedesktop.Telepathy.Connection.Interface.SimplePresence",
+			"org.freedesktop.Telepathy.Connection.Interface.ContactCapabilities",
 		];
 		SelfHandle = 1u;
 		Status = 1u; /* HACK */
@@ -173,6 +174,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 			"org.freedesktop.Telepathy.Connection.Interface.Aliasing",
 			"org.freedesktop.Telepathy.Connection.Interface.Avatars",
 			"org.freedesktop.Telepathy.Connection.Interface.SimplePresence",
+			"org.freedesktop.Telepathy.Connection.Interface.ContactCapabilities",
 		];
 
 		/* Conn.I.Requests. */
@@ -298,6 +300,15 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 			"org.freedesktop.Telepathy.Connection.Interface.Aliasing/alias" : <""?>,
 			"org.freedesktop.Telepathy.Connection.Interface.Avatars/token" : <""?>,
 			"org.freedesktop.Telepathy.Connection.Interface.SimplePresence/presence" : <(3u?, "available"?, "Status message!"?)>,
+			"org.freedesktop.Telepathy.Connection.Interface.ContactCapabilities/capabilities" : <[(
+				{
+					"org.freedesktop.Telepathy.something" : <""?>,
+					"org.freedesktop.Telepathy.Channel.TargetHandleType" : <0u?>,
+				}?,
+				[
+					"org.freedesktop.Telepathy.somethingelse",
+				]?,
+			)]?>,
 			#[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z0-9_][a-zA-Z0-9]*(\.[a-zA-Z0-9_][a-zA-Z0-9]*)*# : <""?>,
 			/* etc. */
 		}?);
@@ -385,6 +396,18 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 
 	transition inside Connecting, inside Connected on method RequestAvatars {
 		throw InvalidHandle;
+	}
+
+	transition inside Disconnected, inside Connecting, inside Connected on random {
+		emit ContactCapabilitiesChanged (pairKeys (@au [0u]?, [(
+			{
+				"org.freedesktop.Telepathy.something" : <""?>,
+				"org.freedesktop.Telepathy.Channel.TargetHandleType" : <0u?>,
+			}?,
+			[
+				"org.freedesktop.Telepathy.somethingelse",
+			]?,
+		)]?));
 	}
 }
 
