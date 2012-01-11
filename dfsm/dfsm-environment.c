@@ -1133,6 +1133,38 @@ _dict_get_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmE
 	return output_value;
 }
 
+static GVariantType *
+_struct_head_calculate_type (const GVariantType *parameters_type, GError **error)
+{
+	const GVariantType *parameters_supertype = (const GVariantType*) "(r)";
+
+	/* Ideally, we'd have a structGet(ru) method which took the struct and a statically-defined integer giving the index. We could then check
+	 * that the integer was a valid index into the struct, and calculate the type accordingly. However, we don't currently support statically
+	 * defined values in the right way, so this isn't possible without introducing a runtime check on the index value. That's unsafe, so
+	 * instead we use a head-and-tail approach, which can be safely typed without needing parametric typing. */
+	if (g_variant_type_is_subtype_of (parameters_type, parameters_supertype) == FALSE) {
+		/* Error */
+		func_set_calculate_type_error (error, "structHead", parameters_supertype, parameters_type);
+		return NULL;
+	}
+
+	/* Always return the value of the first element in the struct. */
+	return g_variant_type_copy (g_variant_type_first (g_variant_type_first (parameters_type)));
+}
+
+static GVariant *
+_struct_head_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment, GError **error)
+{
+	GVariant *_struct, *output_value;
+
+	_struct = g_variant_get_child_value (parameters, 0);
+	output_value = g_variant_get_child_value (_struct, 0);
+	g_variant_unref (_struct);
+
+	/* Return the output value. */
+	return output_value;
+}
+
 typedef struct {
 	const gchar *name;
 	GVariantType *(*calculate_type_func) (const GVariantType *parameters_type, GError **error);
@@ -1151,6 +1183,7 @@ static const DfsmFunctionInfo _function_info[] = {
 	{ "dictSet",		_dict_set_calculate_type,	_dict_set_evaluate },
 	{ "dictUnset",		_dict_unset_calculate_type,	_dict_unset_evaluate },
 	{ "dictGet",		_dict_get_calculate_type,	_dict_get_evaluate },
+	{ "structHead",		_struct_head_calculate_type,	_struct_head_evaluate },
 };
 
 /*
