@@ -659,6 +659,43 @@ _in_array_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmE
 }
 
 static GVariantType *
+_array_get_calculate_type (const GVariantType *parameters_type, GError **error)
+{
+	const GVariantType *parameters_supertype = (const GVariantType*) "(a*u)";
+
+	/* The parameters merely have to conform to the supertype. */
+	if (g_variant_type_is_subtype_of (parameters_type, parameters_supertype) == FALSE) {
+		/* Error */
+		func_set_calculate_type_error (error, "arrayGet", parameters_supertype, parameters_type);
+		return NULL;
+	}
+
+	/* Return the type of the array elements. */
+	return g_variant_type_copy (g_variant_type_element (g_variant_type_first (parameters_type)));
+}
+
+static GVariant *
+_array_get_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment, GError **error)
+{
+	GVariant *haystack, *child_variant;
+	guint array_index;
+
+	haystack = g_variant_get_child_value (parameters, 0);
+	g_variant_get_child (parameters, 1, "u", &array_index);
+
+	/* Silently clamp the insertion index to the size of the input array. */
+	array_index = MIN (array_index, g_variant_n_children (haystack));
+
+	/* Get the child value. */
+	child_variant = g_variant_get_child_value (haystack, array_index);
+
+	g_variant_unref (haystack);
+
+	/* Return the child. */
+	return child_variant;
+}
+
+static GVariantType *
 _array_insert_calculate_type (const GVariantType *parameters_type, GError **error)
 {
 	const GVariantType *parameters_supertype = (const GVariantType*) "(a*u*)";
@@ -1082,6 +1119,7 @@ static const DfsmFunctionInfo _function_info[] = {
 	{ "keys",		_keys_calculate_type,		_keys_evaluate },
 	{ "pairKeys",		_pair_keys_calculate_type,	_pair_keys_evaluate },
 	{ "inArray",		_in_array_calculate_type,	_in_array_evaluate },
+	{ "arrayGet",		_array_get_calculate_type,	_array_get_evaluate },
 	{ "arrayInsert",	_array_insert_calculate_type,	_array_insert_evaluate },
 	{ "arrayRemove",	_array_remove_calculate_type,	_array_remove_evaluate },
 	{ "dictSet",		_dict_set_calculate_type,	_dict_set_evaluate },
