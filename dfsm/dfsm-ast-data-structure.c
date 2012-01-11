@@ -1193,14 +1193,17 @@ generate_character (void)
 		 *  • Private Use Area: U+E000–U+F8FF (6400 points).
 		 *  • Supplementary Private Use Area A: U+F0000–U+FFFFF (65536 points).
 		 *  • Supplementary Private Use Area B: U+100000–U+10FFFF (65536 points).
-		 *  • Surrogates Area: U+D800–U+DFFF (2048 points).
 		 *  • Noncharacters: U+FFFE, U+FFFF, U+1FFFE, U+1FFFF, …, U+10FFFE, U+10FFFF; U+FDD0–U+FDEF (64 points).
 		 *  • Replacement Character: U+FFFD (1 point).
 		 *
-		 * This gives 139585 points in total.
+		 * We can't choose code points from:
+		 *  • Surrogates Area: U+D800–U+DFFF (2048 points).
+		 * because g_utf8_validate() will reject them and cause assertion failures.
+		 *
+		 * This gives 137537 points in total.
 		 */
 
-		i = g_random_int_range (0, 139585);
+		i = g_random_int_range (0, 137537);
 
 		if (i < 6400) {
 			/* Private Use Area */
@@ -1222,13 +1225,6 @@ generate_character (void)
 		}
 
 		i -= 65536;
-
-		if (i < 2048) {
-			/* Surrogates Area */
-			return 0xD800 + i;
-		}
-
-		i -= 2048;
 
 		if (i < 32) {
 			/* Noncharacters (1) */
@@ -1480,6 +1476,10 @@ fuzz_string (const gchar *default_value)
 	if (fuzzy_string == NULL) {
 		fuzzy_string = g_strdup (default_value);
 	}
+
+	/* Sanity check. */
+	g_assert (fuzzy_string != NULL &&
+	          fuzzy_string_length == strlen (fuzzy_string) && g_utf8_validate (fuzzy_string, fuzzy_string_length, NULL) == TRUE);
 
 	return fuzzy_string;
 }
