@@ -1261,10 +1261,44 @@ fuzz_string (const gchar *default_value)
 	 * Additionally, and independently, we randomly add whitespace to the start and end of the string with probability 0.2.
 	 */
 
-	distribution = g_random_int ();
 	default_value_length = strlen (default_value);
 
-	if (distribution < G_MAXUINT32 * 0.1 && default_value_length > 0) {
+	/* If the default_value is the empty string, we:
+	 *  • keep the empty string with probability 0.4; or
+	 *  • generate a random string of random length with probability 0.6.
+	 *
+	 * There's no point then going on and applying any of the transformations above, since they're all designed to fuzz structured strings,
+	 * which a randomly generated string most definitely isn't.
+	 */
+
+	if (default_value_length == 0) {
+		if (g_random_int () < G_MAXUINT32 * 0.4) {
+			/* Generate a string between 1 and 256 characters (not bytes) long (inclusive). */
+			guint32 i;
+			gchar *j;
+
+			i = g_random_int_range (1, 257);
+			fuzzy_string = g_malloc (i * 6 /* max. byte length of a UTF-8 character */ + 1 /* nul terminator */);
+
+			for (j = fuzzy_string; i > 0; i--) {
+				/* Generate a character. To be more efficient, we should really be generating larger chunks at a time than this.
+				 * Oh well. */
+				j += g_unichar_to_utf8 (generate_character (), j);
+			}
+
+			/* Nul terminator */
+			*j = '\0';
+
+			fuzzy_string_length = j - fuzzy_string;
+		}
+
+		goto whitespace;
+	}
+
+	distribution = g_random_int ();
+	g_assert (default_value_length > 0);
+
+	if (distribution < G_MAXUINT32 * 0.1) {
 		guint i;
 
 		/* Case changing. Note that the probability of changing any given character position is ill-defined because it's dependent on the
@@ -1283,7 +1317,7 @@ fuzz_string (const gchar *default_value)
 
 			i += g_random_int_range (i + 1, fuzzy_string_length + 1);
 		}
-	} else if (distribution < G_MAXUINT32 * 0.4 && default_value_length > 0) {
+	} else if (distribution < G_MAXUINT32 * 0.4) {
 		guint old_i, i, j;
 		glong default_value_length_unicode;
 		gchar *temp;
@@ -1329,7 +1363,7 @@ fuzz_string (const gchar *default_value)
 		*temp = '\0';
 
 		fuzzy_string_length = temp - fuzzy_string;
-	} else if (distribution < G_MAXUINT32 * 0.5 && default_value_length > 0) {
+	} else if (distribution < G_MAXUINT32 * 0.5) {
 		const gchar *block_start, *block_end;
 		gsize block_length;
 
@@ -1383,7 +1417,7 @@ fuzz_string (const gchar *default_value)
 			default:
 				g_assert_not_reached ();
 		}
-	} else if (distribution < G_MAXUINT32 * 0.8 && default_value_length > 0) {
+	} else if (distribution < G_MAXUINT32 * 0.8) {
 		const gchar *block_start, *block_end;
 		gsize block_length;
 
@@ -1397,7 +1431,7 @@ fuzz_string (const gchar *default_value)
 		strncpy (fuzzy_string + (block_end - default_value), block_start, block_length);
 		strncpy (fuzzy_string + (block_end - default_value) + block_length, block_end, default_value + default_value_length - block_end);
 		fuzzy_string[fuzzy_string_length] = '\0';
-	} else if (default_value_length > 0) {
+	} else {
 		const gchar *block1_start, *block2_start, *block1_end, *block2_end;
 		gchar *i;
 		gsize block1_length, block2_length;
@@ -1441,6 +1475,7 @@ fuzz_string (const gchar *default_value)
 		fuzzy_string[fuzzy_string_length] = '\0';
 	}
 
+whitespace:
 	/* Whitespace addition. */
 	if (g_random_int () < G_MAXUINT32 * 0.2) {
 		gchar *temp;
