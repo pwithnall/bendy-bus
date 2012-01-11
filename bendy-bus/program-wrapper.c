@@ -296,32 +296,35 @@ stdouterr_channel_cb (GIOChannel *channel, GIOCondition condition, gpointer user
 
 	if (condition & (G_IO_IN | G_IO_PRI)) {
 		while (TRUE) {
-			gchar stdouterr_buf[256];
+			gchar *stdouterr_buf = NULL;
 			gsize bytes_read = 0;
 			GIOStatus status;
 			GError *child_error = NULL;
 
 			/* Read a buffer-load in */
-			status = g_io_channel_read_chars (channel, stdouterr_buf, sizeof (stdouterr_buf) - 1 /* nul */, &bytes_read, &child_error);
-			stdouterr_buf[bytes_read] = '\0'; /* nul terminator */
+			status = g_io_channel_read_line (channel, &stdouterr_buf, &bytes_read, NULL, &child_error);
 
 			switch (status) {
 				case G_IO_STATUS_NORMAL:
-					/* Read this line successfully. After handling it, we'll loop around and read another. */
+				case G_IO_STATUS_EOF:
+					/* Read this line successfully. After handling it, we'll loop around and read another, or we're done.
+					 * Note that we probably need to trim a newline character off the end of the message. */
+					g_assert (stdouterr_buf != NULL && bytes_read > 0);
+
+					if (stdouterr_buf[bytes_read - 1] == '\n') {
+						stdouterr_buf[bytes_read - 1] = '\0';
+					}
+
 					g_log (dsim_program_wrapper_get_logging_domain_name (self), G_LOG_LEVEL_MESSAGE, "%s: %s", channel_name,
 					       stdouterr_buf);
 
-					if (bytes_read != sizeof (stdouterr_buf)) {
-						/* Done? */
+					g_free (stdouterr_buf);
+
+					if (status == G_IO_STATUS_EOF) {
 						goto in_done;
 					}
 
 					break; /* and continue the loop */
-				case G_IO_STATUS_EOF:
-					/* We're done! */
-					g_log (dsim_program_wrapper_get_logging_domain_name (self), G_LOG_LEVEL_MESSAGE, "%s: %s", channel_name,
-					       stdouterr_buf);
-					goto in_done;
 				case G_IO_STATUS_ERROR:
 					/* Error! */
 					g_warning ("Error reading %s line from process: %s", channel_name, child_error->message);
