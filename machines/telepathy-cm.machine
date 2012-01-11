@@ -402,6 +402,10 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 	}
 
 	transition inside Disconnected, inside Connecting, inside Connected on random {
+		emit PresencesChanged (pairKeys (@au [0u]?, (6u?, "busy"?, "I’m busy."?)));
+	}
+
+	transition inside Disconnected, inside Connecting, inside Connected on random {
 		emit ContactCapabilitiesChanged (pairKeys (@au [0u]?, [(
 			{
 				"org.freedesktop.Telepathy.something" : <""?>,
