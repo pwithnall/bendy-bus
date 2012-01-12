@@ -768,10 +768,17 @@ main (int argc, char *argv[])
 		exit (STATUS_INVALID_OPTIONS);
 	}
 
-	test_program_name = argv[3];
+	/* Work out where the test program's command line starts. g_option_context_parse() sometimes leaves the ‘--’ in argv. */
+	if (strcmp (argv[3], "--") == 0) {
+		i = 4;
+	} else {
+		i = 3;
+	}
+
+	test_program_name = argv[i++];
 	test_program_argv = g_ptr_array_new_with_free_func (g_free);
 
-	for (i = 4; i < (guint) argc; i++) {
+	for (; i < (guint) argc; i++) {
 		g_ptr_array_add (test_program_argv, g_strdup (argv[i]));
 	}
 
