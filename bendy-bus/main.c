@@ -717,6 +717,7 @@ main (int argc, char *argv[])
 	g_log (dsim_logging_get_domain_name (DSIM_LOG_TEST_PROGRAM), G_LOG_LEVEL_MESSAGE, "%s", log_header);
 
 	g_free (log_header);
+	g_free (time_str);
 	g_free (command_line);
 
 	/* Set up the random number generator. */

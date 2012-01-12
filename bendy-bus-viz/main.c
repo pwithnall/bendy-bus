@@ -281,6 +281,7 @@ main (int argc, char *argv[])
 	/* Introductory comment. */
 	date_time = g_date_time_new_now_utc ();
 	time_str = g_date_time_format (date_time, "%F %TZ" /* ISO 8601 date and time */);
+	g_date_time_unref (date_time);
 
 	if (object_path != NULL) {
 		g_string_append_printf (graphviz_string,
@@ -297,7 +298,6 @@ main (int argc, char *argv[])
 	g_string_append_c (graphviz_string, '\n');
 
 	g_free (time_str);
-	g_date_time_unref (date_time);
 	g_free (command_line);
 
 	/* Start building the graph. */
