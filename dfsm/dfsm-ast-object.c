@@ -332,7 +332,8 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 	}
 
 	/* While we're at it, create a temporary hash table which maps state names (strings) to their allocated state numbers. This is useful for
-	 * duplicate detection, and for quickly looking up the state numbers corresponding to the state names when we process transitions below. */
+	 * duplicate detection, and for quickly looking up the state numbers corresponding to the state names when we process transitions below.
+	 * Note that its keys are only valid while priv->state_blocks is still alive. */
 	state_numbers = g_hash_table_new (g_str_hash, g_str_equal);
 
 	states = g_ptr_array_index (priv->state_blocks, 0);
@@ -370,9 +371,6 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 			g_hash_table_insert (state_numbers, (gpointer) state_name, GUINT_TO_POINTER (priv->states->len - 1));
 		}
 	}
-
-	g_ptr_array_unref (priv->state_blocks);
-	priv->state_blocks = NULL;
 
 	for (i = 0; i < priv->transition_blocks->len; i++) {
 		DfsmParserTransitionBlock *transition_block;
@@ -431,6 +429,9 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 	}
 
 done:
+	g_ptr_array_unref (priv->state_blocks);
+	priv->state_blocks = NULL;
+
 	if (state_numbers != NULL) {
 		g_hash_table_unref (state_numbers);
 	}

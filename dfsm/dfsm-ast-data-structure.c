@@ -521,6 +521,9 @@ __calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment)
 			dict_type = g_variant_type_new_array (entry_type);
 			g_variant_type_free (entry_type);
 
+			g_variant_type_free (lg_value_type);
+			g_variant_type_free (lg_key_type);
+
 			return dict_type;
 		}
 		case DFSM_AST_DATA_UNIX_FD:
