@@ -305,8 +305,13 @@ stdouterr_channel_cb (GIOChannel *channel, GIOCondition condition, gpointer user
 			status = g_io_channel_read_line (channel, &stdouterr_buf, &bytes_read, NULL, &child_error);
 
 			switch (status) {
-				case G_IO_STATUS_NORMAL:
 				case G_IO_STATUS_EOF:
+					if (stdouterr_buf == NULL || bytes_read == 0) {
+						goto in_done;
+					}
+
+					/* Fall through */
+				case G_IO_STATUS_NORMAL:
 					/* Read this line successfully. After handling it, we'll loop around and read another, or we're done.
 					 * Note that we probably need to trim a newline character off the end of the message. */
 					g_assert (stdouterr_buf != NULL && bytes_read > 0);
