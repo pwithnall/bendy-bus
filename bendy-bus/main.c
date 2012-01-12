@@ -340,6 +340,13 @@ restart_simulation (MainData *data)
 	spawn_test_program (data);
 }
 
+static gboolean
+restart_simulation_idle_cb (MainData *data)
+{
+	restart_simulation (data);
+	return FALSE;
+}
+
 static void
 test_program_died_cb (DsimProgramWrapper *wrapper, gint status, MainData *data)
 {
@@ -347,7 +354,8 @@ test_program_died_cb (DsimProgramWrapper *wrapper, gint status, MainData *data)
 		/* Exited normally: proceed to the next test run. However, if bendy-bus was signalled beforehand, ignore the test program exiting
 		 * and continue to close ourselves. */
 		if (data->exit_signal == EXIT_SIGNAL_INVALID) {
-			restart_simulation (data);
+			/* We have to do this in an idle callback so that we don't try to re-spawn the test program while it's still closing. */
+			g_idle_add ((GSourceFunc) restart_simulation_idle_cb, data);
 		}
 	} else {
 		/* Crashed: stop the entire simulation. */
