@@ -20,9 +20,11 @@
 #include "config.h"
 
 #include <locale.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <glib.h>
+#include <glib-unix.h>
 #include <glib/gi18n.h>
 #include <dfsm/dfsm.h>
 
@@ -130,6 +132,8 @@ typedef struct {
 	/* Program structure */
 	GMainLoop *main_loop;
 	int exit_status;
+	int exit_signal;
+	#define EXIT_SIGNAL_INVALID 0
 
 	/* Simulation gubbins */
 	DsimTestProgram *test_program;
@@ -173,6 +177,16 @@ main_data_clear (MainData *data)
 }
 
 static void
+post_connection_closed (MainData *data)
+{
+	/* Kill the dbus-daemon instance. */
+	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->dbus_daemon));
+
+	/* Quit everything */
+	g_main_loop_quit (data->main_loop);
+}
+
+static void
 connection_close_cb (GObject *source_object, GAsyncResult *result, MainData *data)
 {
 	GError *error = NULL;
@@ -187,11 +201,7 @@ connection_close_cb (GObject *source_object, GAsyncResult *result, MainData *dat
 		g_error_free (error);
 	}
 
-	/* Kill the dbus-daemon instance. */
-	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->dbus_daemon));
-
-	/* Quit everything */
-	g_main_loop_quit (data->main_loop);
+	post_connection_closed (data);
 }
 
 static void restart_simulation (MainData *data);
@@ -233,8 +243,9 @@ simulated_object_dbus_activity_count_notify_cb (GObject *obj, GParamSpec *pspec,
 static void
 stop_simulation (MainData *data)
 {
-	guint i, bus_name_id;
-	GHashTableIter iter;
+	guint i;
+
+	g_debug ("stop_simulation()");
 
 	/* Stop timers. */
 	if (data->test_run_inactivity_timeout_id != 0) {
@@ -245,6 +256,22 @@ stop_simulation (MainData *data)
 	/* Simulation's finished, so kill the test program. */
 	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program));
 
+	/* Drop our well-known names, but only if we haven't been signalled. If we have been signalled, the dbus-daemon has also been signalled,
+	 * and so is concurrently dying. Since g_bus_unown_name() has no error handling, we can't prevent it spewing warnings everywhere about
+	 * failing to interact with the dying dbus-daemon. */
+	if (data->exit_signal == EXIT_SIGNAL_INVALID) {
+		GHashTableIter iter;
+		guint bus_name_id;
+
+		g_hash_table_iter_init (&iter, data->bus_name_ids);
+
+		while (g_hash_table_iter_next (&iter, NULL, (gpointer*) &bus_name_id) == TRUE) {
+			g_bus_unown_name (bus_name_id);
+		}
+	}
+
+	g_hash_table_remove_all (data->bus_name_ids);
+
 	/* Unregister all our DfsmObjects. */
 	for (i = 0; i < data->simulated_objects->len; i++) {
 		DfsmObject *simulated_object = g_ptr_array_index (data->simulated_objects, i);
@@ -253,15 +280,13 @@ stop_simulation (MainData *data)
 		g_signal_handlers_disconnect_by_func (simulated_object, simulated_object_dbus_activity_count_notify_cb, data);
 	}
 
-	/* Drop our well-known names. */
-	g_hash_table_iter_init (&iter, data->bus_name_ids);
-
-	while (g_hash_table_iter_next (&iter, NULL, (gpointer*) &bus_name_id) == TRUE) {
-		g_bus_unown_name (bus_name_id);
-	}
-
 	/* Disconnect from the bus. */
-	g_dbus_connection_close (data->connection, NULL, (GAsyncReadyCallback) connection_close_cb, data);
+	if (data->connection != NULL) {
+		g_dbus_connection_close (data->connection, NULL, (GAsyncReadyCallback) connection_close_cb, data);
+	} else {
+		/* Connection's already closed. */
+		post_connection_closed (data);
+	}
 }
 
 static void
@@ -318,9 +343,12 @@ restart_simulation (MainData *data)
 static void
 test_program_died_cb (DsimProgramWrapper *wrapper, gint status, MainData *data)
 {
-	if (WIFEXITED (status) || (WIFSIGNALED (status) && WTERMSIG (status) == SIGTERM)) {
-		/* Exited normally: proceed to the next test run. */
-		restart_simulation (data);
+	if (WIFEXITED (status) || (WIFSIGNALED (status) && (WTERMSIG (status) == SIGTERM || WTERMSIG (status) == SIGINT))) {
+		/* Exited normally: proceed to the next test run. However, if bendy-bus was signalled beforehand, ignore the test program exiting
+		 * and continue to close ourselves. */
+		if (data->exit_signal == EXIT_SIGNAL_INVALID) {
+			restart_simulation (data);
+		}
 	} else {
 		/* Crashed: stop the entire simulation. */
 		g_message (_("Stopping simulation due to test program crashing (status: %i)."), status);
@@ -333,10 +361,17 @@ static void
 dbus_daemon_died_cb (DsimProgramWrapper *wrapper, gint status, MainData *data)
 {
 	/* This should never happen. We assume the dbus-daemon is rock solid. */
-	if (WIFEXITED (status) || (WIFSIGNALED (status) && WTERMSIG (status) == SIGTERM)) {
-		g_message (_("Stopping simulation due to dbus-daemon exiting (status: %i)."), status);
+	if (WIFEXITED (status) || (WIFSIGNALED (status) && (WTERMSIG (status) == SIGTERM || WTERMSIG (status) == SIGINT))) {
+		/* Ignore the daemon disappearing if bendy-bus was signalled beforehand. */
+		if (data->exit_signal == EXIT_SIGNAL_INVALID) {
+			g_message (_("Stopping simulation due to dbus-daemon exiting (status: %i)."), status);
+		}
 	} else {
 		g_message (_("Stopping simulation due to dbus-daemon crashing (status: %i)."), status);
+	}
+
+	if (data->exit_signal != EXIT_SIGNAL_INVALID) {
+		return;
 	}
 
 	/* Have we created/spawned the test program yet? If not, we don't have much cleaning up to do. */
@@ -413,6 +448,20 @@ name_lost_cb (GDBusConnection *connection, const gchar *name, MainData *data)
 }
 
 static void
+connection_closed_cb (GDBusConnection *connection, gboolean remote_peer_vanished, GError *error, MainData *data)
+{
+	g_debug ("D-Bus connection closed (remote peer vanished: %s, error: %s).", (remote_peer_vanished == TRUE) ? "yes" : "no",
+	         (error != NULL) ? error->message : "no");
+
+	/* Shut down if this wasn't the result of us calling close() on the connection. */
+	if (remote_peer_vanished == TRUE || error != NULL) {
+		g_clear_object (&data->connection);
+
+		stop_simulation (data);
+	}
+}
+
+static void
 connection_created_cb (GObject *source_object, GAsyncResult *result, MainData *data)
 {
 	guint i;
@@ -431,6 +480,9 @@ connection_created_cb (GObject *source_object, GAsyncResult *result, MainData *d
 		g_main_loop_quit (data->main_loop);
 		return;
 	}
+
+	/* Connect to closed notifications, so we know if the bus disappears. */
+	g_signal_connect (data->connection, "closed", (GCallback) connection_closed_cb, data);
 
 	/* Register our DfsmObjects on the bus. */
 	for (i = 0; i < data->simulated_objects->len; i++) {
@@ -586,6 +638,40 @@ dbus_daemon_notify_bus_address_cb (GObject *gobject, GParamSpec *pspec, MainData
 
 	/* We don't want this to fire again. */
 	g_signal_handlers_disconnect_by_func (gobject, dbus_daemon_notify_bus_address_cb, data);
+}
+
+static void
+signal_handler (int signum, MainData *data)
+{
+	g_debug ("signal_handler(%i) called.", signum);
+
+	/* We need to propagate the signal when we exit, in order that the calling process knows we exited due to a signal.
+	 * However, if we kill() now, we won't finish cleaning up properly (because we need to re-enter the main loop for a little
+	 * while to be able to do that). */
+	data->exit_status = STATUS_SUCCESS;
+	data->exit_signal = signum;
+
+	/* Have we created/spawned the test program yet? If not, we don't have much cleaning up to do. */
+	if (data->test_program != NULL) {
+		g_message (_("Stopping simulation due to receiving termination signal."));
+		stop_simulation (data);
+	} else {
+		g_main_loop_quit (data->main_loop);
+	}
+}
+
+static gboolean
+sigterm_handler_cb (MainData *data)
+{
+	signal_handler (SIGTERM, data);
+	return FALSE;
+}
+
+static gboolean
+sigint_handler_cb (MainData *data)
+{
+	signal_handler (SIGINT, data);
+	return FALSE;
 }
 
 int
@@ -773,6 +859,7 @@ main (int argc, char *argv[])
 	/* Prepare the main data struct, which will last for the lifetime of the program. */
 	data.main_loop = g_main_loop_new (NULL, FALSE);
 	data.exit_status = STATUS_SUCCESS;
+	data.exit_signal = EXIT_SIGNAL_INVALID;
 	data.test_program = NULL;
 	data.connection = NULL;
 	data.simulated_objects = g_ptr_array_ref (simulated_objects);
@@ -793,6 +880,10 @@ main (int argc, char *argv[])
 	data.test_program_argv = g_ptr_array_ref (test_program_argv);
 
 	g_ptr_array_unref (test_program_argv);
+
+	/* Set up signal handlers for SIGINT and SIGTERM so that we can close gracefully. */
+	g_unix_signal_add (SIGINT, (GSourceFunc) sigint_handler_cb, &data);
+	g_unix_signal_add (SIGTERM, (GSourceFunc) sigterm_handler_cb, &data);
 
 	/* Start up our own private dbus-daemon instance. */
 	/* TODO */
@@ -821,6 +912,19 @@ main (int argc, char *argv[])
 	/* Free the main data struct. */
 	main_data_clear (&data);
 	dsim_logging_finalise ();
+
+	if (data.exit_signal != EXIT_SIGNAL_INVALID) {
+		struct sigaction action;
+
+		/* Propagate the signal to the default handler. */
+		action.sa_handler = SIG_DFL;
+		sigemptyset (&action.sa_mask);
+		action.sa_flags = 0;
+
+		sigaction (data.exit_signal, &action, NULL);
+
+		kill (getpid (), data.exit_signal);
+	}
 
 	return data.exit_status;
 }
