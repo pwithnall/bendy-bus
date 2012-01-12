@@ -114,20 +114,18 @@ dfsm_ast_variable_check (DfsmAstNode *node, DfsmEnvironment *environment, GError
  * dfsm_ast_variable_new:
  * @scope: scope of the variable reference
  * @variable_name: name of the variable being referenced
- * @error: (allow-none): a #GError, or %NULL
  *
  * Create a new #DfsmAstVariable representing a variable dereferencing operation.
  *
  * Return value: (transfer full): a new AST node
  */
 DfsmAstVariable *
-dfsm_ast_variable_new (DfsmVariableScope scope, const gchar *variable_name, GError **error)
+dfsm_ast_variable_new (DfsmVariableScope scope, const gchar *variable_name)
 {
 	DfsmAstVariable *variable;
 	DfsmAstVariablePrivate *priv;
 
 	g_return_val_if_fail (variable_name != NULL && *variable_name != '\0', NULL);
-	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	variable = g_object_new (DFSM_TYPE_AST_VARIABLE, NULL);
 	priv = variable->priv;

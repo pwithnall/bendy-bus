@@ -724,20 +724,18 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
  * dfsm_ast_data_structure_new:
  * @data_structure_type: the type of the outermost data structure
  * @value: value of the data structure
- * @error: (allow-none): a #GError, or %NULL
  *
  * Create a new #DfsmAstDataStructure of type @data_structure_type and containing the given @value.
  *
  * Return value: (transfer full): a new AST node
  */
 DfsmAstDataStructure *
-dfsm_ast_data_structure_new (DfsmAstDataStructureType data_structure_type, gpointer value, GError **error)
+dfsm_ast_data_structure_new (DfsmAstDataStructureType data_structure_type, gpointer value)
 {
 	DfsmAstDataStructure *data_structure;
 	DfsmAstDataStructurePrivate *priv;
 
 	g_return_val_if_fail (data_structure_type == DFSM_AST_DATA_BOOLEAN || value != NULL, NULL);
-	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	data_structure = g_object_new (DFSM_TYPE_AST_DATA_STRUCTURE, NULL);
 	priv = data_structure->priv;

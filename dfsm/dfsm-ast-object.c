@@ -566,7 +566,6 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
  * @data_blocks: an array of #GHashTable<!-- -->s containing the object-level variables in the object
  * @state_blocks: an array of #GPtrArray<!-- -->s of strings containing the names of the possible states of the object
  * @transition_blocks: an array of #DfsmParserTransitionBlock<!-- -->s containing the object's possible state transitions
- * @error: (allow-none): a #GError, or %NULL
  *
  * Create a new #DfsmAstObject AST node.
  *
@@ -575,7 +574,7 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
 DfsmAstObject *
 dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GPtrArray/*<string>*/ *bus_names, GPtrArray/*<string>*/ *interface_names,
                      GPtrArray/*<GHashTable<string,DfsmAstDataStructure>>*/ *data_blocks, GPtrArray/*<GPtrArray<string>>*/ *state_blocks,
-                     GPtrArray/*<DfsmParserTransitionBlock>*/ *transition_blocks, GError **error)
+                     GPtrArray/*<DfsmParserTransitionBlock>*/ *transition_blocks)
 {
 	DfsmAstObject *object;
 	DfsmAstObjectPrivate *priv;
@@ -587,7 +586,6 @@ dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GP
 	g_return_val_if_fail (data_blocks != NULL, NULL);
 	g_return_val_if_fail (state_blocks != NULL, NULL);
 	g_return_val_if_fail (transition_blocks != NULL, NULL);
-	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	object = g_object_new (DFSM_TYPE_AST_OBJECT, NULL);
 	priv = object->priv;

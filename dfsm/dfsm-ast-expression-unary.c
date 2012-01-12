@@ -205,20 +205,18 @@ dfsm_ast_expression_unary_calculate_weight (DfsmAstExpression *self)
  * dfsm_ast_expression_unary_new:
  * @expression_type: the type of expression
  * @child_node: the expression's child node, or %NULL
- * @error: a #GError, or %NULL
  *
  * Create a new #DfsmAstExpression of type @expression_type with the given child node.
  *
  * Return value: (transfer full): a new AST node
  */
 DfsmAstExpression *
-dfsm_ast_expression_unary_new (DfsmAstExpressionUnaryType expression_type, DfsmAstExpression *child_node, GError **error)
+dfsm_ast_expression_unary_new (DfsmAstExpressionUnaryType expression_type, DfsmAstExpression *child_node)
 {
 	DfsmAstExpressionUnary *expression;
 	DfsmAstExpressionUnaryPrivate *priv;
 
 	g_return_val_if_fail (DFSM_IS_AST_EXPRESSION (child_node), NULL);
-	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	switch (expression_type) {
 		case DFSM_AST_EXPRESSION_UNARY_NOT:

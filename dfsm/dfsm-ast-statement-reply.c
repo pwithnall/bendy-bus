@@ -128,20 +128,18 @@ dfsm_ast_statement_reply_execute (DfsmAstStatement *statement, DfsmEnvironment *
 /**
  * dfsm_ast_statement_reply_new:
  * @expression: expression to evaluate as the reply value
- * @error: (allow-none): a #GError, or %NULL
  *
  * Create a new #DfsmAstStatement for replying to the triggering D-Bus method call with value given by @expression.
  *
  * Return value: (transfer full): a new AST node
  */
 DfsmAstStatement *
-dfsm_ast_statement_reply_new (DfsmAstExpression *expression, GError **error)
+dfsm_ast_statement_reply_new (DfsmAstExpression *expression)
 {
 	DfsmAstStatementReply *statement;
 	DfsmAstStatementReplyPrivate *priv;
 
 	g_return_val_if_fail (DFSM_IS_AST_EXPRESSION (expression), NULL);
-	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	statement = g_object_new (DFSM_TYPE_AST_STATEMENT_REPLY, NULL);
 	priv = statement->priv;

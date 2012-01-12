@@ -94,8 +94,7 @@ G_GNUC_INTERNAL DfsmMachine *_dfsm_machine_new (DfsmEnvironment *environment, GP
 
 #include "dfsm-ast-data-structure.h"
 
-G_GNUC_INTERNAL DfsmAstDataStructure *dfsm_ast_data_structure_new (DfsmAstDataStructureType data_structure_type, gpointer value,
-                                                                   GError **error) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmAstDataStructure *dfsm_ast_data_structure_new (DfsmAstDataStructureType data_structure_type, gpointer value) DFSM_CONSTRUCTOR;
 
 G_GNUC_INTERNAL void dfsm_ast_data_structure_set_weight (DfsmAstDataStructure *self, gdouble weight);
 G_GNUC_INTERNAL void dfsm_ast_data_structure_set_type_annotation (DfsmAstDataStructure *self, const gchar *type_annotation);
@@ -103,49 +102,46 @@ G_GNUC_INTERNAL void dfsm_ast_data_structure_set_type_annotation (DfsmAstDataStr
 #include "dfsm-ast-expression-binary.h"
 
 G_GNUC_INTERNAL DfsmAstExpression *dfsm_ast_expression_binary_new (DfsmAstExpressionBinaryType expression_type, DfsmAstExpression *left_node,
-                                                                   DfsmAstExpression *right_node, GError **error) DFSM_CONSTRUCTOR;
+                                                                   DfsmAstExpression *right_node) DFSM_CONSTRUCTOR;
 
-G_GNUC_INTERNAL DfsmAstExpression *dfsm_ast_expression_data_structure_new (DfsmAstDataStructure *data_structure, GError **error) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmAstExpression *dfsm_ast_expression_data_structure_new (DfsmAstDataStructure *data_structure) DFSM_CONSTRUCTOR;
 
-G_GNUC_INTERNAL DfsmAstExpression *dfsm_ast_expression_function_call_new (const gchar *function_name, DfsmAstExpression *parameters,
-                                                                          GError **error) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmAstExpression *dfsm_ast_expression_function_call_new (const gchar *function_name, DfsmAstExpression *parameters) DFSM_CONSTRUCTOR;
 
 #include "dfsm-ast-expression-unary.h"
 
-G_GNUC_INTERNAL DfsmAstExpression *dfsm_ast_expression_unary_new (DfsmAstExpressionUnaryType expression_type, DfsmAstExpression *child_node,
-                                                                  GError **error) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmAstExpression *dfsm_ast_expression_unary_new (DfsmAstExpressionUnaryType expression_type,
+                                                                  DfsmAstExpression *child_node) DFSM_CONSTRUCTOR;
 
 #include "dfsm-ast-object.h"
 
 G_GNUC_INTERNAL DfsmAstObject *dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GPtrArray/*<string>*/ *bus_names,
                                                     GPtrArray/*<string>*/ *interface_names,
                                                     GPtrArray/*<GHashTable>*/ *data_blocks, GPtrArray/*<GPtrArray>*/ *state_blocks,
-                                                    GPtrArray/*<DfsmParserTransitionBlock>*/ *transition_blocks, GError **error) DFSM_CONSTRUCTOR;
+                                                    GPtrArray/*<DfsmParserTransitionBlock>*/ *transition_blocks) DFSM_CONSTRUCTOR;
 
 #include "dfsm-ast-precondition.h"
 
-G_GNUC_INTERNAL DfsmAstPrecondition *dfsm_ast_precondition_new (const gchar *error_name /* nullable */, DfsmAstExpression *condition,
-                                                                GError **error) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmAstPrecondition *dfsm_ast_precondition_new (const gchar *error_name /* nullable */, DfsmAstExpression *condition) DFSM_CONSTRUCTOR;
 
 #include "dfsm-ast-statement.h"
 
 G_GNUC_INTERNAL DfsmAstStatement *dfsm_ast_statement_assignment_new (DfsmAstDataStructure *data_structure,
-                                                                     DfsmAstExpression *expression, GError **error) DFSM_CONSTRUCTOR;
+                                                                     DfsmAstExpression *expression) DFSM_CONSTRUCTOR;
 
-G_GNUC_INTERNAL DfsmAstStatement *dfsm_ast_statement_emit_new (const gchar *signal_name, DfsmAstExpression *expression,
-                                                               GError **error) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmAstStatement *dfsm_ast_statement_emit_new (const gchar *signal_name, DfsmAstExpression *expression) DFSM_CONSTRUCTOR;
 
-G_GNUC_INTERNAL DfsmAstStatement *dfsm_ast_statement_reply_new (DfsmAstExpression *expression, GError **error) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmAstStatement *dfsm_ast_statement_reply_new (DfsmAstExpression *expression) DFSM_CONSTRUCTOR;
 
-G_GNUC_INTERNAL DfsmAstStatement *dfsm_ast_statement_throw_new (const gchar *error_name, GError **error) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmAstStatement *dfsm_ast_statement_throw_new (const gchar *error_name) DFSM_CONSTRUCTOR;
 
 G_GNUC_INTERNAL DfsmAstTransition *dfsm_ast_transition_new (const DfsmParserTransitionDetails *details,
                                                             GPtrArray/*<DfsmAstPrecondition>*/ *preconditions,
-                                                            GPtrArray/*<DfsmAstStatement>*/ *statements, GError **error) DFSM_CONSTRUCTOR;
+                                                            GPtrArray/*<DfsmAstStatement>*/ *statements) DFSM_CONSTRUCTOR;
 
 #include "dfsm-ast-variable.h"
 
-G_GNUC_INTERNAL DfsmAstVariable *dfsm_ast_variable_new (DfsmVariableScope scope, const gchar *variable_name, GError **error) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmAstVariable *dfsm_ast_variable_new (DfsmVariableScope scope, const gchar *variable_name) DFSM_CONSTRUCTOR;
 
 G_END_DECLS
 

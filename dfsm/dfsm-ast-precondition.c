@@ -147,21 +147,19 @@ dfsm_ast_precondition_check (DfsmAstNode *node, DfsmEnvironment *environment, GE
  * dfsm_ast_precondition_new:
  * @error_name: (allow-none): name of the D-Bus error to throw on precondition failure, or %NULL
  * @condition: the condition to fulfil for the precondition
- * @error: (allow-none): a #GError, or %NULL
  *
  * Create a new #DfsmAstPrecondition for the given @condition.
  *
  * Return value: (transfer full): a new AST node
  */
 DfsmAstPrecondition *
-dfsm_ast_precondition_new (const gchar *error_name /* nullable */, DfsmAstExpression *condition, GError **error)
+dfsm_ast_precondition_new (const gchar *error_name /* nullable */, DfsmAstExpression *condition)
 {
 	DfsmAstPrecondition *precondition;
 	DfsmAstPreconditionPrivate *priv;
 
 	g_return_val_if_fail (error_name == NULL || *error_name != '\0', NULL);
 	g_return_val_if_fail (DFSM_IS_AST_EXPRESSION (condition), NULL);
-	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	precondition = g_object_new (DFSM_TYPE_AST_PRECONDITION, NULL);
 	priv = precondition->priv;

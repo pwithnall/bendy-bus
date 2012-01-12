@@ -178,21 +178,19 @@ dfsm_ast_statement_assignment_execute (DfsmAstStatement *statement, DfsmEnvironm
  * dfsm_ast_statement_assignment_new:
  * @data_structure: data structure being assigned to (lvalue)
  * @expression: expression to be evaluated for assignment (rvalue)
- * @error: (allow-none): a #GError, or %NULL
  *
  * Create a new #DfsmAstStatement for an assignment of @expression to @data_structure.
  *
  * Return value: (transfer full): a new AST node
  */
 DfsmAstStatement *
-dfsm_ast_statement_assignment_new (DfsmAstDataStructure *data_structure, DfsmAstExpression *expression, GError **error)
+dfsm_ast_statement_assignment_new (DfsmAstDataStructure *data_structure, DfsmAstExpression *expression)
 {
 	DfsmAstStatementAssignment *statement;
 	DfsmAstStatementAssignmentPrivate *priv;
 
 	g_return_val_if_fail (DFSM_IS_AST_DATA_STRUCTURE (data_structure), NULL);
 	g_return_val_if_fail (DFSM_IS_AST_EXPRESSION (expression), NULL);
-	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	statement = g_object_new (DFSM_TYPE_AST_STATEMENT_ASSIGNMENT, NULL);
 	priv = statement->priv;

@@ -336,7 +336,6 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
  * @details: details of the transition trigger (such as a method or property name)
  * @precondition: array of #DfsmAstPrecondition<!-- -->s for the transition
  * @statements: array of #DfsmAstStatement<!-- -->s to execute with the transition
- * @error: (allow-none): a #GError, or %NULL
  *
  * Create a new #DfsmAstTransition representing a single transition. The state pairs the transition can be applied to are stored in the #DfsmAstObject
  * containing this transition, since the same #DfsmAstTransition could be applied to many different state pairs.
@@ -345,7 +344,7 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
  */
 DfsmAstTransition *
 dfsm_ast_transition_new (const DfsmParserTransitionDetails *details, GPtrArray/*<DfsmAstPrecondition>*/ *preconditions,
-                         GPtrArray/*<DfsmAstStatement>*/ *statements, GError **error)
+                         GPtrArray/*<DfsmAstStatement>*/ *statements)
 {
 	DfsmAstTransition *transition;
 	DfsmAstTransitionPrivate *priv;
@@ -353,7 +352,6 @@ dfsm_ast_transition_new (const DfsmParserTransitionDetails *details, GPtrArray/*
 	g_return_val_if_fail (details != NULL, NULL);
 	g_return_val_if_fail (preconditions != NULL, NULL);
 	g_return_val_if_fail (statements != NULL, NULL);
-	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	transition = g_object_new (DFSM_TYPE_AST_TRANSITION, NULL);
 	priv = transition->priv;

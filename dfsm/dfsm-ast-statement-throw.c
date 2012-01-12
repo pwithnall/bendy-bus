@@ -108,20 +108,18 @@ dfsm_ast_statement_throw_execute (DfsmAstStatement *statement, DfsmEnvironment *
 /**
  * dfsm_ast_statement_throw_new:
  * @error_name: name of the D-Bus error to throw
- * @error: (allow-none): a #GError, or %NULL
  *
  * Create a new #DfsmAstStatement for throwing a D-Bus error of type @error_name.
  *
  * Return value: (transfer full): a new AST node
  */
 DfsmAstStatement *
-dfsm_ast_statement_throw_new (const gchar *error_name, GError **error)
+dfsm_ast_statement_throw_new (const gchar *error_name)
 {
 	DfsmAstStatementThrow *statement;
 	DfsmAstStatementThrowPrivate *priv;
 
 	g_return_val_if_fail (error_name != NULL && *error_name != '\0', NULL);
-	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	statement = g_object_new (DFSM_TYPE_AST_STATEMENT_THROW, NULL);
 	priv = statement->priv;

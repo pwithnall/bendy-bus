@@ -132,20 +132,18 @@ dfsm_ast_expression_data_structure_calculate_weight (DfsmAstExpression *self)
 /**
  * dfsm_ast_expression_data_structure_new:
  * @data_structure: a #DfsmAstDataStructure to wrap
- * @error: (allow-none): a #GError, or %NULL
  *
  * Create a new #DfsmAstExpression wrapping the given @data_structure.
  *
  * Return value: (transfer full): a new expression
  */
 DfsmAstExpression *
-dfsm_ast_expression_data_structure_new (DfsmAstDataStructure *data_structure, GError **error)
+dfsm_ast_expression_data_structure_new (DfsmAstDataStructure *data_structure)
 {
 	DfsmAstExpressionDataStructure *expression;
 	DfsmAstExpressionDataStructurePrivate *priv;
 
 	g_return_val_if_fail (DFSM_IS_AST_DATA_STRUCTURE (data_structure), NULL);
-	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	expression = g_object_new (DFSM_TYPE_AST_EXPRESSION_DATA_STRUCTURE, NULL);
 	priv = expression->priv;

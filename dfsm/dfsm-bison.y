@@ -36,12 +36,6 @@
 	static void yyerror (YYLTYPE *yylloc, DfsmParserData *parser_data, GError **error, const char *message);
 
 	#define YYLEX_PARAM parser_data->yyscanner
-
-	#define ERROR error
-	#define ABORT_ON_ERROR \
-	if (*ERROR != NULL) { \
-		YYABORT; \
-	}
 }
 
 %union {
@@ -192,9 +186,9 @@ ObjectBlock:
 	R_BRACE									{
 											$$ = dfsm_ast_object_new (parser_data->dbus_node_info, $3, $4,
 											                          $6, $8->data_blocks, $8->state_blocks,
-											                          $8->transitions, ERROR);
+											                          $8->transitions);
 											g_free ($3); g_ptr_array_unref ($4); g_ptr_array_unref ($6);
-											dfsm_parser_block_list_free ($8); ABORT_ON_ERROR;
+											dfsm_parser_block_list_free ($8);
 										}
 |	OBJECT AT DBUS_OBJECT_PATH BusNameList IMPLEMENTS InterfaceNameList L_BRACE
 		error
@@ -289,8 +283,7 @@ TransitionBlock:
 	TRANSITION StatePairList ON TransitionType L_BRACE
 		PreconditionList
 		StatementList
-	R_BRACE							{ DfsmAstTransition *transition = dfsm_ast_transition_new ($4, $6, $7, ERROR);
-								  ABORT_ON_ERROR;
+	R_BRACE							{ DfsmAstTransition *transition = dfsm_ast_transition_new ($4, $6, $7);
 								  $$ = dfsm_parser_transition_block_new (transition, $2);
 								  g_object_unref (transition);
 								  g_ptr_array_unref ($2); dfsm_parser_transition_details_free ($4);
@@ -340,8 +333,8 @@ PreconditionList: /* empty */							{ $$ = g_ptr_array_new_with_free_func (g_obj
 ;
 
 /* Returns a new DfsmAstPrecondition. */
-Precondition: PRECONDITION PreconditionThrow L_BRACE Expression R_BRACE		{ $$ = dfsm_ast_precondition_new ($2, $4, ERROR);
-										  g_free ($2); g_object_unref ($4); ABORT_ON_ERROR; }
+Precondition: PRECONDITION PreconditionThrow L_BRACE Expression R_BRACE		{ $$ = dfsm_ast_precondition_new ($2, $4);
+										  g_free ($2); g_object_unref ($4); }
             | PRECONDITION PreconditionThrow L_BRACE error R_BRACE		{ $$ = NULL; g_free ($2); YYABORT; }
 ;
 
@@ -368,51 +361,45 @@ DBusSignalName: IDENTIFIER							{ $$ = $1; /* steal ownership from flex */ }
 ;
 
 /* Returns a new DfsmAstStatement (or subclass). */
-Statement: DataStructure '=' Expression					{ $$ = dfsm_ast_statement_assignment_new ($1, $3, ERROR);
-									  g_object_unref ($1); g_object_unref ($3); ABORT_ON_ERROR; }
-         | THROW DBusErrorName						{ $$ = dfsm_ast_statement_throw_new ($2, ERROR);
-									  g_free ($2); ABORT_ON_ERROR; }
-         | EMIT DBusSignalName Expression				{ $$ = dfsm_ast_statement_emit_new ($2, $3, ERROR);
-									  g_free ($2); g_object_unref ($3); ABORT_ON_ERROR; }
-         | REPLY Expression						{ $$ = dfsm_ast_statement_reply_new ($2, ERROR);
-									  g_object_unref ($2); ABORT_ON_ERROR; }
+Statement: DataStructure '=' Expression					{ $$ = dfsm_ast_statement_assignment_new ($1, $3);
+									  g_object_unref ($1); g_object_unref ($3); }
+         | THROW DBusErrorName						{ $$ = dfsm_ast_statement_throw_new ($2); g_free ($2); }
+         | EMIT DBusSignalName Expression				{ $$ = dfsm_ast_statement_emit_new ($2, $3); g_free ($2); g_object_unref ($3); }
+         | REPLY Expression						{ $$ = dfsm_ast_statement_reply_new ($2); g_object_unref ($2); }
 ;
 
 /* Returns a new DfsmAstExpression. */
 Expression: L_ANGLE Expression R_ANGLE		{ $$ = $2; }
           | L_ANGLE error R_ANGLE		{ $$ = NULL; YYABORT; }
-          | FunctionName Expression %prec FUNC	{ $$ = dfsm_ast_expression_function_call_new ($1, $2, ERROR);
-						  g_free ($1); g_object_unref ($2); ABORT_ON_ERROR; }
-          | FuzzyDataStructure			{ $$ = dfsm_ast_expression_data_structure_new ($1, ERROR);
-						  g_object_unref ($1); ABORT_ON_ERROR; }
-          | NOT Expression			{ $$ = dfsm_ast_expression_unary_new (DFSM_AST_EXPRESSION_UNARY_NOT, $2, ERROR);
-						  g_object_unref ($2); ABORT_ON_ERROR; }
-          | Expression TIMES Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_TIMES, $1, $3, ERROR);
-						  g_object_unref ($1); g_object_unref ($3); ABORT_ON_ERROR; }
-          | Expression DIVIDE Expression	{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_DIVIDE, $1, $3, ERROR);
-						  g_object_unref ($1); g_object_unref ($3); ABORT_ON_ERROR; }
-          | Expression MODULUS Expression	{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_MODULUS, $1, $3, ERROR);
-						  g_object_unref ($1); g_object_unref ($3); ABORT_ON_ERROR; }
-          | Expression PLUS Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_PLUS, $1, $3, ERROR);
-						  g_object_unref ($1); g_object_unref ($3); ABORT_ON_ERROR; }
-          | Expression MINUS Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_MINUS, $1, $3, ERROR);
-						  g_object_unref ($1); g_object_unref ($3); ABORT_ON_ERROR; }
-          | Expression LT Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_LT, $1, $3, ERROR);
-						  g_object_unref ($1); g_object_unref ($3); ABORT_ON_ERROR; }
-          | Expression LTE Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_LTE, $1, $3, ERROR);
-						  g_object_unref ($1); g_object_unref ($3); ABORT_ON_ERROR; }
-          | Expression GT Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_GT, $1, $3, ERROR);
-						  g_object_unref ($1); g_object_unref ($3); ABORT_ON_ERROR; }
-          | Expression GTE Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_GTE, $1, $3, ERROR);
-						  g_object_unref ($1); g_object_unref ($3); ABORT_ON_ERROR; }
-          | Expression EQ Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_EQ, $1, $3, ERROR);
-						  g_object_unref ($1); g_object_unref ($3); ABORT_ON_ERROR; }
-          | Expression NEQ Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_NEQ, $1, $3, ERROR);
-						  g_object_unref ($1); g_object_unref ($3); ABORT_ON_ERROR; }
-          | Expression AND Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_AND, $1, $3, ERROR);
-						  g_object_unref ($1); g_object_unref ($3); ABORT_ON_ERROR; }
-          | Expression OR Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_OR, $1, $3, ERROR);
-						  g_object_unref ($1); g_object_unref ($3); ABORT_ON_ERROR; }
+          | FunctionName Expression %prec FUNC	{ $$ = dfsm_ast_expression_function_call_new ($1, $2); g_free ($1); g_object_unref ($2); }
+          | FuzzyDataStructure			{ $$ = dfsm_ast_expression_data_structure_new ($1); g_object_unref ($1); }
+          | NOT Expression			{ $$ = dfsm_ast_expression_unary_new (DFSM_AST_EXPRESSION_UNARY_NOT, $2); g_object_unref ($2); }
+          | Expression TIMES Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_TIMES, $1, $3);
+						  g_object_unref ($1); g_object_unref ($3); }
+          | Expression DIVIDE Expression	{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_DIVIDE, $1, $3);
+						  g_object_unref ($1); g_object_unref ($3); }
+          | Expression MODULUS Expression	{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_MODULUS, $1, $3);
+						  g_object_unref ($1); g_object_unref ($3); }
+          | Expression PLUS Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_PLUS, $1, $3);
+						  g_object_unref ($1); g_object_unref ($3); }
+          | Expression MINUS Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_MINUS, $1, $3);
+						  g_object_unref ($1); g_object_unref ($3); }
+          | Expression LT Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_LT, $1, $3);
+						  g_object_unref ($1); g_object_unref ($3); }
+          | Expression LTE Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_LTE, $1, $3);
+						  g_object_unref ($1); g_object_unref ($3); }
+          | Expression GT Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_GT, $1, $3);
+						  g_object_unref ($1); g_object_unref ($3); }
+          | Expression GTE Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_GTE, $1, $3);
+						  g_object_unref ($1); g_object_unref ($3); }
+          | Expression EQ Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_EQ, $1, $3);
+						  g_object_unref ($1); g_object_unref ($3); }
+          | Expression NEQ Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_NEQ, $1, $3);
+						  g_object_unref ($1); g_object_unref ($3); }
+          | Expression AND Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_AND, $1, $3);
+						  g_object_unref ($1); g_object_unref ($3); }
+          | Expression OR Expression		{ $$ = dfsm_ast_expression_binary_new (DFSM_AST_EXPRESSION_BINARY_OR, $1, $3);
+						  g_object_unref ($1); g_object_unref ($3); }
 ;
 
 /* Returns the function name as a string. */
@@ -424,10 +411,10 @@ VariableName: IDENTIFIER							{ $$ = $1; /* steal ownership from flex */ }
 ;
 
 /* Returns a new DfsmAstVariable. */
-Variable: VariableName								{ $$ = dfsm_ast_variable_new (DFSM_VARIABLE_SCOPE_LOCAL, $1, ERROR);
-										  g_free ($1); ABORT_ON_ERROR; }
-        | OBJECT DOT VariableName						{ $$ = dfsm_ast_variable_new (DFSM_VARIABLE_SCOPE_OBJECT, $3, ERROR);
-										  g_free ($3); ABORT_ON_ERROR; }
+Variable: VariableName								{ $$ = dfsm_ast_variable_new (DFSM_VARIABLE_SCOPE_LOCAL, $1);
+										  g_free ($1); }
+        | OBJECT DOT VariableName						{ $$ = dfsm_ast_variable_new (DFSM_VARIABLE_SCOPE_OBJECT, $3);
+										  g_free ($3); }
 ;
 
 /* Returns a new DfsmAstDataStructure. */
@@ -443,36 +430,27 @@ AnnotatedDataStructure: DataStructure						{ $$ = $1; }
 ;
 
 /* Returns a new DfsmAstDataStructure. */
-DataStructure: BYTE					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BYTE, &$1, ERROR); ABORT_ON_ERROR; }
-             | TRUE_LITERAL				{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BOOLEAN,
-							                                    GUINT_TO_POINTER (TRUE), ERROR); ABORT_ON_ERROR; }
-             | FALSE_LITERAL				{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BOOLEAN,
-							                                    GUINT_TO_POINTER (FALSE), ERROR); ABORT_ON_ERROR; }
-             | INT16					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_INT16, &$1, ERROR); ABORT_ON_ERROR; }
-             | UINT16					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_UINT16, &$1, ERROR); ABORT_ON_ERROR; }
-             | INT32					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_INT32, &$1, ERROR); ABORT_ON_ERROR; }
-             | UINT32					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_UINT32, &$1, ERROR); ABORT_ON_ERROR; }
-             | INT64					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_INT64, &$1, ERROR); ABORT_ON_ERROR; }
-             | UINT64					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_UINT64, &$1, ERROR); ABORT_ON_ERROR; }
-             | DOUBLE					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_DOUBLE, &$1, ERROR); ABORT_ON_ERROR; }
-             | STRING					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_STRING, $1, ERROR);
-							  g_free ($1); ABORT_ON_ERROR; }
-             | '<' Expression '>'			{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_VARIANT, $2, ERROR);
-							  g_object_unref ($2); ABORT_ON_ERROR; }
+DataStructure: BYTE					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BYTE, &$1); }
+             | TRUE_LITERAL				{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BOOLEAN, GUINT_TO_POINTER (TRUE)); }
+             | FALSE_LITERAL				{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BOOLEAN, GUINT_TO_POINTER (FALSE)); }
+             | INT16					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_INT16, &$1); }
+             | UINT16					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_UINT16, &$1); }
+             | INT32					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_INT32, &$1); }
+             | UINT32					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_UINT32, &$1); }
+             | INT64					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_INT64, &$1); }
+             | UINT64					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_UINT64, &$1); }
+             | DOUBLE					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_DOUBLE, &$1); }
+             | STRING					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_STRING, $1); g_free ($1); }
+             | '<' Expression '>'			{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_VARIANT, $2); g_object_unref ($2); }
              | '<' error '>'				{ $$ = NULL; YYABORT; }
-             | ARRAY_L_BRACKET ArrayList ARRAY_R_BRACKET	{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_ARRAY, $2, ERROR);
-								  g_ptr_array_unref ($2); ABORT_ON_ERROR; }
+             | ARRAY_L_BRACKET ArrayList ARRAY_R_BRACKET	{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_ARRAY, $2); g_ptr_array_unref ($2); }
              | ARRAY_L_BRACKET error ARRAY_R_BRACKET		{ $$ = NULL; YYABORT; }
-             | L_PAREN StructureList R_PAREN		{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_STRUCT, $2, ERROR);
-							  g_ptr_array_unref ($2); ABORT_ON_ERROR; }
+             | L_PAREN StructureList R_PAREN		{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_STRUCT, $2); g_ptr_array_unref ($2); }
              | L_PAREN error R_PAREN			{ $$ = NULL; YYABORT; }
-             | L_BRACE DictionaryList R_BRACE		{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_DICT, $2, ERROR);
-							  g_ptr_array_unref ($2); ABORT_ON_ERROR; }
+             | L_BRACE DictionaryList R_BRACE		{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_DICT, $2); g_ptr_array_unref ($2); }
              | L_BRACE error R_BRACE			{ $$ = NULL; YYABORT; }
-             | REGEXP					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_REGEXP, $1, ERROR);
-							  g_free ($1); ABORT_ON_ERROR; }
-             | Variable					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_VARIABLE, $1, ERROR);
-							  g_object_unref ($1); ABORT_ON_ERROR; }
+             | REGEXP					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_REGEXP, $1); g_free ($1); }
+             | Variable					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_VARIABLE, $1); g_object_unref ($1); }
 ;
 
 /* Returns a new GPtrArray of DfsmAstExpressions */

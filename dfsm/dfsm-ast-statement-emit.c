@@ -212,21 +212,19 @@ dfsm_ast_statement_emit_execute (DfsmAstStatement *statement, DfsmEnvironment *e
  * dfsm_ast_statement_emit_new:
  * @signal_name: name of the D-Bus signal to emit
  * @expression: expression to evaluate as the signal parameters
- * @error: (allow-none): a #GError, or %NULL
  *
  * Create a new #DfsmAstStatement for emitting a D-Bus signal of name @signal_name with value given by @expression.
  *
  * Return value: (transfer full): a new AST node
  */
 DfsmAstStatement *
-dfsm_ast_statement_emit_new (const gchar *signal_name, DfsmAstExpression *expression, GError **error)
+dfsm_ast_statement_emit_new (const gchar *signal_name, DfsmAstExpression *expression)
 {
 	DfsmAstStatementEmit *statement;
 	DfsmAstStatementEmitPrivate *priv;
 
 	g_return_val_if_fail (signal_name != NULL && *signal_name != '\0', NULL);
 	g_return_val_if_fail (DFSM_IS_AST_EXPRESSION (expression), NULL);
-	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	statement = g_object_new (DFSM_TYPE_AST_STATEMENT_EMIT, NULL);
 	priv = statement->priv;

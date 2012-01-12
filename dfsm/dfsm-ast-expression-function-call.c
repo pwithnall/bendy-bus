@@ -198,21 +198,19 @@ dfsm_ast_expression_function_call_calculate_weight (DfsmAstExpression *self)
  * dfsm_ast_expression_function_call_new:
  * @function_name: function name
  * @parameters: expression for function parameters
- * @error: (allow-none): a #GError, or %NULL
  *
  * Create a new #DfsmAstExpression representing a function call to @function_name with the given @parameters.
  *
  * Return value: (transfer full): a new expression
  */
 DfsmAstExpression *
-dfsm_ast_expression_function_call_new (const gchar *function_name, DfsmAstExpression *parameters, GError **error)
+dfsm_ast_expression_function_call_new (const gchar *function_name, DfsmAstExpression *parameters)
 {
 	DfsmAstExpressionFunctionCall *function_call;
 	DfsmAstExpressionFunctionCallPrivate *priv;
 
 	g_return_val_if_fail (function_name != NULL && *function_name != '\0', NULL);
 	g_return_val_if_fail (DFSM_IS_AST_EXPRESSION (parameters), NULL);
-	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	function_call = g_object_new (DFSM_TYPE_AST_EXPRESSION_FUNCTION_CALL, NULL);
 	priv = function_call->priv;

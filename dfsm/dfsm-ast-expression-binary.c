@@ -392,21 +392,19 @@ dfsm_ast_expression_binary_calculate_weight (DfsmAstExpression *self)
  * @expression_type: the type of expression
  * @left_node: the expression's left node, or %NULL
  * @right_node: the expression's right node, or %NULL
- * @error: a #GError, or %NULL
  *
  * Create a new #DfsmAstExpression of type @expression_type with the given left and right nodes.
  *
  * Return value: (transfer full): a new AST node
  */
 DfsmAstExpression *
-dfsm_ast_expression_binary_new (DfsmAstExpressionBinaryType expression_type, DfsmAstExpression *left_node, DfsmAstExpression *right_node, GError **error)
+dfsm_ast_expression_binary_new (DfsmAstExpressionBinaryType expression_type, DfsmAstExpression *left_node, DfsmAstExpression *right_node)
 {
 	DfsmAstExpressionBinary *expression;
 	DfsmAstExpressionBinaryPrivate *priv;
 
 	g_return_val_if_fail (DFSM_IS_AST_EXPRESSION (left_node), NULL);
 	g_return_val_if_fail (DFSM_IS_AST_EXPRESSION (right_node), NULL);
-	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	switch (expression_type) {
 		case DFSM_AST_EXPRESSION_BINARY_TIMES:
