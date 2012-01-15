@@ -55,8 +55,8 @@ dfsm_simulation_status_get_type (void)
 }
 
 /* Arbitrarily-chosen min. and max. values for the arbitrary transition timeout callbacks. */
-#define MIN_TIMEOUT 500 /* ms */
-#define MAX_TIMEOUT 5000 /* ms */
+#define MIN_TIMEOUT 50 /* ms */
+#define MAX_TIMEOUT 200 /* ms */
 
 static void dfsm_machine_dispose (GObject *object);
 static void dfsm_machine_get_gobject_property (GObject *object, guint property_id, GValue *value, GParamSpec *pspec);
