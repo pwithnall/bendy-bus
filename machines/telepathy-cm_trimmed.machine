@@ -1,0 +1,442 @@
+object at /org/freedesktop/Telepathy/AccountManager, org.freedesktop.Telepathy.AccountManager implements org.freedesktop.Telepathy.AccountManager {
+	data {
+		/* Properties */
+		Interfaces = @as [
+			"org.freedesktop.Telepathy.AccountManager",
+		];
+		ValidAccounts = @ao [
+			@o "/org/freedesktop/Telepathy/Account/cmname/proto/account",
+		];
+		InvalidAccounts = @ao [];
+		SupportedAccountProperties = @as [
+			"org.freedesktop.Telepathy.Account.Enabled",
+			"org.freedesktop.Telepathy.Account.ConnectAutomatically",
+			"org.freedesktop.Telepathy.Account.RequestedPresence",
+		];
+	}
+
+	states {
+		Main
+	}
+}
+
+object at /org/freedesktop/Telepathy/Account/cmname/proto/account implements org.freedesktop.Telepathy.Account {
+	data {
+		/* Properties */
+		Interfaces = @as [
+			"org.freedesktop.Telepathy.Account",
+		];
+		DisplayName = "Test Account"?;
+		Icon = ""?;
+		Valid = true;
+		Enabled = true;
+		Nickname = "John Smith"?;
+		Service = ""?;
+		Parameters = @a{sv} {};
+		AutomaticPresence = (2u, "available", "");
+		ConnectAutomatically = true;
+		Connection = @o "/org/freedesktop/Telepathy/Connection/cmname/proto/account";
+		ConnectionStatus = 0u; /* Connected */
+		ConnectionStatusReason = 0u;
+		ConnectionError = "";
+		ConnectionErrorDetails = @a{sv} {};
+		CurrentPresence = (2u, "available", ""); /* available */
+		RequestedPresence = (2u, "available", "");
+		ChangingPresence = false;
+		NormalizedName = "account";
+		HasBeenOnline = true;
+	}
+
+	states {
+		Connected;
+	}
+}
+
+object at /org/freedesktop/Telepathy/ConnectionManager/cmname, org.freedesktop.Telepathy.ConnectionManager.cmname implements org.freedesktop.Telepathy.ConnectionManager {
+	data {
+		/* Properties */
+		Protocols = @a{sa{sv}} {};
+
+		Interfaces = @as [
+			"org.freedesktop.Telepathy.ConnectionManager",
+		];
+
+		/* Other variables */
+		_ConnectionObjectPath = @o "/org/freedesktop/Telepathy/ConnectionManager/cmname"; /* nonsensical default value */
+		_ConnectionBusName = "org.freedesktop.Telepathy.ConnectionManager.cmname";
+		_Params = @a(suv) [];
+	}
+
+	states {
+		Main
+	}
+
+	transition inside Main on method GetParameters {
+		precondition throwing NotImplemented { inArray(Protocol, keys object->Protocols) }
+
+		reply object->_Params;
+	}
+
+	transition inside Main on method ListProtocols {
+		reply keys object->Protocols;
+	}
+
+	transition inside Main on method RequestConnection {
+		precondition throwing NotImplemented { inArray(Protocol, keys object->Protocols) }
+		precondition throwing NotAvailable { object->_ConnectionBusName == "" }
+
+		emit NewConnection (object->_ConnectionBusName, object->_ConnectionObjectPath, Protocol);
+		reply (object->_ConnectionBusName, object->_ConnectionObjectPath);
+	}
+}
+
+object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freedesktop.Telepathy.Connection.cmname.proto.account implements org.freedesktop.Telepathy.Connection, org.freedesktop.Telepathy.Connection.Interface.Contacts, org.freedesktop.Telepathy.Connection.Interface.Requests, org.freedesktop.Telepathy.Connection.Interface.Aliasing, org.freedesktop.Telepathy.Connection.Interface.Avatars, org.freedesktop.Telepathy.Connection.Interface.SimplePresence, org.freedesktop.Telepathy.Connection.Interface.ContactCapabilities {
+	data {
+		/* Properties */
+		Interfaces = @as [
+			"org.freedesktop.Telepathy.Connection",
+			"org.freedesktop.Telepathy.Connection.Interface.Contacts",
+			"org.freedesktop.Telepathy.Connection.Interface.Requests",
+			"org.freedesktop.Telepathy.Connection.Interface.Aliasing",
+			"org.freedesktop.Telepathy.Connection.Interface.Avatars",
+			"org.freedesktop.Telepathy.Connection.Interface.SimplePresence",
+			"org.freedesktop.Telepathy.Connection.Interface.ContactCapabilities",
+		];
+		SelfHandle = 1u;
+		Status = 0u;
+		HasImmortalHandles = true;
+
+		/* Conn.I.Contacts */
+		ContactAttributeInterfaces = @as [
+			"org.freedesktop.Telepathy.Connection",
+			"org.freedesktop.Telepathy.Connection.Interface.Aliasing",
+			"org.freedesktop.Telepathy.Connection.Interface.Avatars",
+			"org.freedesktop.Telepathy.Connection.Interface.SimplePresence",
+			"org.freedesktop.Telepathy.Connection.Interface.ContactCapabilities",
+		];
+
+		/* Conn.I.Requests. */
+		Channels = @a(oa{sv}) [];
+		RequestableChannelClasses = @a(a{sv}as) [];
+
+		/* Conn.I.Avatars. */
+		SupportedAvatarMIMETypes = @as [
+			"image/jpeg",
+		]?;
+		MinimumAvatarHeight = 0u?;
+		MinimumAvatarWidth = 0u?;
+		RecommendedAvatarHeight = 100u?;
+		RecommendedAvatarWidth = 100u?;
+		MaximumAvatarHeight = 256u?;
+		MaximumAvatarWidth = 256u?;
+		MaximumAvatarBytes = 256u?;
+
+		/* Conn.I.SimplePresence */
+		Statuses = {
+			"available" : (2u, true, true),
+		}?;
+		MaximumStatusMessageLength = 100u?;
+	}
+
+	states {
+		Connected;
+	}
+
+	transition inside Connected on method GetInterfaces {
+		reply object->Interfaces;
+	}
+
+	transition inside Connected on method GetSelfHandle {
+		reply object->SelfHandle;
+	}
+
+	transition inside Connected on method GetStatus {
+		reply object->Status;
+	}
+
+	transition inside Connected on method GetContactAttributes {
+		reply pairKeys (Handles, { /* TODO: Hacky */
+			"org.freedesktop.Telepathy.Connection/contact-id" : <"foo@example.com"?>,
+			"org.freedesktop.Telepathy.Connection.Interface.Aliasing/alias" : <""?>,
+			"org.freedesktop.Telepathy.Connection.Interface.Avatars/token" : <""?>,
+			"org.freedesktop.Telepathy.Connection.Interface.SimplePresence/presence" : <(3u?, "available"?, "Status message!"?)>,
+			"org.freedesktop.Telepathy.Connection.Interface.ContactCapabilities/capabilities" : <[(
+				{
+					"org.freedesktop.Telepathy.something" : <""?>,
+					"org.freedesktop.Telepathy.Channel.TargetHandleType" : <0u?>,
+				}?,
+				[
+					"org.freedesktop.Telepathy.somethingelse",
+				]?,
+			)]?>,
+			#[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z0-9_][a-zA-Z0-9]*(\.[a-zA-Z0-9_][a-zA-Z0-9]*)*# : <""?>,
+			/* etc. */
+		}?);
+	}
+
+	transition inside Connected on method EnsureChannel {
+		precondition throwing NotImplemented {
+			dictGet (Request, "org.freedesktop.Telepathy.Channel.ChannelType", <"">) == <"org.freedesktop.Telepathy.Channel.Type.ContactList"> &&
+			dictGet (Request, "org.freedesktop.Telepathy.Channel.TargetID", <"">) == <"subscribe">
+		}
+
+		object->Channels = arrayInsert (object->Channels, 1u, (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe", {
+			"org.freedesktop.Telepathy.Channel.ChannelType" : <"org.freedesktop.Telepathy.Channel.Type.ContactList">,
+			"org.freedesktop.Telepathy.Channel.TargetHandleType" : <3u>,
+			"org.freedesktop.Telepathy.Channel.TargetHandle" : <0u?>,
+			"org.freedesktop.Telepathy.Channel.TargetID"  : <"subscribe">,
+			"org.freedesktop.Telepathy.Channel.Requested" : <false?>,
+		}));
+
+		reply (true, @o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe", @a{sv} []);
+	}
+
+	transition inside Connected on random {
+		object->Channels = arrayInsert (object->Channels, 0u, (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe", {
+			"org.freedesktop.Telepathy.Channel.ChannelType" : <"org.freedesktop.Telepathy.Channel.Type.ContactList">,
+			"org.freedesktop.Telepathy.Channel.TargetHandleType" : <3u>,
+			"org.freedesktop.Telepathy.Channel.TargetHandle" : <0u?>,
+			"org.freedesktop.Telepathy.Channel.TargetID"  : <"subscribe">,
+			"org.freedesktop.Telepathy.Channel.Requested" : <false?>,
+		}));
+
+		emit NewChannels ([arrayGet (object->Channels, 0u, (@o "/p", @a{sv} {}))]);
+		emit NewChannel (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe",
+		                 "org.freedesktop.Telepathy.Channel.Type.ContactList", 3u, 0u?, false?);
+	}
+
+	transition inside Connected on random {
+		object->Channels = arrayInsert (object->Channels, 0u, (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/group1", {
+			"org.freedesktop.Telepathy.Channel.ChannelType" : <"org.freedesktop.Telepathy.Channel.Type.ContactList">,
+			"org.freedesktop.Telepathy.Channel.TargetHandleType" : <4u>,
+			"org.freedesktop.Telepathy.Channel.TargetHandle" : <0u?>,
+			"org.freedesktop.Telepathy.Channel.TargetID"  : <"group1">,
+			"org.freedesktop.Telepathy.Channel.Requested" : <false?>,
+		}));
+
+		emit NewChannels ([arrayGet (object->Channels, 0u, (@o "/p", @a{sv} {}))]);
+		emit NewChannel (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/group1",
+		                 "org.freedesktop.Telepathy.Channel.Type.ContactList", 4u, 0u?, false?);
+	}
+
+	transition inside Connected on random {
+		precondition { arrayGet (object->Channels, 0u, (@o "/p", @a{sv} {})) != (@o "/p", @a{sv} {}) }
+
+		emit ChannelClosed (structHead (arrayGet (object->Channels, 0u, (@o "/p", @a{sv} {}))));
+		object->Channels = arrayRemove (object->Channels, 0u);
+	}
+
+	transition inside Connected on method GetAliasFlags {
+		reply 0u?;
+	}
+
+	transition inside Connected on random {
+		emit AvatarUpdated (0u?, ""?);
+	}
+
+	transition inside Connected on random {
+		emit AvatarRetrieved (0u?, ""?, @ay [
+			255y, 216y /* JPEG SOI; see if that gets us anywhere */
+		]?, "image/jpeg"?);
+	}
+
+	transition inside Connected on method RequestAvatars {
+		/* Do nothing specific. AvatarRetrieved will be emitted randomly at some point in the future. Possibly even for the contacts the client's requested. */
+		reply ();
+	}
+
+	transition inside Connected on method RequestAvatars {
+		throw InvalidHandle;
+	}
+
+	transition inside Connected on random {
+		emit PresencesChanged (pairKeys (@au [0u]?, (6u?, "busy"?, "I’m busy."?)));
+	}
+
+	transition inside Connected on random {
+		emit ContactCapabilitiesChanged (pairKeys (@au [0u]?, [(
+			{
+				"org.freedesktop.Telepathy.something" : <""?>,
+				"org.freedesktop.Telepathy.Channel.TargetHandleType" : <0u?>,
+			}?,
+			[
+				"org.freedesktop.Telepathy.somethingelse",
+			]?,
+		)]?));
+	}
+}
+
+object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe implements org.freedesktop.Telepathy.Channel, org.freedesktop.Telepathy.Channel.Type.ContactList, org.freedesktop.Telepathy.Channel.Interface.Group {
+	data {
+		/* Channel */
+		ChannelType = "org.freedesktop.Telepathy.Channel.Type.ContactList";
+		Interfaces = [
+			"org.freedesktop.Telepathy.Channel.Type.ContactList",
+			"org.freedesktop.Telepathy.Channel",
+			"org.freedesktop.Telepathy.Channel.Interface.Group",
+		]?;
+		TargetHandle = 0u?;
+		TargetID = "subscribe";
+		TargetHandleType = 3u;
+		Requested = false?;
+		InitiatorHandle = 0u?;
+		InitiatorID = ""?;
+
+		/* Channel.I.Group */
+		GroupFlags = 6144u; /* Properties | Members_Changed_Detailed */
+		HandleOwners = @a{uu} {};
+		LocalPendingMembers = @a(uuus) [];
+		Members = @au [ 1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u, 9u, 10u ];
+		RemotePendingMembers = @au [];
+		SelfHandle = 0u;
+		MemberIdentifiers = @a{us} {
+			1u : "1@example.com",
+			2u : "2@example.com",
+			3u : "3@example.com",
+			4u : "4@example.com",
+			5u : "5@example.com",
+			6u : "6@example.com",
+			7u : "7@example.com",
+			8u : "8@example.com",
+			9u : "9@example.com",
+			10u : "10@example.com",
+		};
+
+		/* Temporaries */
+		_MemberCount = 10u;
+	}
+
+	states {
+		Open;
+		Closed;
+	}
+
+	transition from Open to Closed on method Close {
+		emit Closed ();
+	}
+
+	transition inside Open on random {
+		object->Members = arrayInsert (object->Members, 0u, object->_MemberCount);
+		object->MemberIdentifiers = dictSet (object->MemberIdentifiers, object->_MemberCount, "foo@example.com"?);
+
+		emit MembersChangedDetailed ([object->_MemberCount + 1u], @au [], @au [], @au [], @a{sv} {});
+
+		object->_MemberCount = object->_MemberCount + 1u;
+	}
+
+	transition inside Open on random {
+		precondition { object->_MemberCount >= 1u }
+
+		object->_MemberCount = object->_MemberCount - 1u;
+
+		object->Members = arrayRemove (object->Members, 0u);
+		object->MemberIdentifiers = dictUnset (object->MemberIdentifiers, object->_MemberCount);
+
+		emit MembersChangedDetailed (@au [], [object->_MemberCount + 1u], @au [], @au [], @a{sv} {});
+	}
+
+	transition inside Open on method GetHandle {
+		reply (object->TargetHandleType, object->TargetHandle);
+	}
+
+	transition inside Open on method GetGroupFlags {
+		reply (object->GroupFlags);
+	}
+
+	transition inside Open on method GetSelfHandle {
+		reply (object->SelfHandle);
+	}
+
+	transition inside Open on method GetAllMembers {
+		reply (object->Members, @au [] /* TODO */, object->RemotePendingMembers);
+	}
+
+	transition inside Open on method GetLocalPendingMembersWithInfo {
+		reply (object->LocalPendingMembers);
+	}
+}
+
+object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/group1 implements org.freedesktop.Telepathy.Channel, org.freedesktop.Telepathy.Channel.Type.ContactList, org.freedesktop.Telepathy.Channel.Interface.Group {
+	data {
+		/* Channel */
+		ChannelType = "org.freedesktop.Telepathy.Channel.Type.ContactList";
+		Interfaces = [
+			"org.freedesktop.Telepathy.Channel.Type.ContactList",
+			"org.freedesktop.Telepathy.Channel",
+			"org.freedesktop.Telepathy.Channel.Interface.Group",
+		]?;
+		TargetHandle = 0u?;
+		TargetID = "group1";
+		TargetHandleType = 4u;
+		Requested = false?;
+		InitiatorHandle = 0u?;
+		InitiatorID = ""?;
+
+		/* Channel.I.Group */
+		GroupFlags = 6144u; /* Properties | Members_Changed_Detailed */
+		HandleOwners = @a{uu} {};
+		LocalPendingMembers = @a(uuus) [];
+		Members = @au [ 1u, 2u, 3u, 4u ];
+		RemotePendingMembers = @au [];
+		SelfHandle = 0u;
+		MemberIdentifiers = @a{us} {
+			1u : "1@example.com",
+			2u : "2@example.com",
+			3u : "3@example.com",
+			4u : "4@example.com",
+		};
+
+		/* Temporaries */
+		_MemberCount = 4u;
+	}
+
+	states {
+		Open;
+		Closed;
+	}
+
+	transition from Open to Closed on method Close {
+		emit Closed ();
+	}
+
+	transition inside Open on random {
+		object->Members = arrayInsert (object->Members, 0u, object->_MemberCount);
+		object->MemberIdentifiers = dictSet (object->MemberIdentifiers, object->_MemberCount, "foo@example.com"?);
+
+		emit MembersChangedDetailed ([object->_MemberCount + 1u], @au [], @au [], @au [], @a{sv} {});
+
+		object->_MemberCount = object->_MemberCount + 1u;
+	}
+
+	transition inside Open on random {
+		precondition { object->_MemberCount >= 1u }
+
+		object->_MemberCount = object->_MemberCount - 1u;
+
+		object->Members = arrayRemove (object->Members, 0u);
+		object->MemberIdentifiers = dictUnset (object->MemberIdentifiers, object->_MemberCount);
+
+		emit MembersChangedDetailed (@au [], [object->_MemberCount + 1u], @au [], @au [], @a{sv} {});
+	}
+
+	transition inside Open on method GetHandle {
+		reply (object->TargetHandleType, object->TargetHandle);
+	}
+
+	transition inside Open on method GetGroupFlags {
+		reply (object->GroupFlags);
+	}
+
+	transition inside Open on method GetSelfHandle {
+		reply (object->SelfHandle);
+	}
+
+	transition inside Open on method GetAllMembers {
+		reply (object->Members, @au [] /* TODO */, object->RemotePendingMembers);
+	}
+
+	transition inside Open on method GetLocalPendingMembersWithInfo {
+		reply (object->LocalPendingMembers);
+	}
+}
+
