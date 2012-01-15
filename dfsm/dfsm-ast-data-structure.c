@@ -938,7 +938,8 @@ fuzz_signed_int (gint64 default_value, gint64 min_value, gint64 max_value)
 	/* We use a non-uniform distribution for this:
 	 *  • With probability 0.3 we get a number in the range [-5, 5].
 	 *  • With probability 0.3 we keep our default value.
-	 *  • With probability 0.4 we take a random integer in the given range.
+	 *  • With probability 0.1 we choose a boundary number for the given range.
+	 *  • With probability 0.3 we take a random integer in the given range.
 	 */
 
 	distribution = g_random_int ();
@@ -949,6 +950,15 @@ fuzz_signed_int (gint64 default_value, gint64 min_value, gint64 max_value)
 	} else if (distribution <= G_MAXUINT32 * 0.6) {
 		/* Default value. */
 		return default_value;
+	} else if (distribution <= G_MAXUINT32 * 0.7) {
+		/* Boundary number. */
+		if (g_random_boolean () == TRUE) {
+			/* Lower boundary. */
+			return min_value;
+		} else {
+			/* Upper boundary. */
+			return max_value;
+		}
 	} else {
 		/* Random int in the given range. If the range is large, we'll have to combine a g_random_int() call with a coin toss to determine
 		 * the sign, since g_random_int() only returns 32-bit integers. */
@@ -976,7 +986,8 @@ fuzz_unsigned_int (guint64 default_value, guint64 min_value, guint64 max_value)
 	/* We use a non-uniform distribution for this:
 	 *  • With probability 0.3 we get a number in the range [0, 10].
 	 *  • With probability 0.3 we keep our default value.
-	 *  • With probability 0.4 we take a random integer in the given range.
+	 *  • With probability 0.1 we choose a boundary number for the given range.
+	 *  • With probability 0.3 we take a random integer in the given range.
 	 */
 
 	distribution = g_random_int ();
@@ -987,6 +998,15 @@ fuzz_unsigned_int (guint64 default_value, guint64 min_value, guint64 max_value)
 	} else if (distribution <= G_MAXUINT32 * 0.6) {
 		/* Default value. */
 		return default_value;
+	} else if (distribution <= G_MAXUINT32 * 0.7) {
+		/* Boundary number. */
+		if (g_random_boolean () == TRUE) {
+			/* Lower boundary. */
+			return min_value;
+		} else {
+			/* Upper boundary. */
+			return max_value;
+		}
 	} else {
 		/* Random int in the given range. If the range is large, we'll have to combine two g_random_int() calls to get a 64-bit integer,
 		 * since g_random_int() only returns 32-bit integers. */
