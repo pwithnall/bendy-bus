@@ -1768,7 +1768,7 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 		case DFSM_AST_DATA_ARRAY: {
 			GVariantType *data_structure_type;
 			GVariantBuilder builder;
-			guint i;
+			guint i, effective_array_length;
 
 			/* Fuzzing for arrays takes several forms, each of which are decided by independent probabilities for each array element
 			 * individually:
@@ -1778,13 +1778,19 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 			 *
 			 * Notably, the amount of fuzzing (of any type) on a given array element is affected by the fuzzing weight of the expression
 			 * for the array element.
+			 *
+			 * Additionally, there is a global 0.05 chance of an array being emptied completely, regardless of what's happened to its
+			 * individual elements.
 			 */
 
 			data_structure_type = dfsm_ast_data_structure_calculate_type (self, environment);
 			g_variant_builder_init (&builder, data_structure_type);
 			g_variant_type_free (data_structure_type);
 
-			for (i = 0; i < priv->array_val->len; i++) {
+			/* Delete all entries? */
+			effective_array_length = (should_be_fuzzed (self) == FALSE || g_random_int () >= G_MAXUINT32 * 0.05) ? priv->array_val->len : 0;
+
+			for (i = 0; i < effective_array_length; i++) {
 				GVariant *child_value;
 				DfsmAstExpression *child_expression;
 				gdouble child_expression_weight;
@@ -1903,7 +1909,7 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 		case DFSM_AST_DATA_DICT: {
 			GVariantType *data_structure_type;
 			GVariantBuilder builder;
-			guint i;
+			guint i, effective_dict_length;
 
 			/* Fuzzing for dictionaries takes several forms, each of which are decided by independent probabilities for each dict. entry
 			 * individually:
@@ -1913,12 +1919,18 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 			 *
 			 * Notably, the amount of fuzzing (of any type) on a given dict. entry is affected by the fuzzing weight of the expression
 			 * for the entry.
+			 *
+			 * Additionally, there is a global 0.05 chance of an array being emptied completely, regardless of what's happened to its
+			 * individual elements.
 			 */
 
 			data_structure_type = dfsm_ast_data_structure_calculate_type (self, environment);
 			g_variant_builder_init (&builder, data_structure_type);
 
-			for (i = 0; i < priv->dict_val->len; i++) {
+			/* Delete all entries? */
+			effective_dict_length = (should_be_fuzzed (self) == FALSE || g_random_int () >= G_MAXUINT32 * 0.05) ? priv->dict_val->len : 0;
+
+			for (i = 0; i < effective_dict_length; i++) {
 				GVariant *key_value, *value_value;
 				DfsmAstDictionaryEntry *dict_entry;
 				gdouble key_weight, value_weight;
