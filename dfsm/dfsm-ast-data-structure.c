@@ -1224,8 +1224,8 @@ generate_character (void)
 
 		/* Invalid Unicode. We choose code points from:
 		 *  • Private Use Area: U+E000–U+F8FF (6400 points).
-		 *  • Supplementary Private Use Area A: U+F0000–U+FFFFF (65536 points).
-		 *  • Supplementary Private Use Area B: U+100000–U+10FFFF (65536 points).
+		 *  • Supplementary Private Use Area A: U+F0000–U+FFFFD (65534 points).
+		 *  • Supplementary Private Use Area B: U+100000–U+10FFFD (65534 points).
 		 *  • Replacement Character: U+FFFD (1 point).
 		 *
 		 * We can't choose code points from:
@@ -1233,10 +1233,10 @@ generate_character (void)
 		 *  • Noncharacters: U+FFFE, U+FFFF, U+1FFFE, U+1FFFF, …, U+10FFFE, U+10FFFF; U+FDD0–U+FDEF (64 points).
 		 * because g_utf8_validate() will reject them and cause assertion failures.
 		 *
-		 * This gives 137473 points in total.
+		 * This gives 137469 points in total.
 		 */
 
-		i = g_random_int_range (0, 137473);
+		i = g_random_int_range (0, 137469);
 
 		if (i < 6400) {
 			/* Private Use Area */
@@ -1246,15 +1246,15 @@ generate_character (void)
 
 		i -= 6400;
 
-		if (i < 65536) {
+		if (i < 65534) {
 			/* Supplementary Private Use Area A */
 			output = 0xF0000 + i;
 			goto done;
 		}
 
-		i -= 65536;
+		i -= 65534;
 
-		if (i < 65536) {
+		if (i < 65534) {
 			/* Supplementary Private Use Area B */
 			output = 0x100000 + i;
 			goto done;
