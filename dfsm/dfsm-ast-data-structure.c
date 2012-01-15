@@ -1180,6 +1180,7 @@ static gunichar
 generate_character (void)
 {
 	guint32 distribution;
+	gunichar output;
 
 	/* We use a non-uniform distribution for this.
 	 *  • With probability 0.5 we choose an ASCII character (except NUL).
@@ -1190,19 +1191,14 @@ generate_character (void)
 
 	if (distribution < G_MAXUINT32 * 0.5) {
 		/* ASCII. */
-		return g_random_int_range (0x01, 0xFF + 1); /* anything except NUL */
+		output = g_random_int_range (0x01, 0xFF + 1); /* anything except NUL */
 	} else if (distribution < G_MAXUINT32 * 0.9) {
-		gunichar output;
-
 		/* Valid Unicode. It would be impractical to list all assigned and valid code points here such that they all have a uniform
 		 * probability of being chosen. Consequently, we just choose a random code point from planes 0, 1 and 2, and check whether it's
-		 * assigned. If not, we choose another. Note that we never choose NUL. */
-		output = g_random_int_range (0x01, 0x2FFFF + 1);
-		while (g_unichar_isdefined (output) == FALSE) {
+		 * assigned and valid. If not, we choose another. Note that we never choose NUL. */
+		do {
 			output = g_random_int_range (0x01, 0x2FFFF + 1);
-		}
-
-		return output;
+		} while (g_unichar_isdefined (output) == FALSE || g_unichar_validate (output) == FALSE);
 	} else {
 		guint32 i;
 
@@ -1210,54 +1206,50 @@ generate_character (void)
 		 *  • Private Use Area: U+E000–U+F8FF (6400 points).
 		 *  • Supplementary Private Use Area A: U+F0000–U+FFFFF (65536 points).
 		 *  • Supplementary Private Use Area B: U+100000–U+10FFFF (65536 points).
-		 *  • Noncharacters: U+FFFE, U+FFFF, U+1FFFE, U+1FFFF, …, U+10FFFE, U+10FFFF; U+FDD0–U+FDEF (64 points).
 		 *  • Replacement Character: U+FFFD (1 point).
 		 *
 		 * We can't choose code points from:
 		 *  • Surrogates Area: U+D800–U+DFFF (2048 points).
+		 *  • Noncharacters: U+FFFE, U+FFFF, U+1FFFE, U+1FFFF, …, U+10FFFE, U+10FFFF; U+FDD0–U+FDEF (64 points).
 		 * because g_utf8_validate() will reject them and cause assertion failures.
 		 *
-		 * This gives 137537 points in total.
+		 * This gives 137473 points in total.
 		 */
 
-		i = g_random_int_range (0, 137537);
+		i = g_random_int_range (0, 137473);
 
 		if (i < 6400) {
 			/* Private Use Area */
-			return 0xE000 + i;
+			output = 0xE000 + i;
+			goto done;
 		}
 
 		i -= 6400;
 
 		if (i < 65536) {
 			/* Supplementary Private Use Area A */
-			return 0xF0000 + i;
+			output = 0xF0000 + i;
+			goto done;
 		}
 
 		i -= 65536;
 
 		if (i < 65536) {
 			/* Supplementary Private Use Area B */
-			return 0x100000 + i;
-		}
-
-		i -= 65536;
-
-		if (i < 32) {
-			/* Noncharacters (1) */
-			return ((i / 2) + 1) * 0x10000 - 1 - (i % 2);
-		}
-
-		i -= 32;
-
-		if (i < 32) {
-			/* Noncharacters (2) */
-			return 0xFDD0 + i;
+			output = 0x100000 + i;
+			goto done;
 		}
 
 		/* Replacement Character */
-		return 0xFFFD;
+		output = 0xFFFD;
+		goto done;
 	}
+
+done:
+	/* Sanity check. */
+	g_assert (g_unichar_validate (output) == TRUE);
+
+	return output;
 }
 
 static gchar *
