@@ -90,7 +90,7 @@ object at /org/freedesktop/Telepathy/ConnectionManager/cmname, org.freedesktop.T
 	}
 }
 
-object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freedesktop.Telepathy.Connection.cmname.proto.account implements org.freedesktop.Telepathy.Connection, org.freedesktop.Telepathy.Connection.Interface.Contacts, org.freedesktop.Telepathy.Connection.Interface.Requests, org.freedesktop.Telepathy.Connection.Interface.Aliasing, org.freedesktop.Telepathy.Connection.Interface.Avatars, org.freedesktop.Telepathy.Connection.Interface.SimplePresence, org.freedesktop.Telepathy.Connection.Interface.ContactCapabilities {
+object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freedesktop.Telepathy.Connection.cmname.proto.account implements org.freedesktop.Telepathy.Connection, org.freedesktop.Telepathy.Connection.Interface.Contacts, org.freedesktop.Telepathy.Connection.Interface.Requests, org.freedesktop.Telepathy.Connection.Interface.Aliasing, org.freedesktop.Telepathy.Connection.Interface.Avatars, org.freedesktop.Telepathy.Connection.Interface.SimplePresence, org.freedesktop.Telepathy.Connection.Interface.ContactCapabilities, org.freedesktop.Telepathy.Connection.Interface.ContactInfo {
 	data {
 		/* Properties */
 		Interfaces = @as [
@@ -101,6 +101,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 			"org.freedesktop.Telepathy.Connection.Interface.Avatars",
 			"org.freedesktop.Telepathy.Connection.Interface.SimplePresence",
 			"org.freedesktop.Telepathy.Connection.Interface.ContactCapabilities",
+			"org.freedesktop.Telepathy.Connection.Interface.ContactInfo",
 		];
 		SelfHandle = 1u;
 		Status = 0u;
@@ -113,6 +114,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 			"org.freedesktop.Telepathy.Connection.Interface.Avatars",
 			"org.freedesktop.Telepathy.Connection.Interface.SimplePresence",
 			"org.freedesktop.Telepathy.Connection.Interface.ContactCapabilities",
+			"org.freedesktop.Telepathy.Connection.Interface.ContactInfo",
 		];
 
 		/* Conn.I.Requests. */
@@ -136,6 +138,19 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 			"available" : (2u, true, true),
 		}?;
 		MaximumStatusMessageLength = 100u?;
+
+		/* Conn.I.ContactInfo */
+		ContactInfoFlags = 1u?; /* Can_Set */
+		SupportedFields = [
+			("tel", ["type=home"]?, 1u?, 1u?),
+			("tel", ["type=cell"]?, 1u?, 1u?),
+			("adr", @as []?, 1u?, 1u?),
+			("bday", @as []?, 1u?, 1u?),
+			("email", ["type=internet"]?, 1u?, 1u?),
+			("fn", @as []?, 1u?, 1u?),
+			("org", @as []?, 1u?, 1u?),
+			("url", ["type=home"]?, 1u?, 1u?),
+		]?;
 	}
 
 	states {
@@ -169,6 +184,15 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 					"org.freedesktop.Telepathy.somethingelse",
 				]?,
 			)]?>,
+			"org.freedesktop.Telepathy.Connection.Interface.ContactInfo/info" : <[
+				("fn", @as []?, ["Wee Ninja"]?),
+				("org", @as []?, ["Collabora, Ltd.", "Management Division", "Human Resources; Company Policy Enforcement"]?),
+				("adr", ["type=work", "type=postal", "type=parcel"]?, ["", "", "11 Kings Parade", "Cambridge", "Cambridgeshire", "CB2 1SJ", "UK"]?),
+				("tel", ["type=voice", "type=work"]?, ["+44 1223 362967"]?),
+				("bday", @as []?, ["2000-01-01"]?),
+				("email", ["type=work"]?, ["foo@example.baz"]?),
+				("url", ["type=home"]?, ["http://example.com/"]?),
+			]?>,
 			#[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z0-9_][a-zA-Z0-9]*(\.[a-zA-Z0-9_][a-zA-Z0-9]*)*# : <""?>,
 			/* etc. */
 		}?);
@@ -263,6 +287,18 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 				"org.freedesktop.Telepathy.somethingelse",
 			]?,
 		)]?));
+	}
+
+	transition inside Connected on random {
+		emit ContactInfoChanged (0u?, [
+			("fn", @as []?, ["Wee Ninja"]?),
+			("org", @as []?, ["Collabora, Ltd.", "Management Division", "Human Resources; Company Policy Enforcement"]?),
+			("adr", ["type=work", "type=postal", "type=parcel"]?, ["", "", "11 Kings Parade", "Cambridge", "Cambridgeshire", "CB2 1SJ", "UK"]?),
+			("tel", ["type=voice", "type=work"]?, ["+44 1223 362967"]?),
+			("bday", @as []?, ["2000-01-01"]?),
+			("email", ["type=work"]?, ["foo@example.baz"]?),
+			("url", ["type=home"]?, ["http://example.com/"]?),
+		]?);
 	}
 }
 
