@@ -845,13 +845,11 @@ dfsm_ast_data_structure_set_weight (DfsmAstDataStructure *self, gdouble weight)
 			case DFSM_AST_DATA_SIGNATURE:
 			case DFSM_AST_DATA_ARRAY:
 			case DFSM_AST_DATA_DICT:
+			case DFSM_AST_DATA_VARIANT:
 				/* No problems with fuzzing these. */
 				break;
 			case DFSM_AST_DATA_STRUCT:
 				g_warning (_("Can't fuzz structures. Ignoring the indication to fuzz %p."), self);
-				return;
-			case DFSM_AST_DATA_VARIANT:
-				g_warning (_("Can't fuzz variants. Ignoring the indication to fuzz %p."), self);
 				return;
 			case DFSM_AST_DATA_UNIX_FD:
 				g_warning (_("Can't fuzz Unix FDs. Ignoring the indication to fuzz %p."), self);
@@ -1909,20 +1907,44 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 			return g_variant_ref_sink (g_variant_builder_end (&builder));
 		}
 		case DFSM_AST_DATA_VARIANT: {
-			GVariant *expr_value, *variant_value;
+			GVariant *default_child_value, *child_value, *variant_value;
 			GError *child_error = NULL;
 
-			/* Note: Fuzzing variants doesn't make sense, so we ignore any fuzzing here. */
+			/* Fuzzing for variants can only be done in one way: fuzzing the type of the variant's value.
+			 *  • Changing the type of the variant's value happens with probability 0.2.
+			 *  • The value remains unchanged (i.e. with its default type) with probability 0.8.
+			 *
+			 * In the first case, we just choose the first basic type which isn't the default value's type. It's too complex and
+			 * time-intensive to compute random values of arbitrary type, especially since the client code which unpacks the variant
+			 * will almost certainly either handle all variant types, or only the one it's expecting. (So to test it, we just need to
+			 * choose a variant type it wasn't expecting; i.e. any type other than the default value's type.)
+			 *
+			 * In the second case, fuzzing of the default value itself is performed by marking the default value as fuzzable, rather
+			 * than by marking the enclosing variant as fuzzable. */
 
-			expr_value = dfsm_ast_expression_evaluate (priv->variant_val, environment, &child_error);
+			default_child_value = dfsm_ast_expression_evaluate (priv->variant_val, environment, &child_error);
 
 			if (child_error != NULL) {
 				g_propagate_error (error, child_error);
 				return NULL;
 			}
 
-			variant_value = g_variant_ref_sink (g_variant_new_variant (expr_value));
-			g_variant_unref (expr_value);
+			if (should_be_fuzzed (self) == TRUE && g_random_int () < G_MAXUINT32 * 0.2) {
+				/* Choose an arbitrary type and generate a value for it. See explanation above. */
+				if (g_variant_type_equal (g_variant_get_type (default_child_value), G_VARIANT_TYPE_UINT32) == TRUE) {
+					child_value = g_variant_ref_sink (g_variant_new_string (fuzz_string ("")));
+				} else {
+					child_value = g_variant_ref_sink (g_variant_new_uint32 (fuzz_unsigned_int (0, 0, G_MAXUINT32)));
+				}
+			} else {
+				/* Leave the value unchanged. */
+				child_value = g_variant_ref (default_child_value);
+			}
+
+			variant_value = g_variant_ref_sink (g_variant_new_variant (child_value));
+
+			g_variant_unref (child_value);
+			g_variant_unref (default_child_value);
 
 			return variant_value;
 		}
