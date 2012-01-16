@@ -62,6 +62,8 @@ dfsm_sources = \
 	dfsm/dfsm-ast-variable.h \
 	dfsm/dfsm-parser.c \
 	dfsm/dfsm-parser-internal.h \
+	dfsm/dfsm-probabilities.c \
+	dfsm/dfsm-probabilities.h \
 	dfsm/dfsm-machine.c \
 	dfsm/dfsm-object.c \
 	dfsm/dfsm-environment.c \

@@ -29,6 +29,7 @@
 #include "dfsm-ast-variable.h"
 #include "dfsm-parser.h"
 #include "dfsm-parser-internal.h"
+#include "dfsm-probabilities.h"
 
 static void dfsm_ast_data_structure_finalize (GObject *object);
 static void dfsm_ast_data_structure_sanity_check (DfsmAstNode *node);
@@ -929,97 +930,87 @@ should_be_fuzzed (DfsmAstDataStructure *self)
 static gint64
 fuzz_signed_int (gint64 default_value, gint64 min_value, gint64 max_value)
 {
-	guint32 distribution;
-
 	g_assert (min_value <= default_value && default_value <= max_value);
 
-	/* We use a non-uniform distribution for this:
-	 *  • With probability 0.3 we get a number in the range [-5, 5].
-	 *  • With probability 0.3 we keep our default value.
-	 *  • With probability 0.1 we choose a boundary number for the given range.
-	 *  • With probability 0.3 we take a random integer in the given range.
-	 */
-
-	distribution = g_random_int ();
-
-	if (distribution <= G_MAXUINT32 * 0.3) {
-		/* Number in the range [-5, 5]. */
-		return g_random_int_range (-5, 6);
-	} else if (distribution <= G_MAXUINT32 * 0.6) {
-		/* Default value. */
-		return default_value;
-	} else if (distribution <= G_MAXUINT32 * 0.7) {
-		/* Boundary number. */
-		if (g_random_boolean () == TRUE) {
-			/* Lower boundary. */
-			return min_value;
-		} else {
-			/* Upper boundary. */
-			return max_value;
-		}
-	} else {
-		/* Random int in the given range. If the range is large, we'll have to combine a g_random_int() call with a coin toss to determine
-		 * the sign, since g_random_int() only returns 32-bit integers. */
-		if (min_value >= G_MININT32 && max_value <= G_MAXINT32) {
-			return g_random_int_range (min_value, max_value);
-		} else {
-			g_assert (min_value == G_MININT64 && max_value == G_MAXINT64);
-
+	DFSM_NONUNIFORM_DISTRIBUTION (4,
+		SMALL_RANGE, 0.3, /* a number in the range [-5, 5] */
+		DEFAULT, 0.3, /* keep our default value */
+		BOUNDARY, 0.1, /* a boundary number for the given range */
+		LARGE_RANGE, 0.3 /* a random integer in the given range */
+	)
+		case SMALL_RANGE:
+			/* Number in the range [-5, 5]. */
+			return g_random_int_range (-5, 6);
+		case DEFAULT:
+			/* Default value. */
+			return default_value;
+		case BOUNDARY:
+			/* Boundary number. */
 			if (g_random_boolean () == TRUE) {
-				return g_random_int ();
+				/* Lower boundary. */
+				return min_value;
 			} else {
-				return (-1) - g_random_int (); /* shift it down by 1 so we don't cover 0 twice */
+				/* Upper boundary. */
+				return max_value;
 			}
-		}
-	}
+		case LARGE_RANGE:
+			/* Random int in the given range. If the range is large, we'll have to combine a g_random_int() call with a coin toss to
+			 * determine the sign, since g_random_int() only returns 32-bit integers. */
+			if (min_value >= G_MININT32 && max_value <= G_MAXINT32) {
+				return g_random_int_range (min_value, max_value);
+			} else {
+				g_assert (min_value == G_MININT64 && max_value == G_MAXINT64);
+
+				if (g_random_boolean () == TRUE) {
+					return g_random_int ();
+				} else {
+					return (-1) - g_random_int (); /* shift it down by 1 so we don't cover 0 twice */
+				}
+			}
+	DFSM_NONUNIFORM_DISTRIBUTION_END
 }
 
 static guint64
 fuzz_unsigned_int (guint64 default_value, guint64 min_value, guint64 max_value)
 {
-	guint32 distribution;
-
 	g_assert (min_value <= default_value && default_value <= max_value);
 
-	/* We use a non-uniform distribution for this:
-	 *  • With probability 0.3 we get a number in the range [0, 10].
-	 *  • With probability 0.3 we keep our default value.
-	 *  • With probability 0.1 we choose a boundary number for the given range.
-	 *  • With probability 0.3 we take a random integer in the given range.
-	 */
+	DFSM_NONUNIFORM_DISTRIBUTION (4,
+		SMALL_RANGE, 0.3, /* a number in the range [0, 10] */
+		DEFAULT, 0.3, /* keep our default value */
+		BOUNDARY, 0.1, /* a boundary number for the given range */
+		LARGE_RANGE, 0.3 /* a random integer in the given range */
+	)
+		case SMALL_RANGE:
+			/* Number in the range [0, 10]. */
+			return g_random_int_range (0, 11);
+		case DEFAULT:
+			/* Default value. */
+			return default_value;
+		case BOUNDARY:
+			/* Boundary number. */
+			if (g_random_boolean () == TRUE) {
+				/* Lower boundary. */
+				return min_value;
+			} else {
+				/* Upper boundary. */
+				return max_value;
+			}
+		case LARGE_RANGE:
+			/* Random int in the given range. If the range is large, we'll have to combine two g_random_int() calls to get a 64-bit integer,
+			 * since g_random_int() only returns 32-bit integers. */
+			if (/*min_value >= 0 && */ max_value <= G_MAXINT32) {
+				return g_random_int_range (min_value, max_value);
+			} else if (/*min_value >= 0 && */ max_value <= G_MAXUINT32) {
+				g_assert (min_value == 0 && max_value == G_MAXUINT32);
 
-	distribution = g_random_int ();
+				return g_random_int ();
+			} else {
+				g_assert (min_value == 0 && max_value == G_MAXUINT64);
 
-	if (distribution <= G_MAXUINT32 * 0.3) {
-		/* Number in the range [0, 10]. */
-		return g_random_int_range (0, 11);
-	} else if (distribution <= G_MAXUINT32 * 0.6) {
-		/* Default value. */
-		return default_value;
-	} else if (distribution <= G_MAXUINT32 * 0.7) {
-		/* Boundary number. */
-		if (g_random_boolean () == TRUE) {
-			/* Lower boundary. */
-			return min_value;
-		} else {
-			/* Upper boundary. */
-			return max_value;
-		}
-	} else {
-		/* Random int in the given range. If the range is large, we'll have to combine two g_random_int() calls to get a 64-bit integer,
-		 * since g_random_int() only returns 32-bit integers. */
-		if (/*min_value >= 0 && */ max_value <= G_MAXINT32) {
-			return g_random_int_range (min_value, max_value);
-		} else if (/*min_value >= 0 && */ max_value <= G_MAXUINT32) {
-			g_assert (min_value == 0 && max_value == G_MAXUINT32);
-
-			return g_random_int ();
-		} else {
-			g_assert (min_value == 0 && max_value == G_MAXUINT64);
-
-			return (((guint64) g_random_int () << 32) | (guint64) g_random_int ());
-		}
-	}
+				return (((guint64) g_random_int () << 32) | (guint64) g_random_int ());
+			}
+	DFSM_NONUNIFORM_DISTRIBUTION_END
 }
 
 static void
@@ -1197,73 +1188,74 @@ generate_whitespace (gchar *buffer, gsize whitespace_length)
 static gunichar
 generate_character (void)
 {
-	guint32 distribution;
 	gunichar output;
 
-	/* We use a non-uniform distribution for this.
-	 *  • With probability 0.5 we choose an ASCII character (except NUL).
-	 *  • With probability 0.4 we choose any other valid Unicode character (except NUL).
-	 *  • With probability 0.1 we choose any invalid Unicode character (such as the replacement character).
-	 */
-	distribution = g_random_int ();
+	DFSM_NONUNIFORM_DISTRIBUTION (3,
+		ASCII, 0.5, /* any ASCII character (except NUL) */
+		VALID_UNICODE, 0.4, /* any other valid Unicode character (except NUL) */
+		INVALID_UNICODE, 0.1 /* any invalid Unicode character (such as the replacement character) */
+	)
+		case ASCII:
+			/* ASCII. */
+			output = g_random_int_range (0x01, 0xFF + 1); /* anything except NUL */
 
-	if (distribution < G_MAXUINT32 * 0.5) {
-		/* ASCII. */
-		output = g_random_int_range (0x01, 0xFF + 1); /* anything except NUL */
-	} else if (distribution < G_MAXUINT32 * 0.9) {
-		/* Valid Unicode. It would be impractical to list all assigned and valid code points here such that they all have a uniform
-		 * probability of being chosen. Consequently, we just choose a random code point from planes 0, 1 and 2, and check whether it's
-		 * assigned and valid. If not, we choose another. Note that we never choose NUL. */
-		do {
-			output = g_random_int_range (0x01, 0x2FFFF + 1);
-		} while (g_unichar_isdefined (output) == FALSE || g_unichar_validate (output) == FALSE);
-	} else {
-		guint32 i;
+			break;
+		case VALID_UNICODE:
+			/* Valid Unicode. It would be impractical to list all assigned and valid code points here such that they all have a uniform
+			 * probability of being chosen. Consequently, we just choose a random code point from planes 0, 1 and 2, and check whether it's
+			 * assigned and valid. If not, we choose another. Note that we never choose NUL. */
+			do {
+				output = g_random_int_range (0x01, 0x2FFFF + 1);
+			} while (g_unichar_isdefined (output) == FALSE || g_unichar_validate (output) == FALSE);
 
-		/* Invalid Unicode. We choose code points from:
-		 *  • Private Use Area: U+E000–U+F8FF (6400 points).
-		 *  • Supplementary Private Use Area A: U+F0000–U+FFFFD (65534 points).
-		 *  • Supplementary Private Use Area B: U+100000–U+10FFFD (65534 points).
-		 *  • Replacement Character: U+FFFD (1 point).
-		 *
-		 * We can't choose code points from:
-		 *  • Surrogates Area: U+D800–U+DFFF (2048 points).
-		 *  • Noncharacters: U+FFFE, U+FFFF, U+1FFFE, U+1FFFF, …, U+10FFFE, U+10FFFF; U+FDD0–U+FDEF (64 points).
-		 * because g_utf8_validate() will reject them and cause assertion failures.
-		 *
-		 * This gives 137469 points in total.
-		 */
+			break;
+		case INVALID_UNICODE: {
+			guint32 i;
 
-		i = g_random_int_range (0, 137469);
+			/* Invalid Unicode. We choose code points from:
+			 *  • Private Use Area: U+E000–U+F8FF (6400 points).
+			 *  • Supplementary Private Use Area A: U+F0000–U+FFFFD (65534 points).
+			 *  • Supplementary Private Use Area B: U+100000–U+10FFFD (65534 points).
+			 *  • Replacement Character: U+FFFD (1 point).
+			 *
+			 * We can't choose code points from:
+			 *  • Surrogates Area: U+D800–U+DFFF (2048 points).
+			 *  • Noncharacters: U+FFFE, U+FFFF, U+1FFFE, U+1FFFF, …, U+10FFFE, U+10FFFF; U+FDD0–U+FDEF (64 points).
+			 * because g_utf8_validate() will reject them and cause assertion failures.
+			 *
+			 * This gives 137469 points in total.
+			 */
 
-		if (i < 6400) {
-			/* Private Use Area */
-			output = 0xE000 + i;
-			goto done;
+			i = g_random_int_range (0, 137469);
+
+			if (i < 6400) {
+				/* Private Use Area */
+				output = 0xE000 + i;
+				break;
+			}
+
+			i -= 6400;
+
+			if (i < 65534) {
+				/* Supplementary Private Use Area A */
+				output = 0xF0000 + i;
+				break;
+			}
+
+			i -= 65534;
+
+			if (i < 65534) {
+				/* Supplementary Private Use Area B */
+				output = 0x100000 + i;
+				break;
+			}
+
+			/* Replacement Character */
+			output = 0xFFFD;
+			break;
 		}
+	DFSM_NONUNIFORM_DISTRIBUTION_END
 
-		i -= 6400;
-
-		if (i < 65534) {
-			/* Supplementary Private Use Area A */
-			output = 0xF0000 + i;
-			goto done;
-		}
-
-		i -= 65534;
-
-		if (i < 65534) {
-			/* Supplementary Private Use Area B */
-			output = 0x100000 + i;
-			goto done;
-		}
-
-		/* Replacement Character */
-		output = 0xFFFD;
-		goto done;
-	}
-
-done:
 	/* Sanity check. */
 	g_assert (g_unichar_validate (output) == TRUE);
 
@@ -1273,20 +1265,8 @@ done:
 static gchar *
 fuzz_string (const gchar *default_value)
 {
-	guint32 distribution;
 	gchar *fuzzy_string = NULL;
 	gsize default_value_length, fuzzy_string_length = 0; /* both in bytes */
-
-	/* We use a non-uniform distribution over several possible approaches to fuzzing the string.
-	 *  • With probability 0.1 we change the case of some letters.
-	 *  • With probability 0.3 we replace some letters with random replacements.
-	 *  • With probability 0.1 we delete a random block of text.
-	 *  • With probability 0.2 we overwrite a random block of text with a random replacement.
-	 *  • With probability 0.1 we clone a random block of text to somewhere else in the string.
-	 *  • With probability 0.2 we swap two random blocks of text.
-	 *
-	 * Additionally, and independently, we randomly add whitespace to the start and end of the string with probability 0.2.
-	 */
 
 	default_value_length = strlen (default_value);
 
@@ -1299,7 +1279,7 @@ fuzz_string (const gchar *default_value)
 	 */
 
 	if (default_value_length == 0) {
-		if (g_random_int () < G_MAXUINT32 * 0.4) {
+		if (DFSM_BIASED_COIN_FLIP (0.4)) {
 			/* Generate a string between 1 and 256 characters (not bytes) long (inclusive). */
 			guint32 i;
 			gchar *j;
@@ -1322,45 +1302,75 @@ fuzz_string (const gchar *default_value)
 		goto whitespace;
 	}
 
-	distribution = g_random_int ();
 	g_assert (default_value_length > 0);
 
-	if (distribution < G_MAXUINT32 * 0.1) {
-		guint i;
+	DFSM_NONUNIFORM_DISTRIBUTION (6,
+		CASE_CHANGE, 0.1, /* change the case of some letters */
+		REPLACE_LETTERS, 0.3, /* replace some letters with random replacements */
+		DELETE_BLOCK, 0.1, /* delete a random block of text */
+		OVERWRITE_BLOCK, 0.2, /* overwrite a random block of text with a random replacement */
+		CLONE_BLOCK, 0.1, /* clone a random block of text to somewhere else in the string */
+		SWAP_BLOCKS, 0.2 /* swap two random blocks of text */
+		/* Additionally, and independently, we randomly add whitespace to the start and end of the string with probability 0.2. */
+	)
+		case CASE_CHANGE: {
+			guint i;
 
-		/* Case changing. Note that the probability of changing any given character position is ill-defined because it's dependent on the
-		 * indices of the previously flipped characters, and also whether the character in question is ASCII. */
-		fuzzy_string = g_strdup (default_value);
-		fuzzy_string_length = default_value_length;
+			/* Case changing. Note that the probability of changing any given character position is ill-defined because it's dependent on
+			 * the indices of the previously flipped characters, and also whether the character in question is ASCII. */
+			fuzzy_string = g_strdup (default_value);
+			fuzzy_string_length = default_value_length;
 
-		i = g_random_int_range (0, fuzzy_string_length + 1);
+			i = g_random_int_range (0, fuzzy_string_length + 1);
 
-		while (i < fuzzy_string_length) {
-			if (g_ascii_isupper (fuzzy_string[i]) == TRUE) {
-				fuzzy_string[i] = g_ascii_tolower (fuzzy_string[i]);
-			} else if (g_ascii_islower (fuzzy_string[i]) == TRUE) {
-				fuzzy_string[i] = g_ascii_toupper (fuzzy_string[i]);
+			while (i < fuzzy_string_length) {
+				if (g_ascii_isupper (fuzzy_string[i]) == TRUE) {
+					fuzzy_string[i] = g_ascii_tolower (fuzzy_string[i]);
+				} else if (g_ascii_islower (fuzzy_string[i]) == TRUE) {
+					fuzzy_string[i] = g_ascii_toupper (fuzzy_string[i]);
+				}
+
+				i += g_random_int_range (i + 1, fuzzy_string_length + 1);
 			}
 
-			i += g_random_int_range (i + 1, fuzzy_string_length + 1);
+			break;
 		}
-	} else if (distribution < G_MAXUINT32 * 0.4) {
-		guint old_i, i, j;
-		glong default_value_length_unicode;
-		gchar *temp;
+		case REPLACE_LETTERS: {
+			guint old_i, i, j;
+			glong default_value_length_unicode;
+			gchar *temp;
 
-		/* Letter replacement. As with case changing, the probability of replacing any given character position is ill-defined because it's
-		 * dependent on the indices of the previously replaced characters. Note that we have to perform this operation in terms of Unicode
-		 * characters, rather than bytes. */
-		default_value_length_unicode = g_utf8_strlen (default_value, -1);
-		fuzzy_string = g_malloc (default_value_length_unicode * 6 /* max. byte length of a UTF-8 character */ + 1);
-		temp = fuzzy_string;
+			/* Letter replacement. As with case changing, the probability of replacing any given character position is ill-defined because
+			 * it's dependent on the indices of the previously replaced characters. Note that we have to perform this operation in terms
+			 * of Unicode characters, rather than bytes. */
+			default_value_length_unicode = g_utf8_strlen (default_value, -1);
+			fuzzy_string = g_malloc (default_value_length_unicode * 6 /* max. byte length of a UTF-8 character */ + 1);
+			temp = fuzzy_string;
 
-		old_i = 0;
-		i = g_random_int_range (0, default_value_length_unicode + 1);
+			old_i = 0;
+			i = g_random_int_range (0, default_value_length_unicode + 1);
 
-		while (i < default_value_length_unicode) {
-			/* Copy the chunk between the previously replaced character and the next character to replace (at character offset i). */
+			while (i < default_value_length_unicode) {
+				/* Copy the chunk between the previously replaced character and the next character to replace
+				 * (at character offset i). */
+				for (j = old_i; j < i; j++) {
+					const gchar *next_char = g_utf8_find_next_char (default_value, NULL);
+
+					while (default_value < next_char) {
+						*(temp++) = *(default_value++);
+					}
+				}
+
+				/* Replace character i. */
+				temp += g_unichar_to_utf8 (generate_character (), temp);
+				default_value = g_utf8_next_char (default_value);
+
+				/* Choose the next character to replace. */
+				old_i = i + 1;
+				i = g_random_int_range (old_i, default_value_length_unicode + 1);
+			}
+
+			/* Copy the final chunk. */
 			for (j = old_i; j < i; j++) {
 				const gchar *next_char = g_utf8_find_next_char (default_value, NULL);
 
@@ -1369,142 +1379,141 @@ fuzz_string (const gchar *default_value)
 				}
 			}
 
-			/* Replace character i. */
-			temp += g_unichar_to_utf8 (generate_character (), temp);
-			default_value = g_utf8_next_char (default_value);
+			*temp = '\0';
 
-			/* Choose the next character to replace. */
-			old_i = i + 1;
-			i = g_random_int_range (old_i, default_value_length_unicode + 1);
+			fuzzy_string_length = temp - fuzzy_string;
+
+			break;
 		}
+		case DELETE_BLOCK: {
+			const gchar *block_start, *block_end;
+			gsize block_length;
 
-		/* Copy the final chunk. */
-		for (j = old_i; j < i; j++) {
-			const gchar *next_char = g_utf8_find_next_char (default_value, NULL);
+			/* Block deletion. Find a random block and build a new string which doesn't include it. */
+			block_length = find_random_block (default_value, default_value_length, &block_start, &block_end);
 
-			while (default_value < next_char) {
-				*(temp++) = *(default_value++);
-			}
+			fuzzy_string_length = default_value_length - block_length;
+			fuzzy_string = g_malloc (fuzzy_string_length + 1);
+
+			strncpy (fuzzy_string, default_value, block_start - default_value);
+			strncpy (fuzzy_string + (block_start - default_value), block_end, default_value + default_value_length - block_end);
+			fuzzy_string[fuzzy_string_length] = '\0';
+
+			break;
 		}
+		case OVERWRITE_BLOCK: {
+			gchar *block_start, *block_end, *i;
 
-		*temp = '\0';
+			/* Block overwriting. Find a random block and build a new string which replaces it with the same number of bytes. */
+			fuzzy_string = g_strdup (default_value);
+			fuzzy_string_length = default_value_length;
 
-		fuzzy_string_length = temp - fuzzy_string;
-	} else if (distribution < G_MAXUINT32 * 0.5) {
-		const gchar *block_start, *block_end;
-		gsize block_length;
+			find_random_block (fuzzy_string, fuzzy_string_length, (const gchar**) &block_start, (const gchar**) &block_end);
 
-		/* Block deletion. Find a random block and build a new string which doesn't include it. */
-		block_length = find_random_block (default_value, default_value_length, &block_start, &block_end);
-
-		fuzzy_string_length = default_value_length - block_length;
-		fuzzy_string = g_malloc (fuzzy_string_length + 1);
-
-		strncpy (fuzzy_string, default_value, block_start - default_value);
-		strncpy (fuzzy_string + (block_start - default_value), block_end, default_value + default_value_length - block_end);
-		fuzzy_string[fuzzy_string_length] = '\0';
-	} else if (distribution < G_MAXUINT32 * 0.7) {
-		gchar *block_start, *block_end, *i;
-
-		/* Block overwriting. Find a random block and build a new string which replaces it with the same number of bytes. */
-		fuzzy_string = g_strdup (default_value);
-		fuzzy_string_length = default_value_length;
-
-		find_random_block (fuzzy_string, fuzzy_string_length, (const gchar**) &block_start, (const gchar**) &block_end);
-
-		for (i = block_start; i + 8 <= block_end;) {
-			*(i++) = 'd';
-			*(i++) = 'e';
-			*(i++) = 'a';
-			*(i++) = 'd';
-			*(i++) = 'b';
-			*(i++) = 'e';
-			*(i++) = 'e';
-			*(i++) = 'f';
-		}
-
-		switch (block_end - i) {
-			case 7:
+			for (i = block_start; i + 8 <= block_end;) {
+				*(i++) = 'd';
+				*(i++) = 'e';
+				*(i++) = 'a';
+				*(i++) = 'd';
+				*(i++) = 'b';
+				*(i++) = 'e';
+				*(i++) = 'e';
 				*(i++) = 'f';
-			case 6:
-				*(i++) = 'u';
-			case 5:
-				*(i++) = 'z';
-			case 4:
-				*(i++) = 'z';
-			case 3:
-				*(i++) = 'i';
-			case 2:
-				*(i++) = 'n';
-			case 1:
-				*(i++) = 'g';
-			case 0:
-				/* Don't potentially overwrite the nul terminator */
-				break;
-			default:
-				g_assert_not_reached ();
+			}
+
+			switch (block_end - i) {
+				case 7:
+					*(i++) = 'f';
+				case 6:
+					*(i++) = 'u';
+				case 5:
+					*(i++) = 'z';
+				case 4:
+					*(i++) = 'z';
+				case 3:
+					*(i++) = 'i';
+				case 2:
+					*(i++) = 'n';
+				case 1:
+					*(i++) = 'g';
+				case 0:
+					/* Don't potentially overwrite the nul terminator */
+					break;
+				default:
+					g_assert_not_reached ();
+			}
+
+			break;
 		}
-	} else if (distribution < G_MAXUINT32 * 0.8) {
-		const gchar *block_start, *block_end;
-		gsize block_length;
+		case CLONE_BLOCK: {
+			const gchar *block_start, *block_end;
+			gsize block_length;
 
-		/* Block cloning. Find a random block and clone it in the same position. */
-		block_length = find_random_block (default_value, default_value_length, &block_start, &block_end);
+			/* Block cloning. Find a random block and clone it in the same position. */
+			block_length = find_random_block (default_value, default_value_length, &block_start, &block_end);
 
-		fuzzy_string_length = default_value_length + block_length;
-		fuzzy_string = g_malloc (fuzzy_string_length + 1);
+			fuzzy_string_length = default_value_length + block_length;
+			fuzzy_string = g_malloc (fuzzy_string_length + 1);
 
-		strncpy (fuzzy_string, default_value, block_end - default_value);
-		strncpy (fuzzy_string + (block_end - default_value), block_start, block_length);
-		strncpy (fuzzy_string + (block_end - default_value) + block_length, block_end, default_value + default_value_length - block_end);
-		fuzzy_string[fuzzy_string_length] = '\0';
-	} else {
-		const gchar *block1_start, *block2_start, *block1_end, *block2_end;
-		gchar *i;
-		gsize block1_length, block2_length;
+			strncpy (fuzzy_string, default_value, block_end - default_value);
+			strncpy (fuzzy_string + (block_end - default_value), block_start, block_length);
+			strncpy (fuzzy_string + (block_end - default_value) + block_length, block_end,
+			         default_value + default_value_length - block_end);
+			fuzzy_string[fuzzy_string_length] = '\0';
 
-		/* Block swapping. Find two random blocks and swap them. We have to be careful to make sure they don't overlap, so we take the
-		 * second block from the larger of the remaining portions after choosing the first block. */
-		block1_length = find_random_block (default_value, default_value_length, &block1_start, &block1_end);
-
-		if (block1_start - default_value > default_value + default_value_length - block1_end) {
-			const gchar *temp_start, *temp_end;
-			gsize temp_length;
-
-			temp_length = find_random_block (default_value, block1_start - default_value, &temp_start, &temp_end);
-
-			/* Ensure block1 is always < block2. */
-			block2_start = block1_start;
-			block2_end = block1_end;
-			block2_length = block1_length;
-			block1_start = temp_start;
-			block1_end = temp_end;
-			block1_length = temp_length;
-		} else {
-			block2_length = find_random_block (block1_end, default_value + default_value_length - block1_end, &block2_start, &block2_end);
+			break;
 		}
+		case SWAP_BLOCKS: {
+			const gchar *block1_start, *block2_start, *block1_end, *block2_end;
+			gchar *i;
+			gsize block1_length, block2_length;
 
-		/* Build the output string. */
-		fuzzy_string_length = default_value_length;
-		fuzzy_string = g_malloc (fuzzy_string_length + 1);
-		i = fuzzy_string;
+			/* Block swapping. Find two random blocks and swap them. We have to be careful to make sure they don't overlap, so we take the
+			 * second block from the larger of the remaining portions after choosing the first block. */
+			block1_length = find_random_block (default_value, default_value_length, &block1_start, &block1_end);
 
-		strncpy (i, default_value, block1_start - default_value);
-		i += block1_start - default_value;
-		strncpy (i, block2_start, block2_length);
-		i += block2_length;
-		strncpy (i, block1_end, block2_start - block1_end);
-		i += block2_start - block1_end;
-		strncpy (i, block1_start, block1_length);
-		i += block1_length;
-		strncpy (i, block2_end, default_value + default_value_length - block2_end);
+			if (block1_start - default_value > default_value + default_value_length - block1_end) {
+				const gchar *temp_start, *temp_end;
+				gsize temp_length;
 
-		fuzzy_string[fuzzy_string_length] = '\0';
-	}
+				temp_length = find_random_block (default_value, block1_start - default_value, &temp_start, &temp_end);
+
+				/* Ensure block1 is always < block2. */
+				block2_start = block1_start;
+				block2_end = block1_end;
+				block2_length = block1_length;
+				block1_start = temp_start;
+				block1_end = temp_end;
+				block1_length = temp_length;
+			} else {
+				block2_length = find_random_block (block1_end, default_value + default_value_length - block1_end,
+				                                   &block2_start, &block2_end);
+			}
+
+			/* Build the output string. */
+			fuzzy_string_length = default_value_length;
+			fuzzy_string = g_malloc (fuzzy_string_length + 1);
+			i = fuzzy_string;
+
+			strncpy (i, default_value, block1_start - default_value);
+			i += block1_start - default_value;
+			strncpy (i, block2_start, block2_length);
+			i += block2_length;
+			strncpy (i, block1_end, block2_start - block1_end);
+			i += block2_start - block1_end;
+			strncpy (i, block1_start, block1_length);
+			i += block1_length;
+			strncpy (i, block2_end, default_value + default_value_length - block2_end);
+
+			fuzzy_string[fuzzy_string_length] = '\0';
+
+			break;
+		}
+	DFSM_NONUNIFORM_DISTRIBUTION_END
 
 whitespace:
 	/* Whitespace addition. */
-	if (g_random_int () < G_MAXUINT32 * 0.2) {
+	if (DFSM_BIASED_COIN_FLIP (0.2)) {
 		gchar *temp;
 		gsize prefix_length = 0, suffix_length = 0;
 
@@ -1625,13 +1634,16 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 			gboolean boolean_val = priv->boolean_val;
 
 			if (should_be_fuzzed (self) == TRUE) {
-				/* We use a non-uniform distribution for this:
-				 *  • With probability 0.6 we keep the default value.
-				 *  • With probability 0.4 we flip it.
-				 */
-				if (g_random_int () > G_MAXUINT32 * 0.6) {
-					boolean_val = !boolean_val;
-				}
+				DFSM_NONUNIFORM_DISTRIBUTION (2,
+					DEFAULT, 0.6, /* keep the default value */
+					FLIP, 0.4 /* flip the default value */
+				)
+					case DEFAULT:
+						break;
+					case FLIP:
+						boolean_val = !boolean_val;
+						break;
+				DFSM_NONUNIFORM_DISTRIBUTION_END
 			}
 
 			return g_variant_ref_sink (g_variant_new_boolean (boolean_val));
@@ -1694,26 +1706,24 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 			gdouble double_val = priv->double_val;
 
 			if (should_be_fuzzed (self) == TRUE) {
-				guint32 distribution;
-
-				/* We use a non-uniform distribution for this:
-				 *  • With probability 0.3 we get a number in the range [-5.0, 5.0).
-				 *  • With probability 0.3 we keep our default value.
-				 *  • With probability 0.4 we take a random double in the given range.
-				 */
-
-				distribution = g_random_int ();
-
-				if (distribution <= G_MAXUINT32 * 0.3) {
-					/* Number in the range [-5.0, 5.0). */
-					double_val = g_random_double_range (-5.0, 5.0);
-				} else if (distribution <= G_MAXUINT32 * 0.6) {
-					/* Default value. */
-					double_val = priv->double_val;
-				} else {
-					/* Random double in the maximum range. */
-					double_val = g_random_double_range (-G_MAXDOUBLE, G_MAXDOUBLE);
-				}
+				DFSM_NONUNIFORM_DISTRIBUTION (3,
+					SMALL_RANGE, 0.3, /* a number in the range [-5.0, 5.0) */
+					DEFAULT, 0.3, /* keep our default value */
+					LARGE_RANGE, 0.4 /* a random double in the given range */
+				)
+					case SMALL_RANGE:
+						/* Number in the range [-5.0, 5.0). */
+						double_val = g_random_double_range (-5.0, 5.0);
+						break;
+					case DEFAULT:
+						/* Default value. */
+						double_val = priv->double_val;
+						break;
+					case LARGE_RANGE:
+						/* Random double in the maximum range. */
+						double_val = g_random_double_range (-G_MAXDOUBLE, G_MAXDOUBLE);
+						break;
+				DFSM_NONUNIFORM_DISTRIBUTION_END
 			}
 
 			return g_variant_ref_sink (g_variant_new_double (double_val));
@@ -1806,7 +1816,7 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 			g_variant_type_free (data_structure_type);
 
 			/* Delete all entries? */
-			effective_array_length = (should_be_fuzzed (self) == FALSE || g_random_int () >= G_MAXUINT32 * 0.05) ? priv->array_val->len : 0;
+			effective_array_length = (should_be_fuzzed (self) == FALSE || DFSM_BIASED_COIN_FLIP (0.95)) ? priv->array_val->len : 0;
 
 			for (i = 0; i < effective_array_length; i++) {
 				GVariant *child_value;
@@ -1819,7 +1829,7 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 				child_expression_weight = MAX (1.0, dfsm_ast_expression_calculate_weight (child_expression));
 
 				/* Delete this element? */
-				if (should_be_fuzzed (self) && g_random_int () < G_MAXUINT32 * MIN (1.0, 0.2 * child_expression_weight)) {
+				if (should_be_fuzzed (self) && DFSM_BIASED_COIN_FLIP (0.2 * child_expression_weight)) {
 					continue;
 				}
 
@@ -1838,7 +1848,7 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 				g_variant_builder_add_value (&builder, child_value);
 
 				/* Clone this element? */
-				if (should_be_fuzzed (self) && g_random_int () < G_MAXUINT32 * MIN (1.0, 0.2 * child_expression_weight)) {
+				if (should_be_fuzzed (self) && DFSM_BIASED_COIN_FLIP (0.2 * child_expression_weight)) {
 					g_variant_builder_add_value (&builder, child_value);
 				}
 
@@ -1846,7 +1856,7 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 
 				/* Clone and mutate the element?  We can only do this if the child expression is a data structure expression. */
 				if (should_be_fuzzed (self) && DFSM_IS_AST_EXPRESSION_DATA_STRUCTURE (child_expression) &&
-				    g_random_int () < G_MAXUINT32 * MIN (1.0, 0.4 * child_expression_weight)) {
+				    DFSM_BIASED_COIN_FLIP (0.4 * child_expression_weight)) {
 					DfsmAstDataStructure *child_data_structure;
 
 					child_data_structure =
@@ -1929,7 +1939,7 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 				return NULL;
 			}
 
-			if (should_be_fuzzed (self) == TRUE && g_random_int () < G_MAXUINT32 * 0.2) {
+			if (should_be_fuzzed (self) == TRUE && DFSM_BIASED_COIN_FLIP (0.2)) {
 				/* Choose an arbitrary type and generate a value for it. See explanation above. */
 				if (g_variant_type_equal (g_variant_get_type (default_child_value), G_VARIANT_TYPE_UINT32) == TRUE) {
 					child_value = g_variant_ref_sink (g_variant_new_string (fuzz_string ("")));
@@ -1970,7 +1980,7 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 			g_variant_builder_init (&builder, data_structure_type);
 
 			/* Delete all entries? */
-			effective_dict_length = (should_be_fuzzed (self) == FALSE || g_random_int () >= G_MAXUINT32 * 0.05) ? priv->dict_val->len : 0;
+			effective_dict_length = (should_be_fuzzed (self) == FALSE || DFSM_BIASED_COIN_FLIP (0.95)) ? priv->dict_val->len : 0;
 
 			for (i = 0; i < effective_dict_length; i++) {
 				GVariant *key_value, *value_value;
@@ -1986,7 +1996,7 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 				value_weight = MAX (1.0, dfsm_ast_expression_calculate_weight (dict_entry->value));
 
 				/* Delete this entry? */
-				if (should_be_fuzzed (self) && g_random_int () < G_MAXUINT32 * MIN (1.0, 0.2 * key_weight)) {
+				if (should_be_fuzzed (self) && DFSM_BIASED_COIN_FLIP (0.2 * key_weight)) {
 					continue;
 				}
 
@@ -2022,7 +2032,7 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 				/* Clone and mutate the entry?  We can only do this if the child expressions are data structure expressions. */
 				if (should_be_fuzzed (self) && DFSM_IS_AST_EXPRESSION_DATA_STRUCTURE (dict_entry->key) &&
 				    DFSM_IS_AST_EXPRESSION_DATA_STRUCTURE (dict_entry->value) &&
-				    g_random_int () < G_MAXUINT32 * MIN (1.0, 0.6 * key_weight)) {
+				    DFSM_BIASED_COIN_FLIP (0.6 * key_weight)) {
 					DfsmAstDataStructure *key_data_structure, *value_data_structure;
 
 					key_data_structure =
@@ -2046,7 +2056,7 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 						return NULL;
 					}
 
-					if (g_random_int () < G_MAXUINT32 * MIN (1.0, 0.5 * value_weight)) {
+					if (DFSM_BIASED_COIN_FLIP (0.5 * value_weight)) {
 						/* Mutate the value as well as the key. */
 						g_variant_unref (value_value);
 						value_value = fuzz_data_structure (value_data_structure, environment, &child_error);
