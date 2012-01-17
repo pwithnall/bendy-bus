@@ -1,0 +1,72 @@
+object at /org/gnome/evolution/dataserver/AddressBookFactory, org.gnome.evolution.dataserver.AddressBook1 implements org.gnome.evolution.dataserver.AddressBookFactory {
+	states {
+		Main
+	}
+
+	transition inside Main on method get_book {
+		throw NoSuchBook;
+	}
+
+	transition inside Main on method get_book {
+		/* Why doesn't this have type @o? */
+		reply "/org/gnome/evolution/dataserver/AddressBook/2170/0";
+	}
+}
+
+object at /org/gnome/evolution/dataserver/AddressBook/2170/0 implements org.gnome.evolution.dataserver.AddressBook {
+	data {
+		_opid_counter = 0u;
+	}
+
+	states {
+		Closed;
+		Opening;
+		Authenticated;
+	}
+
+	/* Unsuccessful async open call. */
+	transition inside Closed on method open {
+		throw ArbitraryError;
+	}
+
+	/* Successful async open call with authentication. */
+	transition from Closed to Opening on method open {
+		reply (object->_opid_counter);
+		emit auth_required (["credential1"?, "credential2"?]?);
+	}
+	transition from Opening to Authenticated on method authenticate_user {
+		emit open_done (object->_opid_counter, ""?, ""?);
+
+		object->_opid_counter = object->_opid_counter + 1u;
+		reply ();
+	}
+
+	/* Failed authentication. */
+	transition from Opening to Authenticated on method authenticate_user {
+		throw ArbitraryError;
+	}
+
+	/* Already open. */
+	transition inside Opening, inside Authenticated on method open {
+		emit open_done (object->_opid_counter, ""?, ""?);
+		reply (object->_opid_counter);
+
+		object->_opid_counter = object->_opid_counter + 1u;
+	}
+
+	/* Closing. */
+	transition inside Closed, from Opening to Closed, from Authenticated to Closed on method close {
+		/* Nothing to see here. */
+		reply ();
+	}
+
+	transition inside Closed, inside Opening, inside Authenticated on method close {
+		throw ArbitraryError;
+	}
+
+	/* Arbitrary online/opened/readonly errors. */
+	transition inside Closed, inside Opening, inside Authenticated on random { emit online (true?); }
+	transition inside Closed, inside Opening, inside Authenticated on random { emit opened (["foobar"]?); }
+	transition inside Closed, inside Opening, inside Authenticated on random { emit readonly (false?); }
+	transition inside Closed, inside Opening, inside Authenticated on random { emit backend_property_changed (["key"?, "value"?]?); /* This API is mental */ }
+}

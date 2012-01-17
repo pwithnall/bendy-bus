@@ -1,0 +1,216 @@
+<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
+                      "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+<!-- GDBus 2.30.1 -->
+<node>
+  <interface name="org.freedesktop.DBus.Properties">
+    <method name="Get">
+      <arg type="s" name="interface_name" direction="in"/>
+      <arg type="s" name="property_name" direction="in"/>
+      <arg type="v" name="value" direction="out"/>
+    </method>
+    <method name="GetAll">
+      <arg type="s" name="interface_name" direction="in"/>
+      <arg type="a{sv}" name="properties" direction="out"/>
+    </method>
+    <method name="Set">
+      <arg type="s" name="interface_name" direction="in"/>
+      <arg type="s" name="property_name" direction="in"/>
+      <arg type="v" name="value" direction="in"/>
+    </method>
+    <signal name="PropertiesChanged">
+      <arg type="s" name="interface_name"/>
+      <arg type="a{sv}" name="changed_properties"/>
+      <arg type="as" name="invalidated_properties"/>
+    </signal>
+  </interface>
+  <interface name="org.freedesktop.DBus.Introspectable">
+    <method name="Introspect">
+      <arg type="s" name="xml_data" direction="out"/>
+    </method>
+  </interface>
+  <interface name="org.freedesktop.DBus.Peer">
+    <method name="Ping"/>
+    <method name="GetMachineId">
+      <arg type="s" name="machine_uuid" direction="out"/>
+    </method>
+  </interface>
+  <interface name="org.gnome.evolution.dataserver.AddressBookFactory">
+    <method name="get_book">
+      <arg type="s" name="source" direction="in"/>
+      <arg type="s" name="path" direction="out"/>
+    </method>
+  </interface>
+
+  <interface name="org.freedesktop.DBus.Properties">
+    <method name="Get">
+      <arg type="s" name="interface_name" direction="in"/>
+      <arg type="s" name="property_name" direction="in"/>
+      <arg type="v" name="value" direction="out"/>
+    </method>
+    <method name="GetAll">
+      <arg type="s" name="interface_name" direction="in"/>
+      <arg type="a{sv}" name="properties" direction="out"/>
+    </method>
+    <method name="Set">
+      <arg type="s" name="interface_name" direction="in"/>
+      <arg type="s" name="property_name" direction="in"/>
+      <arg type="v" name="value" direction="in"/>
+    </method>
+    <signal name="PropertiesChanged">
+      <arg type="s" name="interface_name"/>
+      <arg type="a{sv}" name="changed_properties"/>
+      <arg type="as" name="invalidated_properties"/>
+    </signal>
+  </interface>
+  <interface name="org.freedesktop.DBus.Introspectable">
+    <method name="Introspect">
+      <arg type="s" name="xml_data" direction="out"/>
+    </method>
+  </interface>
+  <interface name="org.freedesktop.DBus.Peer">
+    <method name="Ping"/>
+    <method name="GetMachineId">
+      <arg type="s" name="machine_uuid" direction="out"/>
+    </method>
+  </interface>
+  <interface name="org.gnome.evolution.dataserver.AddressBook">
+    <method name="open">
+      <arg type="b" name="only_if_exists" direction="in"/>
+      <arg type="u" name="opid" direction="out"/>
+    </method>
+    <method name="remove">
+      <arg type="u" name="opid" direction="out"/>
+    </method>
+    <method name="refresh">
+      <arg type="u" name="opid" direction="out"/>
+    </method>
+    <method name="get_contact">
+      <arg type="s" name="uid" direction="in"/>
+      <arg type="u" name="opid" direction="out"/>
+    </method>
+    <method name="get_contact_list">
+      <arg type="s" name="query" direction="in"/>
+      <arg type="u" name="opid" direction="out"/>
+    </method>
+    <method name="get_contact_list_uids">
+      <arg type="s" name="query" direction="in"/>
+      <arg type="u" name="opid" direction="out"/>
+    </method>
+    <method name="add_contact">
+      <arg type="s" name="vcard" direction="in"/>
+      <arg type="u" name="opid" direction="out"/>
+    </method>
+    <method name="remove_contacts">
+      <arg type="as" name="list" direction="in"/>
+      <arg type="u" name="opid" direction="out"/>
+    </method>
+    <method name="modify_contact">
+      <arg type="s" name="vcard" direction="in"/>
+      <arg type="u" name="opid" direction="out"/>
+    </method>
+    <method name="get_backend_property">
+      <arg type="s" name="prop_name" direction="in"/>
+      <arg type="u" name="opid" direction="out"/>
+    </method>
+    <method name="set_backend_property">
+      <arg type="as" name="prop_name_value" direction="in"/>
+      <arg type="u" name="opid" direction="out"/>
+    </method>
+    <method name="get_view">
+      <arg type="s" name="query" direction="in"/>
+      <arg type="u" name="opid" direction="out"/>
+    </method>
+    <method name="authenticate_user">
+      <arg type="as" name="credentials" direction="in"/>
+    </method>
+    <method name="cancel_operation">
+      <arg type="u" name="opid" direction="in"/>
+    </method>
+    <method name="cancel_all"/>
+    <method name="close"/>
+    <signal name="backend_error">
+      <arg type="s" name="message"/>
+    </signal>
+    <signal name="readonly">
+      <arg type="b" name="is_readonly"/>
+    </signal>
+    <signal name="online">
+      <arg type="b" name="is_online"/>
+    </signal>
+    <signal name="auth_required">
+      <arg type="as" name="credentials"/>
+    </signal>
+    <signal name="opened">
+      <arg type="as" name="error"/>
+    </signal>
+    <signal name="backend_property_changed">
+      <arg type="as" name="name_value"/>
+    </signal>
+    <signal name="open_done">
+      <arg type="u" name="opid"/>
+      <arg type="s" name="dbus_error_name"/>
+      <arg type="s" name="dbus_error_message"/>
+    </signal>
+    <signal name="remove_done">
+      <arg type="u" name="opid"/>
+      <arg type="s" name="dbus_error_name"/>
+      <arg type="s" name="dbus_error_message"/>
+    </signal>
+    <signal name="refresh_done">
+      <arg type="u" name="opid"/>
+      <arg type="s" name="dbus_error_name"/>
+      <arg type="s" name="dbus_error_message"/>
+    </signal>
+    <signal name="get_contact_done">
+      <arg type="u" name="opid"/>
+      <arg type="s" name="dbus_error_name"/>
+      <arg type="s" name="dbus_error_message"/>
+      <arg type="s" name="vcard"/>
+    </signal>
+    <signal name="get_contact_list_done">
+      <arg type="u" name="opid"/>
+      <arg type="s" name="dbus_error_name"/>
+      <arg type="s" name="dbus_error_message"/>
+      <arg type="as" name="vcards"/>
+    </signal>
+    <signal name="get_contact_list_uids_done">
+      <arg type="u" name="opid"/>
+      <arg type="s" name="dbus_error_name"/>
+      <arg type="s" name="dbus_error_message"/>
+      <arg type="as" name="uids"/>
+    </signal>
+    <signal name="add_contact_done">
+      <arg type="u" name="opid"/>
+      <arg type="s" name="dbus_error_name"/>
+      <arg type="s" name="dbus_error_message"/>
+      <arg type="s" name="uid"/>
+    </signal>
+    <signal name="remove_contacts_done">
+      <arg type="u" name="opid"/>
+      <arg type="s" name="dbus_error_name"/>
+      <arg type="s" name="dbus_error_message"/>
+    </signal>
+    <signal name="modify_contact_done">
+      <arg type="u" name="opid"/>
+      <arg type="s" name="dbus_error_name"/>
+      <arg type="s" name="dbus_error_message"/>
+    </signal>
+    <signal name="get_backend_property_done">
+      <arg type="u" name="opid"/>
+      <arg type="s" name="dbus_error_name"/>
+      <arg type="s" name="dbus_error_message"/>
+      <arg type="s" name="prop_value"/>
+    </signal>
+    <signal name="set_backend_property_done">
+      <arg type="u" name="opid"/>
+      <arg type="s" name="dbus_error_name"/>
+      <arg type="s" name="dbus_error_message"/>
+    </signal>
+    <signal name="get_view_done">
+      <arg type="u" name="opid"/>
+      <arg type="s" name="dbus_error_name"/>
+      <arg type="s" name="dbus_error_message"/>
+      <arg type="s" name="view"/>
+    </signal>
+  </interface>
+</node>
