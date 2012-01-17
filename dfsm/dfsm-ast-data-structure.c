@@ -59,7 +59,6 @@ struct _DfsmAstDataStructurePrivate {
 		DfsmAstExpression *variant_val;
 		GPtrArray/*<DfsmAstDictionaryEntry>*/ *dict_val;
 		gint unix_fd_val;
-		gchar *regexp_val;
 		DfsmAstVariable *variable_val;
 	};
 };
@@ -133,9 +132,6 @@ dfsm_ast_data_structure_finalize (GObject *object)
 			break;
 		case DFSM_AST_DATA_UNIX_FD:
 			/* Nothing to free here */
-			break;
-		case DFSM_AST_DATA_REGEXP:
-			g_free (priv->regexp_val);
 			break;
 		case DFSM_AST_DATA_VARIABLE:
 			g_object_unref (priv->variable_val);
@@ -213,9 +209,6 @@ dfsm_ast_data_structure_sanity_check (DfsmAstNode *node)
 			break;
 		case DFSM_AST_DATA_UNIX_FD:
 			/* Nothing to do here */
-			break;
-		case DFSM_AST_DATA_REGEXP:
-			g_assert (priv->regexp_val != NULL);
 			break;
 		case DFSM_AST_DATA_VARIABLE:
 			g_assert (priv->variable_val != NULL);
@@ -359,20 +352,6 @@ dfsm_ast_data_structure_pre_check_and_register (DfsmAstNode *node, DfsmEnvironme
 		case DFSM_AST_DATA_UNIX_FD:
 			/* Nothing to do here */
 			break;
-		case DFSM_AST_DATA_REGEXP: {
-			/* Check if the regexp is valid by trying to parse it */
-			GRegex *regex = g_regex_new (priv->regexp_val, 0, 0, error);
-
-			if (regex != NULL) {
-				g_regex_unref (regex);
-			}
-
-			if (*error != NULL) {
-				return;
-			}
-
-			break;
-		}
 		case DFSM_AST_DATA_VARIABLE:
 			/* Valid variable? */
 			dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (priv->variable_val), environment, error);
@@ -529,8 +508,6 @@ __calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment)
 		}
 		case DFSM_AST_DATA_UNIX_FD:
 			return g_variant_type_copy (G_VARIANT_TYPE_UINT32);
-		case DFSM_AST_DATA_REGEXP:
-			return g_variant_type_copy (G_VARIANT_TYPE_STRING);
 		case DFSM_AST_DATA_VARIABLE:
 			return dfsm_ast_variable_calculate_type (priv->variable_val, environment);
 		default:
@@ -627,7 +604,6 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 		case DFSM_AST_DATA_OBJECT_PATH:
 		case DFSM_AST_DATA_SIGNATURE:
 		case DFSM_AST_DATA_UNIX_FD:
-		case DFSM_AST_DATA_REGEXP:
 			/* Nothing to do here */
 			break;
 		case DFSM_AST_DATA_VARIANT:
@@ -794,9 +770,6 @@ dfsm_ast_data_structure_new (DfsmAstDataStructureType data_structure_type, gpoin
 			/* Note: not representable in the FSM language. */
 			priv->unix_fd_val = 0;
 			break;
-		case DFSM_AST_DATA_REGEXP:
-			priv->regexp_val = g_strdup ((gchar*) value);
-			break;
 		case DFSM_AST_DATA_VARIABLE:
 			priv->variable_val = g_object_ref (value); /* DfsmAstVariable */
 			break;
@@ -854,9 +827,6 @@ dfsm_ast_data_structure_set_weight (DfsmAstDataStructure *self, gdouble weight)
 				return;
 			case DFSM_AST_DATA_UNIX_FD:
 				g_warning (_("Can't fuzz Unix FDs. Ignoring the indication to fuzz %p."), self);
-				return;
-			case DFSM_AST_DATA_REGEXP:
-				g_warning (_("Can't fuzz regular expressions. Ignoring the indication to fuzz %p."), self);
 				return;
 			case DFSM_AST_DATA_VARIABLE:
 				g_warning (_("Can't fuzz variables. Ignoring the indication to fuzz %p."), self);
@@ -2091,10 +2061,6 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 		case DFSM_AST_DATA_UNIX_FD:
 			/* Note: Fuzzing Unix FDs isn't currently supported, so we ignore any fuzzing here. */
 			return g_variant_ref_sink (g_variant_new_uint32 (priv->unix_fd_val));
-		case DFSM_AST_DATA_REGEXP:
-			/* TODO: Fuzz me */
-			/* Note: Fuzzing regular expressions isn't currently supported, so we ignore any fuzzing here. */
-			return g_variant_ref_sink (g_variant_new_string (priv->regexp_val));
 		case DFSM_AST_DATA_VARIABLE:
 			/* Note: Fuzzing variables isn't currently supported, so we ignore any fuzzing here. */
 			return dfsm_ast_variable_to_variant (priv->variable_val, environment, error);
@@ -2143,7 +2109,6 @@ dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnviro
 		case DFSM_AST_DATA_SIGNATURE:
 		case DFSM_AST_DATA_VARIANT:
 		case DFSM_AST_DATA_UNIX_FD:
-		case DFSM_AST_DATA_REGEXP:
 			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid assignment to a basic data structure."));
 			break;
 		case DFSM_AST_DATA_ARRAY: {

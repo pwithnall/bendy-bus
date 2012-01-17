@@ -285,7 +285,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 	}
 
 	transition inside Disconnected on random {
-		emit ConnectionError (#[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z0-9_][a-zA-Z0-9]*(\.[a-zA-Z0-9_][a-zA-Z0-9]*)*#?, {
+		emit ConnectionError ("org.freedesktop.Telepathy.Error.ConnectionRefused"?, {
 			"debug-message" : <""?>,
 			"server-message" : <""?>,
 			"user-requested" : <true?>,
@@ -309,7 +309,6 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 					"org.freedesktop.Telepathy.somethingelse",
 				]?,
 			)]?>,
-			#[a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z0-9_][a-zA-Z0-9]*(\.[a-zA-Z0-9_][a-zA-Z0-9]*)*# : <""?>,
 			/* etc. */
 		}?);
 	}

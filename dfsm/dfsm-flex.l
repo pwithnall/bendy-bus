@@ -20,15 +20,10 @@
 
 	static int comment_caller = 0;
 	static int string_caller = 0;
-	static int regexp_caller = 0;
 
 	#define MAX_STRING_CONST_SIZE 4096
 	static char string_buf[MAX_STRING_CONST_SIZE + 1 /* nul delimiter */];
 	static char *string_buf_ptr = NULL;
-
-	#define MAX_REGEXP_CONST_SIZE 4096
-	static char regexp_buf[MAX_REGEXP_CONST_SIZE + 1 /* nul delimiter */];
-	static char *regexp_buf_ptr = NULL;
 
 	#define YY_INPUT(buf, result, max_size) result = yy_input_proc (buf, max_size, yyscanner)
 	static int yy_input_proc (gchar *out_buf, gint size, yyscan_t yyscanner);
@@ -64,7 +59,6 @@
 
 %x comment
 %x string
-%x regexp
 
 /* Definitions, mainly extracted from http://dbus.freedesktop.org/doc/dbus-specification.html. */
 DBUS_OBJECT_PATH_ELEMENT		[A-Za-z0-9_]+
@@ -145,33 +139,6 @@ TYPE_ANNOTATION				@[\(\)\{\}ybnqiuxtdsogarvehm\*\?@&^]+[ \t\n\r\v\f]+
 
 		strncpy (string_buf_ptr, yytext, yytext_len);
 		string_buf_ptr += yytext_len;
-	}
-}
-
-"#" { regexp_caller = YYSTATE; regexp_buf_ptr = regexp_buf; BEGIN(regexp); }
-<regexp>{
-	"#" { /* closing delimiter */
-		BEGIN(regexp_caller);
-		*regexp_buf_ptr = '\0';
-		yylval->str = strdup (regexp_buf);
-		return REGEXP;
-	}
-
-	"\n" {
-		/* Unterminated regexp constant */
-		return FLEX_ERROR;
-	}
-
-	\\(.|\n) { if (regexp_buf_ptr - regexp_buf + 1 > MAX_REGEXP_CONST_SIZE) { return FLEX_ERROR; } *regexp_buf_ptr++ = yytext[1]; }
-	[^\\\n#]+ {
-		size_t yytext_len = strlen (yytext);
-
-		if (regexp_buf_ptr - regexp_buf + yytext_len > MAX_REGEXP_CONST_SIZE) {
-			return FLEX_ERROR;
-		}
-
-		strncpy (regexp_buf_ptr, yytext, yytext_len);
-		regexp_buf_ptr += yytext_len;
 	}
 }
 

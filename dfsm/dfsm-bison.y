@@ -86,7 +86,6 @@
 %token <flt> DOUBLE
 %token TRUE_LITERAL
 %token FALSE_LITERAL
-%token <str> REGEXP
 
 %token FLEX_ERROR
 
@@ -449,7 +448,6 @@ DataStructure: BYTE					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BYTE, 
              | L_PAREN error R_PAREN			{ $$ = NULL; YYABORT; }
              | L_BRACE DictionaryList R_BRACE		{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_DICT, $2); g_ptr_array_unref ($2); }
              | L_BRACE error R_BRACE			{ $$ = NULL; YYABORT; }
-             | REGEXP					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_REGEXP, $1); g_free ($1); }
              | Variable					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_VARIABLE, $1); g_object_unref ($1); }
 ;
 
