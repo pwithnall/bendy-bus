@@ -25,6 +25,8 @@
 
 #include "dfsm-ast-precondition.h"
 #include "dfsm-ast-statement.h"
+#include "dfsm-ast-statement-reply.h"
+#include "dfsm-ast-statement-throw.h"
 #include "dfsm-ast-transition.h"
 #include "dfsm-parser.h"
 #include "dfsm-parser-internal.h"
@@ -151,6 +153,7 @@ static void
 dfsm_ast_transition_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstTransitionPrivate *priv = DFSM_AST_TRANSITION (node)->priv;
+	gboolean reply_statement_count = 0, throw_statement_count = 0;
 	guint i;
 
 	switch (priv->trigger) {
@@ -189,6 +192,7 @@ dfsm_ast_transition_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *
 		}
 	}
 
+	/* Check each of our statements. */
 	for (i = 0; i < priv->statements->len; i++) {
 		DfsmAstStatement *statement;
 
@@ -199,6 +203,48 @@ dfsm_ast_transition_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *
 		if (*error != NULL) {
 			return;
 		}
+
+		/* What type of statement is it? */
+		if (DFSM_IS_AST_STATEMENT_REPLY (statement)) {
+			reply_statement_count++;
+		} else if (DFSM_IS_AST_STATEMENT_THROW (statement)) {
+			throw_statement_count++;
+		}
+	}
+
+	/* Check that:
+	 *  • if we're a method-triggered transition, we have exactly one reply or throw statement;
+	 *  • if we're a random transition, we have no reply or throw statements; or
+	 *  • if we're a property-triggered transition, we have no reply or throw statements. */
+	switch (priv->trigger) {
+		case DFSM_AST_TRANSITION_METHOD_CALL:
+			if (reply_statement_count == 0 && throw_statement_count == 0) {
+				/* No reply or throw statements. */
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+					     _("Missing ‘reply’ or ‘throw’ statement in transition. Exactly one must be present in every transition."));
+				return;
+			} else if (reply_statement_count + throw_statement_count != 1) {
+				/* Too many of either statement. */
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+					     _("Too many ‘reply’ or ‘throw’ statements in transition. "
+					       "Exactly one must be present in every transition."));
+				return;
+			}
+
+			break;
+		case DFSM_AST_TRANSITION_PROPERTY_SET:
+		case DFSM_AST_TRANSITION_ARBITRARY:
+			if (reply_statement_count != 0 || throw_statement_count != 0) {
+				/* Extraneous reply or throw statement. */
+				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+				             _("Unexpected ‘reply’ or ‘throw’ statement in transition. None must be present in property-triggered "
+				               "and random transitions."));
+				return;
+			}
+
+			break;
+		default:
+			g_assert_not_reached ();
 	}
 }
 
