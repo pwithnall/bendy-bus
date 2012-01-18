@@ -176,9 +176,12 @@ dfsm_ast_precondition_new (const gchar *error_name /* nullable */, DfsmAstExpres
  * @environment: a #DfsmEnvironment containing all variables
  * @error: a #GError
  *
- * TODO
+ * Check whether the precondition is satisfied by the given @environment. This will evaluate the precondition's statement in the given @environment,
+ * and return the boolean value of the statement.
  *
- * Return value: TODO
+ * If an error is encountered while evaluating the statement, @error will be set and %FALSE will be returned.
+ *
+ * Return value: %TRUE if the precondition is satisfied by @environment, %FALSE otherwise
  */
 gboolean
 dfsm_ast_precondition_check_is_satisfied (DfsmAstPrecondition *self, DfsmEnvironment *environment, GError **error)

@@ -89,7 +89,7 @@ dfsm_ast_statement_throw_pre_check_and_register (DfsmAstNode *node, DfsmEnvironm
 		return;
 	}
 
-	/* TODO: Check we're actually allowed to throw. */
+	/* Whether the transition we're in is allowed to throw errors is checked by the transition itself, not us. */
 }
 
 static GVariant *

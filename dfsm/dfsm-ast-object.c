@@ -610,9 +610,9 @@ dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GP
  * dfsm_ast_object_get_environment:
  * @self: a #DfsmAstObject
  *
- * TODO
+ * Gets the environment associated with the #DfsmAstObject.
  *
- * Return value: TODO
+ * Return value: the object's #DfsmEnvironment
  */
 DfsmEnvironment *
 dfsm_ast_object_get_environment (DfsmAstObject *self)
@@ -626,9 +626,10 @@ dfsm_ast_object_get_environment (DfsmAstObject *self)
  * dfsm_ast_object_get_state_names:
  * @self: a #DfsmAstObject
  *
- * TODO
+ * Gets the array of human-readable state names for all the states in the object. Each state name is indexed by its state number
+ * (#DfsmAstObjectStateNumber). Each state name is a UTF-8 string.
  *
- * Return value: TODO
+ * Return value: (transfer none) (element-type utf8): array of state names
  */
 GPtrArray/*<string>*/ *
 dfsm_ast_object_get_state_names (DfsmAstObject *self)
@@ -642,9 +643,9 @@ dfsm_ast_object_get_state_names (DfsmAstObject *self)
  * dfsm_ast_object_get_transitions:
  * @self: a #DfsmAstObject
  *
- * TODO
+ * Gets the array of all the transitions in the object. The array is in no particular order.
  *
- * Return value: TODO
+ * Return value: (transfer none) (element-type utf8): array of #DfsmAstObjectTransitions
  */
 GPtrArray/*<GPtrArray<DfsmAstObjectTransitionPair>>*/ *
 dfsm_ast_object_get_transitions (DfsmAstObject *self)
@@ -658,9 +659,9 @@ dfsm_ast_object_get_transitions (DfsmAstObject *self)
  * dfsm_ast_object_get_object_path:
  * @self: a #DfsmAstObject
  *
- * TODO
+ * Gets the D-Bus object path the object should be exposed on when added to the bus. This will always be set.
  *
- * Return value: TODO
+ * Return value: D-Bus object path for the object
  */
 const gchar *
 dfsm_ast_object_get_object_path (DfsmAstObject *self)
@@ -677,7 +678,7 @@ dfsm_ast_object_get_object_path (DfsmAstObject *self)
  * Gets an array of strings containing the D-Bus well-known bus names which should be owned by the object. This array may be empty, but will never be
  * %NULL.
  *
- * Return value: (transfer none): array of D-Bus well-known bus names
+ * Return value: (transfer none) (element-type utf8): array of D-Bus well-known bus names
  */
 GPtrArray/*<string>*/ *
 dfsm_ast_object_get_well_known_bus_names (DfsmAstObject *self)
@@ -691,9 +692,10 @@ dfsm_ast_object_get_well_known_bus_names (DfsmAstObject *self)
  * dfsm_ast_object_get_interface_names:
  * @self: a #DfsmAstObject
  *
- * TODO
+ * Gets an array of strings containing the D-Bus interface names which are implemented by the object. This array should always have at least one
+ * entry, and will never be %NULL.
  *
- * Return value: TODO
+ * Return value: (transfer none) (element-type utf8): array of D-Bus interface names
  */
 GPtrArray/*<string>*/ *
 dfsm_ast_object_get_interface_names (DfsmAstObject *self)

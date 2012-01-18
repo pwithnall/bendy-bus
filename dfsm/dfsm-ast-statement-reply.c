@@ -89,7 +89,7 @@ dfsm_ast_statement_reply_pre_check_and_register (DfsmAstNode *node, DfsmEnvironm
 		return;
 	}
 
-	/* TODO: Check we're actually allowed to reply. */
+	/* Whether the transition we're in is allowed to reply is checked by the transition itself, not us. */
 }
 
 static void

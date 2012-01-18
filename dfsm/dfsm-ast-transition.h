@@ -29,8 +29,11 @@ G_BEGIN_DECLS
 
 /**
  * DfsmAstTransitionTrigger:
+ * @DFSM_AST_TRANSITION_METHOD_CALL: triggered by an incoming D-Bus method call
+ * @DFSM_AST_TRANSITION_PROPERTY_SET: triggered by a D-Bus property changing value
+ * @DFSM_AST_TRANSITION_ARBITRARY: triggered at random intervals on a timer
  *
- * TODO
+ * Types of triggers for a transition to occur.
  */
 typedef enum {
 	DFSM_AST_TRANSITION_METHOD_CALL,

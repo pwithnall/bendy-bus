@@ -522,9 +522,9 @@ dfsm_ast_transition_execute (DfsmAstTransition *self, DfsmEnvironment *environme
  * dfsm_ast_transition_get_trigger:
  * @self: a #DfsmAstTransition
  *
- * TODO
+ * Gets the type of triggering for this transition.
  *
- * Return value: TODO
+ * Return value: trigger type for the transition
  */
 DfsmAstTransitionTrigger
 dfsm_ast_transition_get_trigger (DfsmAstTransition *self)
@@ -538,9 +538,10 @@ dfsm_ast_transition_get_trigger (DfsmAstTransition *self)
  * dfsm_ast_transition_get_trigger_method_name:
  * @self: a #DfsmAstTransition
  *
- * TODO
+ * Gets the name of the D-Bus method triggering this transition when it's called by the client. It is only valid to call this method if
+ * dfsm_ast_transition_get_trigger() returns %DFSM_AST_TRANSITION_METHOD_CALL.
  *
- * Return value: TODO
+ * Return value: name of the D-Bus method triggering this transition
  */
 const gchar *
 dfsm_ast_transition_get_trigger_method_name (DfsmAstTransition *self)
