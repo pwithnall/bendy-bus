@@ -348,6 +348,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe i
 
 	transition from Open to Closed on method Close {
 		emit Closed ();
+		reply ();
 	}
 
 	transition inside Open on random {
@@ -432,6 +433,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/group1 impl
 
 	transition from Open to Closed on method Close {
 		emit Closed ();
+		reply ();
 	}
 
 	transition inside Open on random {
