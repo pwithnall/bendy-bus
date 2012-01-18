@@ -60,13 +60,18 @@ static gboolean pass_through_environment = FALSE;
 static gboolean
 option_env_parse_cb (const gchar *option_name, const gchar *value, gpointer data, GError **error)
 {
-	gchar **parts;
+	guint equals_count = 0;
+	const gchar *i;
 
-	/* Parse the key-value pair. */
-	/* TODO: This could be done without allocations. */
-	parts = g_strsplit (value, "=", 2);
+	/* Parse the key-value pair. We expect something of the form ‘KEY=VALUE’ where both KEY and VALUE are non-empty and neither contain equals
+	 * signs. */
+	for (i = value; *i != '\0'; i++) {
+		if (*i == '=') {
+			equals_count++;
+		}
+	}
 
-	if (parts[0] == NULL || parts[1] == NULL || parts[2] != NULL || *parts[0] == '\0') {
+	if (equals_count != 1 || *value == '=' || *(i - 1) == '=') {
 		g_set_error (error, G_OPTION_ERROR, G_OPTION_ERROR_BAD_VALUE, _("Invalid key-value pair (should be of the form: ‘KEY=VALUE’): %s"),
 		             value);
 		return FALSE;
