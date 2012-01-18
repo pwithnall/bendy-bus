@@ -41,6 +41,7 @@ enum StatusCodes {
 	STATUS_DAEMON_SPAWN_ERROR = 5,
 	STATUS_TEST_PROGRAM_SPAWN_ERROR = 6,
 	STATUS_LOGGING_PROBLEM = 7,
+	STATUS_TMP_DIR_ERROR = 8,
 };
 
 static gint64 random_seed = 0;
@@ -56,6 +57,7 @@ static gint run_iters = 0;
 static gboolean run_infinitely = FALSE;
 static GPtrArray *test_program_environment = NULL;
 static gboolean pass_through_environment = FALSE;
+static gchar *dbus_daemon_config_file_path = NULL;
 
 static gboolean
 option_env_parse_cb (const gchar *option_name, const gchar *value, gpointer data, GError **error)
@@ -123,6 +125,12 @@ static const GOptionEntry test_program_entries[] = {
 	{ NULL }
 };
 
+static const GOptionEntry dbus_daemon_entries[] = {
+	{ "dbus-daemon-config-file", 0, 0, G_OPTION_ARG_FILENAME, &dbus_daemon_config_file_path,
+	  N_("URI or path of a config.xml file for the dbus-daemon"), N_("FILE") },
+	{ NULL }
+};
+
 static void
 print_help_text (GOptionContext *context)
 {
@@ -175,8 +183,10 @@ main_data_clear (MainData *data)
 	g_ptr_array_unref (data->test_program_argv);
 	g_free (data->test_program_name);
 
-	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->dbus_daemon));
-	g_clear_object (&data->dbus_daemon);
+	if (data->dbus_daemon != NULL) {
+		dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->dbus_daemon));
+		g_clear_object (&data->dbus_daemon);
+	}
 
 	g_main_loop_unref (data->main_loop);
 }
@@ -687,6 +697,162 @@ sigint_handler_cb (MainData *data)
 	return FALSE;
 }
 
+static gchar *
+build_config_file (GFile *working_directory_file, gsize *length_out)
+{
+	gchar *working_directory_path, *output;
+
+	working_directory_path = g_file_get_path (working_directory_file);
+
+	/* Heavily based on the config.xml for the session bus. */
+	output = g_strdup_printf (
+		"<!DOCTYPE busconfig PUBLIC '-//freedesktop//DTD D-BUS Bus Configuration 1.0//EN' "
+		         "'http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd'>"
+		"<busconfig>"
+			/* Our well-known bus type. Don't change this. */
+			"<type>session</type>"
+
+			/* If we fork, keep the user's original umask to avoid affecting the behavior of child processes. */
+			"<keep_umask/>"
+
+			"<listen>unix:tmpdir=%s</listen>"
+
+			/* Search for .service files in our special services dir. */
+			"<servicedir>%s/services</servicedir>"
+
+			"<policy context='default'>"
+				/* Allow everything to be sent. */
+				"<allow send_destination='*' eavesdrop='true'/>"
+				/* Allow everything to be received. */
+				"<allow eavesdrop='true'/>"
+				/* Allow anyone to own anything. */
+				"<allow own='*'/>"
+			"</policy>"
+
+			"<include if_selinux_enabled='yes' selinux_root_relative='yes'>contexts/dbus_contexts</include>"
+
+			/* For the session bus, override the default relatively-low limits with essentially infinite limits, since the bus is just
+			 * running as the user anyway, using up bus resources is not something we need to worry about. In some cases, we do set the
+			 * limits lower than "all available memory" if exceeding the limit is almost certainly a bug, having the bus enforce a limit
+			 * is nicer than a huge memory leak. But the intent is that these limits should never be hit. */
+
+			/* The memory limits are 1G instead of say 4G because they can't exceed 32-bit signed int max. */
+			"<limit name='max_incoming_bytes'>1000000000</limit>"
+			"<limit name='max_outgoing_bytes'>1000000000</limit>"
+			"<limit name='max_message_size'>1000000000</limit>"
+			"<limit name='service_start_timeout'>120000</limit>"
+			"<limit name='auth_timeout'>240000</limit>"
+			"<limit name='max_completed_connections'>100000</limit>"
+			"<limit name='max_incomplete_connections'>10000</limit>"
+			"<limit name='max_connections_per_user'>100000</limit>"
+			"<limit name='max_pending_service_starts'>10000</limit>"
+			"<limit name='max_names_per_connection'>50000</limit>"
+			"<limit name='max_match_rules_per_connection'>50000</limit>"
+			"<limit name='max_replies_per_connection'>50000</limit>"
+		"</busconfig>", working_directory_path, working_directory_path);
+
+	g_free (working_directory_path);
+
+	*length_out = strlen (output);
+
+	return output;
+}
+
+static void
+prepare_dbus_daemon_working_directory (GFile **working_directory_out, GFile **config_file_out, GError **error)
+{
+	gchar *tmp_dir_path, *config_file;
+	gsize config_file_length;
+	GFile *tmp_dir_file = NULL, *tmp_dir_file_daemon = NULL, *tmp_dir_file_daemon_config = NULL;
+	GError *child_error = NULL;
+
+	/* Output. */
+	*working_directory_out = NULL;
+	*config_file_out = NULL;
+
+	/* Check if the user's provided a config file. */
+	if (dbus_daemon_config_file_path != NULL) {
+		tmp_dir_file_daemon_config = g_file_new_for_commandline_arg (dbus_daemon_config_file_path);
+
+		/* Check for existence; if the file doesn't exist, return an error. Note that subsequent code still needs to be able to handle
+		 * the file not existing/dbus-daemon dying because of it. */
+		if (g_file_query_exists (tmp_dir_file_daemon_config, NULL) == FALSE) {
+			g_set_error (error, G_IO_ERROR, G_IO_ERROR_NOT_FOUND,
+			             _("The dbus-daemon configuration file specified with --dbus-daemon-config-file couldn’t be found."));
+
+			g_object_unref (tmp_dir_file_daemon_config);
+
+			return;
+		}
+
+		/* If the file exists, take its parent directory as the working directory and return. */
+		tmp_dir_file_daemon = g_file_get_parent (tmp_dir_file_daemon_config);
+
+		*working_directory_out = tmp_dir_file_daemon;
+		*config_file_out = tmp_dir_file_daemon_config;
+
+		return;
+	}
+
+	/* Set up a temporary runtime directory for the dbus-daemon. */
+	tmp_dir_path = g_dir_make_tmp ("bendy-bus_XXXXXX", &child_error);
+
+	if (child_error != NULL) {
+		goto error;
+	}
+
+	g_debug ("Using working directory: %s", tmp_dir_path);
+
+	tmp_dir_file = g_file_new_for_path (tmp_dir_path);
+	g_free (tmp_dir_path);
+
+	/* Make a subdirectory for the dbus-daemon .*/
+	tmp_dir_file_daemon = g_file_get_child (tmp_dir_file, "dbus-daemon");
+
+	g_file_make_directory (tmp_dir_file_daemon, NULL, &child_error);
+
+	if (child_error != NULL) {
+		goto error;
+	}
+
+	/* Create the default config.xml file. */
+	tmp_dir_file_daemon_config = g_file_get_child (tmp_dir_file_daemon, "config.xml");
+
+	config_file = build_config_file (tmp_dir_file_daemon, &config_file_length);
+	g_file_replace_contents (tmp_dir_file_daemon_config, config_file, config_file_length, NULL, FALSE, G_FILE_CREATE_REPLACE_DESTINATION, NULL,
+	                         NULL, &child_error);
+	g_free (config_file);
+
+	if (child_error != NULL) {
+		goto error;
+	}
+
+	/* Success! */
+	*working_directory_out = tmp_dir_file_daemon;
+	*config_file_out = tmp_dir_file_daemon_config;
+
+	return;
+
+error:
+	g_propagate_error (error, child_error);
+
+	if (tmp_dir_file_daemon_config != NULL) {
+		/* Hide the evidence. */
+		g_file_delete (tmp_dir_file_daemon_config, NULL, NULL);
+		g_object_unref (tmp_dir_file_daemon_config);
+	}
+
+	if (tmp_dir_file_daemon != NULL) {
+		g_file_delete (tmp_dir_file_daemon, NULL, NULL);
+		g_object_unref (tmp_dir_file_daemon);
+	}
+
+	if (tmp_dir_file != NULL) {
+		g_file_delete (tmp_dir_file, NULL, NULL);
+		g_object_unref (tmp_dir_file);
+	}
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -702,6 +868,7 @@ main (int argc, char *argv[])
 	guint i;
 	gchar *time_str, *command_line, *log_header, *seed_str;
 	GDateTime *date_time;
+	GFile *working_directory_file, *dbus_daemon_config_file;
 
 	/* Set up localisation. */
 	setlocale (LC_ALL, "");
@@ -733,10 +900,16 @@ main (int argc, char *argv[])
 	g_option_group_add_entries (option_group, testing_entries);
 	g_option_context_add_group (context, option_group);
 
-	/* Testing option group */
+	/* Test program option group */
 	option_group = g_option_group_new ("test-program", _("Test Program Options:"), _("Show help options for the program under test"), NULL, NULL);
 	g_option_group_set_translation_domain (option_group, GETTEXT_PACKAGE);
 	g_option_group_add_entries (option_group, test_program_entries);
+	g_option_context_add_group (context, option_group);
+
+	/* dbus-daemon option group */
+	option_group = g_option_group_new ("dbus-daemon", _("D-Bus Daemon Options:"), _("Show help options for the dbus-daemon"), NULL, NULL);
+	g_option_group_set_translation_domain (option_group, GETTEXT_PACKAGE);
+	g_option_group_add_entries (option_group, dbus_daemon_entries);
 	g_option_context_add_group (context, option_group);
 
 	if (g_option_context_parse (context, &argc, &argv, &error) == FALSE) {
@@ -905,10 +1078,26 @@ main (int argc, char *argv[])
 	g_unix_signal_add (SIGINT, (GSourceFunc) sigint_handler_cb, &data);
 	g_unix_signal_add (SIGTERM, (GSourceFunc) sigterm_handler_cb, &data);
 
+	/* Create a working directory. */
+	prepare_dbus_daemon_working_directory (&working_directory_file, &dbus_daemon_config_file, &error);
+
+	if (error != NULL) {
+		g_printerr (_("Error creating dbus-daemon working directory: %s"), error->message);
+		g_printerr ("\n");
+
+		g_error_free (error);
+		main_data_clear (&data);
+		dsim_logging_finalise ();
+
+		exit (STATUS_TMP_DIR_ERROR);
+	}
+
 	/* Start up our own private dbus-daemon instance. */
-	/* TODO */
-	data.dbus_daemon = dsim_dbus_daemon_new (g_file_new_for_path ("/tmp/dbus"), g_file_new_for_path ("/tmp/dbus/config.xml"));
+	data.dbus_daemon = dsim_dbus_daemon_new (working_directory_file, dbus_daemon_config_file);
 	data.dbus_address = NULL;
+
+	g_object_unref (dbus_daemon_config_file);
+	g_object_unref (working_directory_file);
 
 	g_signal_connect (data.dbus_daemon, "process-died", (GCallback) dbus_daemon_died_cb, &data);
 	g_signal_connect (data.dbus_daemon, "notify::bus-address", (GCallback) dbus_daemon_notify_bus_address_cb, &data);
