@@ -306,7 +306,7 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstObject
 {
 	DfsmMachinePrivate *priv = self->priv;
 	guint i, rand_offset;
-	DfsmAstObjectTransition *candidate_object_transition;
+	DfsmAstObjectTransition *candidate_object_transition = NULL;
 	GVariant *return_value = NULL;
 	GError *child_error = NULL, *precondition_error = NULL;
 
