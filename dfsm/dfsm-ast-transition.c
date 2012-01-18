@@ -46,6 +46,7 @@ struct _DfsmAstTransitionPrivate {
 	} trigger_params;
 	GPtrArray *preconditions; /* array of DfsmAstPreconditions */
 	GPtrArray *statements; /* array of DfsmAstStatements */
+	gboolean contains_throw_statement; /* cache of whether ->statements contains a DfsmAstStatementThrow */
 };
 
 G_DEFINE_TYPE (DfsmAstTransition, dfsm_ast_transition, DFSM_TYPE_AST_NODE)
@@ -209,6 +210,7 @@ dfsm_ast_transition_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *
 			reply_statement_count++;
 		} else if (DFSM_IS_AST_STATEMENT_THROW (statement)) {
 			throw_statement_count++;
+			priv->contains_throw_statement = TRUE;
 		}
 	}
 
@@ -565,4 +567,23 @@ dfsm_ast_transition_get_trigger_property_name (DfsmAstTransition *self)
 	g_return_val_if_fail (self->priv->trigger == DFSM_AST_TRANSITION_PROPERTY_SET, NULL);
 
 	return self->priv->trigger_params.property_name;
+}
+
+/**
+ * dfsm_ast_transition_contains_throw_statement:
+ * @self: a #DfsmAstTransition
+ *
+ * Gets whether the transition contains a statement of type #DfsmAstStatementThrow. The alternatives are to contain a #DfsmAstStatementReply instead,
+ * or to contain neither statement, depending on the trigger type of the transition.
+ *
+ * It is only valid to call this method after successfully calling dfsm_ast_node_pre_check_and_register().
+ *
+ * Return value: %TRUE if the transition contains a #DfsmAstStatementThrow, %FALSE otherwise
+ */
+gboolean
+dfsm_ast_transition_contains_throw_statement (DfsmAstTransition *self)
+{
+	g_return_val_if_fail (DFSM_IS_AST_TRANSITION (self), FALSE);
+
+	return self->priv->contains_throw_statement;
 }

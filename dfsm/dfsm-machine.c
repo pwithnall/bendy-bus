@@ -29,6 +29,7 @@
 #include "dfsm-marshal.h"
 #include "dfsm-parser.h"
 #include "dfsm-parser-internal.h"
+#include "dfsm-probabilities.h"
 
 GQuark
 dfsm_simulation_error_quark (void)
@@ -259,11 +260,53 @@ get_state_name (DfsmMachine *self, DfsmMachineStateNumber state_number)
 }
 
 static GVariant *
+execute_transition (DfsmMachine *self, DfsmAstObjectTransition *object_transition, gboolean *executed_transition, GError **error)
+{
+	DfsmMachinePrivate *priv = self->priv;
+	GVariant *return_value = NULL;
+	GError *child_error = NULL;
+
+	g_assert (executed_transition != NULL);
+	*executed_transition = FALSE;
+
+	g_debug ("…Executing transition %p from ‘%s’ to ‘%s’.", object_transition->transition, get_state_name (self, object_transition->from_state),
+	         get_state_name (self, object_transition->to_state));
+	return_value = dfsm_ast_transition_execute (object_transition->transition, priv->environment, &child_error);
+
+	/* Various possibilities for return values. */
+	if (child_error == NULL) {
+		gchar *return_value_string;
+
+		/* Success, with or without a return value. */
+		return_value_string = (return_value != NULL) ? g_variant_print (return_value, TRUE) : g_strdup ("(null)");
+		g_debug ("…(Successful, with return value: %s.)", return_value_string);
+		g_free (return_value_string);
+
+		*executed_transition = TRUE;
+
+		/* Change machine state. */
+		priv->machine_state = object_transition->to_state;
+		g_object_notify (G_OBJECT (self), "machine-state");
+	} else if (return_value == NULL && child_error != NULL) {
+		/* Error, either during execution or as a result of a throw statement. Don't change states. */
+		g_debug ("…(Error: %s)", child_error->message);
+
+		g_propagate_error (error, child_error);
+		*executed_transition = FALSE;
+	} else {
+		g_assert_not_reached ();
+	}
+
+	return return_value;
+}
+
+static GVariant *
 find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstObjectTransition>*/ *possible_transitions, gboolean *executed_transition,
                                     GError **error)
 {
 	DfsmMachinePrivate *priv = self->priv;
 	guint i, rand_offset;
+	DfsmAstObjectTransition *candidate_object_transition;
 	GVariant *return_value = NULL;
 	GError *child_error = NULL, *precondition_error = NULL;
 
@@ -279,7 +322,17 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstObject
 	}
 
 	/* Arbitrarily choose a transition to perform. We do this by taking a random start index into the array of transitions, and then sequentially
-	 * checking preconditions of transitions until we find one which is satisfied. We then execute that transition. */
+	 * checking preconditions of transitions until we find one which is satisfied. We then execute that transition.
+	 *
+	 * We weight the probability of executing a given transition by the type of transition. If the transition contains a ‘throw’ statement then
+	 * we have a 0.8 chance of skipping the transition. This is an attempt to make the simulation follow ‘interesting’ transitions more often
+	 * than not.
+	 *
+	 * If we're trying to find a transition as a result of a method call or property change, we can try to prioritise non-throwing transitions over
+	 * those which contain ‘throw’ statements; but we *must* pick a transition. We can't just ignore the method call/property change.
+	 *
+	 * If we're trying to find a transition as a result of a random timeout, we can prioritise non-throwing transitions over those which contain
+	 * ‘throw’ statements to the extent that we may not actually execute a transition. That's fine. */
 	rand_offset = g_random_int_range (0, possible_transitions->len);
 	for (i = 0; i < possible_transitions->len; i++) {
 		DfsmAstObjectTransition *object_transition;
@@ -296,7 +349,7 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstObject
 			continue;
 		}
 
-		/* If this transition's preconditions are satisfied, execute it. Otherwise, loop round and try the next transition. */
+		/* If this transition's preconditions are satisfied, continue down to execute it. Otherwise, loop round and try the next transition. */
 		if (dfsm_ast_transition_check_preconditions (transition, priv->environment, &child_error) == FALSE) {
 			g_debug ("…Skipping transition %p from ‘%s’ to ‘%s’ due to precondition failures.", transition,
 			         get_state_name (self, object_transition->from_state), get_state_name (self, object_transition->to_state));
@@ -315,42 +368,27 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstObject
 			continue;
 		}
 
-		/* We're found a transition whose preconditions pass, so forget about any previous precondition failures. */
-		g_clear_error (&precondition_error);
+		/* If this transition contains a ‘throw’ statement, check if we really want to execute it. */
+		if (dfsm_ast_transition_contains_throw_statement (transition) == TRUE && DFSM_BIASED_COIN_FLIP (0.8)) {
+			/* Skip the transition, but keep a record of it in case we find there are no other transitions whose preconditions pass and
+			 * which don't contain ‘throw’ statements. */
+			candidate_object_transition = object_transition;
 
-		/* Execute the transition. */
-		g_debug ("…Executing transition %p from ‘%s’ to ‘%s’.", transition, get_state_name (self, object_transition->from_state),
-		         get_state_name (self, object_transition->to_state));
-		return_value = dfsm_ast_transition_execute (transition, priv->environment, &child_error);
+			g_debug ("…Skipping transition %p from ‘%s’ to ‘%s’ due to it containing a throw statement.", transition,
+			         get_state_name (self, object_transition->from_state), get_state_name (self, object_transition->to_state));
 
-		/* Various possibilities for return values. */
-		if (child_error == NULL) {
-			gchar *return_value_string;
-
-			/* Success, with or without a return value. */
-			return_value_string = (return_value != NULL) ? g_variant_print (return_value, TRUE) : g_strdup ("(null)");
-			g_debug ("…(Successful, with return value: %s.)", return_value_string);
-			g_free (return_value_string);
-
-			*executed_transition = TRUE;
-
-			/* Change machine state. */
-			priv->machine_state = object_transition->to_state;
-			g_object_notify (G_OBJECT (self), "machine-state");
-		} else if (return_value == NULL && child_error != NULL) {
-			/* Error, either during execution or as a result of a throw statement. Don't change states. */
-			g_debug ("…(Error: %s)", child_error->message);
-
-			g_propagate_error (error, child_error);
-			*executed_transition = FALSE;
-		} else {
-			g_assert_not_reached ();
+			continue;
 		}
+
+		/* We're found a transition whose preconditions pass, so forget about any previous precondition failures. Execute the transition. */
+		g_clear_error (&precondition_error);
+		candidate_object_transition = NULL;
+		return_value = execute_transition (self, object_transition, executed_transition, &child_error);
 
 		break;
 	}
 
-	/* If we didn't manage to execute any transitions, return the error from the first precondition failure. */
+	/* If we didn't manage to find/execute any transitions, return the error from the first precondition failure. */
 	if (precondition_error != NULL) {
 		child_error = precondition_error;
 		precondition_error = NULL;
@@ -358,9 +396,19 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstObject
 		g_propagate_error (error, child_error);
 	}
 
+	/* If we found a candidate transition but then skipped it due to it containing ‘throw’ statements, and didn't subsequently find a better
+	 * transition, execute the previous candidate transition now. */
+	if (candidate_object_transition != NULL) {
+		return_value = execute_transition (self, candidate_object_transition, executed_transition, &child_error);
+	}
+
 done:
 	g_assert ((*executed_transition == TRUE && child_error == NULL) ||
 	          (*executed_transition == FALSE && return_value == NULL));
+
+	if (child_error != NULL) {
+		g_propagate_error (error, child_error);
+	}
 
 	return return_value;
 }

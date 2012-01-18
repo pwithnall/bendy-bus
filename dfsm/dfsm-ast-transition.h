@@ -64,6 +64,7 @@ GVariant *dfsm_ast_transition_execute (DfsmAstTransition *transition, DfsmEnviro
 DfsmAstTransitionTrigger dfsm_ast_transition_get_trigger (DfsmAstTransition *self) G_GNUC_PURE;
 const gchar *dfsm_ast_transition_get_trigger_method_name (DfsmAstTransition *self) G_GNUC_PURE;
 const gchar *dfsm_ast_transition_get_trigger_property_name (DfsmAstTransition *self) G_GNUC_PURE;
+gboolean dfsm_ast_transition_contains_throw_statement (DfsmAstTransition *self) G_GNUC_PURE;
 
 G_END_DECLS
 
