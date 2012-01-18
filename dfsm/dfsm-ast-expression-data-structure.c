@@ -156,12 +156,12 @@ dfsm_ast_expression_data_structure_new (DfsmAstDataStructure *data_structure)
 /**
  * dfsm_ast_expression_data_structure_to_variant:
  * @self: a #DfsmAstExpressionDataStructure
- * @environment: TODO
+ * @environment: a #DfsmEnvironment containing any referenced variables
  * @error: (allow-none): a #GError, or %NULL
  *
- * TODO
+ * Evaluate the data structure completely, returning a #GVariant which represents it with all variables, and nested expressions evaluated.
  *
- * Return value: (transfer full): TODO
+ * Return value: (transfer full): a fully-evaluated #GVariant form of the data structure
  */
 GVariant *
 dfsm_ast_expression_data_structure_to_variant (DfsmAstExpressionDataStructure *self, DfsmEnvironment *environment, GError **error)
@@ -176,17 +176,27 @@ dfsm_ast_expression_data_structure_to_variant (DfsmAstExpressionDataStructure *s
 /**
  * dfsm_ast_expression_data_structure_set_from_variant:
  * @self: a #DfsmAstExpressionDataStructure
- * @environment: TODO
- * @new_value: TODO
+ * @environment: a #DfsmEnvironment containing any referenced variables
+ * @new_value: the new value to assign to the data structure
  * @error: (allow-none): a #GError, or %NULL
  *
- * TODO
+ * Recursively set the value of the data structure to @new_value. This will recursively assign to any variables in the data structure the equivalent
+ * value from @new_value. This allows assignments of the form:
+ * |[
+ * (var1, var2, var3) = my_expression_returning_a_3_tuple
+ * ]|
+ * to assign to three variables at once.
  */
 void
 dfsm_ast_expression_data_structure_set_from_variant (DfsmAstExpressionDataStructure *self, DfsmEnvironment *environment, GVariant *new_value,
                                                      GError **error)
 {
+	g_return_if_fail (DFSM_IS_AST_EXPRESSION_DATA_STRUCTURE (self));
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (environment));
+	g_return_if_fail (new_value != NULL);
+	g_return_if_fail (error == NULL || *error == NULL);
 
+	dfsm_ast_data_structure_set_from_variant (self->priv->data_structure, environment, new_value, error);
 }
 
 /**

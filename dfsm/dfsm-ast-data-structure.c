@@ -649,7 +649,7 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 			break;
 		}
 		case DFSM_AST_DATA_DICT: {
-			/* All entries valid with no duplicate keys? */
+			/* All entries valid? */
 			for (i = 0; i < priv->dict_val->len; i++) {
 				DfsmAstDictionaryEntry *entry;
 
@@ -669,7 +669,9 @@ dfsm_ast_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 				}
 			}
 
-			/* TODO: Check for duplicate keys. */
+			/* NOTE: We can't check for duplicate keys here, since the expressions for the dict keys can't be evaluated yet. We have to
+			 * allow duplicate keys at runtime, and allow the GVariant code to just use the value corresponding to the first key of any
+			 * duplicate pair. */
 
 			break;
 		}
@@ -2211,7 +2213,8 @@ dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnviro
 			}
 
 			/* We should only assign to the values in the data structure dict which are listed in the variant dict. i.e. We touch the
-			 * values corresponding to the intersection of the keys of the data structure and variant dicts. */
+			 * values corresponding to the intersection of the keys of the data structure and variant dicts (plus the difference between
+			 * the variant and data structure keys). */
 			g_variant_iter_init (&iter, new_value);
 
 			while ((child_entry_variant = g_variant_iter_next_value (&iter)) != NULL) {
