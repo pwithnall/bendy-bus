@@ -279,13 +279,12 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 
 	switch (priv->trigger) {
 		case DFSM_AST_TRANSITION_METHOD_CALL: {
-			GDBusNodeInfo *node_info;
-			GDBusInterfaceInfo **interface_infos, *interface_info;
+			GPtrArray/*<GDBusInterfaceInfo>*/ *interfaces;
 
-			node_info = dfsm_environment_get_dbus_node_info (environment);
+			interfaces = dfsm_environment_get_interfaces (environment);
 
-			for (interface_infos = node_info->interfaces; *interface_infos != NULL; interface_infos++) {
-				interface_info = *interface_infos;
+			for (i = 0; i < interfaces->len; i++) {
+				GDBusInterfaceInfo *interface_info = (GDBusInterfaceInfo*) g_ptr_array_index (interfaces, i);
 
 				method_info = g_dbus_interface_info_lookup_method (interface_info, priv->trigger_params.method_name);
 
@@ -352,15 +351,14 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 			break;
 		}
 		case DFSM_AST_TRANSITION_PROPERTY_SET: {
-			GDBusNodeInfo *node_info;
-			GDBusInterfaceInfo **interface_infos, *interface_info;
+			GPtrArray/*<GDBusInterfaceInfo>*/ *interfaces;
 			GDBusPropertyInfo *property_info;
 			GVariantType *property_type;
 
-			node_info = dfsm_environment_get_dbus_node_info (environment);
+			interfaces = dfsm_environment_get_interfaces (environment);
 
-			for (interface_infos = node_info->interfaces; *interface_infos != NULL; interface_infos++) {
-				interface_info = *interface_infos;
+			for (i = 0; i < interfaces->len; i++) {
+				GDBusInterfaceInfo *interface_info = (GDBusInterfaceInfo*) g_ptr_array_index (interfaces, i);
 
 				property_info = g_dbus_interface_info_lookup_property (interface_info, priv->trigger_params.property_name);
 
@@ -423,7 +421,7 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 
 done:
 	/* Restore the environment if this is a method- or property-triggered transition. */
-	if (priv->trigger == DFSM_AST_TRANSITION_METHOD_CALL && method_info->in_args != NULL) {
+	if (priv->trigger == DFSM_AST_TRANSITION_METHOD_CALL && method_info != NULL && method_info->in_args != NULL) {
 		GDBusArgInfo **arg_infos;
 
 		for (arg_infos = method_info->in_args; *arg_infos != NULL; arg_infos++) {

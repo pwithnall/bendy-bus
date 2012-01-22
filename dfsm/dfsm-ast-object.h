@@ -64,6 +64,8 @@ typedef struct {
 
 GType dfsm_ast_object_get_type (void) G_GNUC_CONST;
 
+void dfsm_ast_object_initial_check (DfsmAstObject *self, GError **error);
+
 DfsmEnvironment *dfsm_ast_object_get_environment (DfsmAstObject *self) G_GNUC_PURE;
 GPtrArray/*<string>*/ *dfsm_ast_object_get_state_names (DfsmAstObject *self) G_GNUC_PURE;
 GPtrArray/*<DfsmAstObjectTransition>*/ *dfsm_ast_object_get_transitions (DfsmAstObject *self) G_GNUC_PURE;

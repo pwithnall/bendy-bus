@@ -74,7 +74,8 @@ struct _DfsmAstObjectPrivate {
 	gchar *object_path;
 	GPtrArray *bus_names; /* array of strings */
 	GPtrArray *interface_names; /* array of strings */
-	DfsmEnvironment *environment; /* not populated until pre_check_and_register() */
+	GDBusNodeInfo *dbus_node_info;
+	DfsmEnvironment *environment; /* not built or populated until pre_check_and_register() */
 	GPtrArray *states; /* array of strings (indexed by DfsmAstStateNumber), not populated until pre_check_and_register() */
 	GPtrArray *transitions; /* array of DfsmAstObjectTransitions (no index), not populated until pre_check_and_register() */
 
@@ -143,6 +144,11 @@ dfsm_ast_object_dispose (GObject *object)
 		priv->states = NULL;
 	}
 
+	if (priv->dbus_node_info != NULL) {
+		g_dbus_node_info_unref (priv->dbus_node_info);
+		priv->dbus_node_info = NULL;
+	}
+
 	g_clear_object (&priv->environment);
 
 	if (priv->interface_names != NULL) {
@@ -191,7 +197,8 @@ dfsm_ast_object_sanity_check (DfsmAstNode *node)
 		g_assert (interface_name != NULL);
 	}
 
-	g_assert (DFSM_IS_ENVIRONMENT (priv->environment));
+	g_assert (priv->dbus_node_info != NULL);
+	g_assert (priv->environment == NULL || DFSM_IS_ENVIRONMENT (priv->environment));
 	/* TODO: Check all variable names and values in ->environment are non-NULL */
 
 	g_assert (priv->states != NULL);
@@ -243,8 +250,10 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 	DfsmAstObjectPrivate *priv = DFSM_AST_OBJECT (node)->priv;
 	guint i;
 	GPtrArray *states;
-	GDBusNodeInfo *node_info;
+	GPtrArray/*<GDBusInterfaceInfo>*/ *interfaces = NULL;
 	GHashTable/*<string, DfsmMachineStateNumber>*/ *state_numbers = NULL;
+
+	g_assert (environment == NULL); /* we haven't created this yet */
 
 	if (g_variant_is_object_path (priv->object_path) == FALSE) {
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid D-Bus object path: %s"), priv->object_path);
@@ -262,11 +271,20 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 		}
 	}
 
-	node_info = dfsm_environment_get_dbus_node_info (environment);
+	/* Must have at least one interface implemented. */
+	if (priv->interface_names->len == 0) {
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+		             _("At least one interface must be implemented on every D-Bus object."));
+		goto done;
+	}
+
+	/* Check and build an array of relevant GDBusInterfaceInfo structures. */
+	interfaces = g_ptr_array_new_with_free_func ((GDestroyNotify) g_dbus_interface_info_unref);
 
 	for (i = 0; i < priv->interface_names->len; i++) {
 		guint f;
 		const gchar *interface_name;
+		GDBusInterfaceInfo *interface_info;
 
 		interface_name = g_ptr_array_index (priv->interface_names, i);
 
@@ -286,11 +304,19 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 		}
 
 		/* Defined in the node info? */
-		if (g_dbus_node_info_lookup_interface (node_info, interface_name) == NULL) {
+		interface_info = g_dbus_node_info_lookup_interface (priv->dbus_node_info, interface_name);
+
+		if (interface_info == NULL) {
 			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Unknown D-Bus interface name: %s"), interface_name);
 			goto done;
 		}
+
+		/* Add it to the interface list. */
+		g_ptr_array_add (interfaces, g_dbus_interface_info_ref (interface_info));
 	}
+
+	/* Build the environment. */
+	priv->environment = _dfsm_environment_new (interfaces);
 
 	/* Check all variable names in ->environment are valid names, and recursively check their values are acceptable. */
 	for (i = 0; i < priv->data_blocks->len; i++) {
@@ -379,7 +405,7 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 		transition_block = g_ptr_array_index (priv->transition_blocks, i);
 
 		/* Check the transition itself first. */
-		dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (transition_block->transition), environment, error);
+		dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (transition_block->transition), priv->environment, error);
 
 		if (*error != NULL) {
 			goto done;
@@ -435,6 +461,37 @@ done:
 	if (state_numbers != NULL) {
 		g_hash_table_unref (state_numbers);
 	}
+
+	if (interfaces != NULL) {
+		g_ptr_array_unref (interfaces);
+		interfaces = NULL;
+	}
+}
+
+/**
+ * dfsm_ast_object_initial_check:
+ * @self: a #DfsmAstObject
+ * @error: a #GError, or %NULL
+ *
+ * Run the initial checks on the #DfsmAstObject, and generate its environment. For #DfsmAstObject<!-- -->s, this must be run instead of
+ * dfsm_ast_node_sanity_check() and dfsm_ast_node_pre_check_and_register().
+ */
+void
+dfsm_ast_object_initial_check (DfsmAstObject *self, GError **error)
+{
+	GError *child_error = NULL;
+
+	g_return_if_fail (DFSM_IS_AST_OBJECT (self));
+	g_return_if_fail (error == NULL || *error == NULL);
+
+	/* Sanity check, then run the pre-check without an environment. */
+	dfsm_ast_object_sanity_check (DFSM_AST_NODE (self));
+	dfsm_ast_object_pre_check_and_register (DFSM_AST_NODE (self), NULL, &child_error);
+
+	/* We pass in our own child_error so that we can guarantee it's non-NULL to the virtual method implementations. */
+	if (child_error != NULL) {
+		g_propagate_error (error, child_error);
+	}
 }
 
 static void
@@ -442,7 +499,7 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
 {
 	DfsmAstObjectPrivate *priv = DFSM_AST_OBJECT (node)->priv;
 	guint i;
-	GDBusNodeInfo *node_info;
+	GPtrArray/*<GDBusInterfaceInfo>*/ *interfaces;
 
 	/* Check the value expressions for each variable, then evaluate them and set the final values in the environment. Only then can we free
 	 * ->data_blocks. */
@@ -493,16 +550,15 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
 	g_ptr_array_unref (priv->data_blocks);
 	priv->data_blocks = NULL;
 
-	/* Check the object defines object-level variables for each of the properties of its interfaces. */
-	node_info = dfsm_environment_get_dbus_node_info (environment);
+	/* Check the object defines object-level variables for each of the properties of its interfaces. The set of interfaces in the environment
+	 * should be equal to those in ->interface_names. */
+	interfaces = dfsm_environment_get_interfaces (environment);
 
-	for (i = 0; i < priv->interface_names->len; i++) {
+	for (i = 0; i < interfaces->len; i++) {
 		GDBusInterfaceInfo *interface_info;
 		GDBusPropertyInfo **property_infos;
-		const gchar *interface_name;
 
-		interface_name = (const gchar*) g_ptr_array_index (priv->interface_names, i);
-		interface_info = g_dbus_node_info_lookup_interface (node_info, interface_name);
+		interface_info = (GDBusInterfaceInfo*) g_ptr_array_index (interfaces, i);
 
 		if (interface_info->properties == NULL) {
 			continue;
@@ -593,7 +649,8 @@ dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GP
 	priv->object_path = g_strdup (object_path);
 	priv->bus_names = g_ptr_array_ref (bus_names);
 	priv->interface_names = g_ptr_array_ref (interface_names);
-	priv->environment = _dfsm_environment_new (dbus_node_info);
+	priv->dbus_node_info = g_dbus_node_info_ref (dbus_node_info);
+	priv->environment = NULL; /* build in pre_check_and_register() */
 	priv->states = g_ptr_array_new_with_free_func (g_free);
 	priv->transitions = g_ptr_array_new_with_free_func ((GDestroyNotify) dfsm_ast_object_transition_unref);
 

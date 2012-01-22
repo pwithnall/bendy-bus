@@ -71,7 +71,7 @@ GVariant *dfsm_environment_function_evaluate (const gchar *function_name, GVaria
 
 void dfsm_environment_emit_signal (DfsmEnvironment *self, const gchar *signal_name, GVariant *parameters, GError **error);
 
-GDBusNodeInfo *dfsm_environment_get_dbus_node_info (DfsmEnvironment *self) G_GNUC_PURE;
+GPtrArray/*<GDBusInterfaceInfo>*/ *dfsm_environment_get_interfaces (DfsmEnvironment *self) G_GNUC_PURE;
 
 G_END_DECLS
 

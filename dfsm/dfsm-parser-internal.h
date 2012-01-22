@@ -88,7 +88,7 @@ G_GNUC_INTERNAL DfsmParserStatePair *dfsm_parser_state_pair_new (const gchar *fr
 G_GNUC_INTERNAL void dfsm_parser_state_pair_free (DfsmParserStatePair *state_pair);
 
 /* AST node constructors */
-G_GNUC_INTERNAL DfsmEnvironment *_dfsm_environment_new (GDBusNodeInfo *dbus_node_info) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmEnvironment *_dfsm_environment_new (GPtrArray/*<GDBusInterfaceInfo>*/ *interfaces) DFSM_CONSTRUCTOR;
 G_GNUC_INTERNAL DfsmMachine *_dfsm_machine_new (DfsmEnvironment *environment, GPtrArray/*<string>*/ *state_names,
                                                 GPtrArray/*<DfsmAstTransition>*/ *transitions) DFSM_CONSTRUCTOR;
 

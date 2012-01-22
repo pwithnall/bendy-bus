@@ -120,10 +120,10 @@ static void
 dfsm_ast_statement_emit_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
 	DfsmAstStatementEmitPrivate *priv = DFSM_AST_STATEMENT_EMIT (node)->priv;
-	GDBusNodeInfo *node_info;
-	GDBusInterfaceInfo **interface_infos, *interface_info;
 	GDBusSignalInfo *signal_info = NULL;
 	GVariantType *expr_parameters_type, *signal_parameters_type;
+	GPtrArray/*<GDBusInterfaceInfo>*/ *interfaces;
+	guint i;
 
 	dfsm_ast_node_check (DFSM_AST_NODE (priv->expression), environment, error);
 
@@ -131,11 +131,11 @@ dfsm_ast_statement_emit_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 		return;
 	}
 
-	/* Find the interface declaring the signal. */
-	node_info = dfsm_environment_get_dbus_node_info (environment);
+	/* Find the interface declaring the signal out of the interfaces declared as implemented by the object */
+	interfaces = dfsm_environment_get_interfaces (environment);
 
-	for (interface_infos = node_info->interfaces; *interface_infos != NULL; interface_infos++) {
-		interface_info = *interface_infos;
+	for (i = 0; i < interfaces->len; i++) {
+		GDBusInterfaceInfo *interface_info = (GDBusInterfaceInfo*) g_ptr_array_index (interfaces, i);
 
 		signal_info = g_dbus_interface_info_lookup_signal (interface_info, priv->signal_name);
 
@@ -146,7 +146,6 @@ dfsm_ast_statement_emit_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 	}
 
 	/* Failed to find a suitable interface? */
-	/* TODO: This doesn't check the interfaces against what the object actually declares it implements. */
 	if (signal_info == NULL) {
 		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
 		             _("Undeclared D-Bus signal referenced by an ‘emit’ statement: %s"), priv->signal_name);

@@ -694,8 +694,8 @@ dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const 
 	GPtrArray/*<DfsmAstObjectTransition>*/ *possible_transitions;
 	gboolean executed_transition = FALSE;
 	GVariant *return_value = NULL;
-	GDBusNodeInfo *node_info;
-	GDBusInterfaceInfo *interface_info;
+	GPtrArray/*<GDBusInterfaceInfo>*/ *interfaces;
+	GDBusInterfaceInfo *interface_info = NULL;
 	GDBusMethodInfo *method_info;
 	guint i;
 	GError *child_error = NULL;
@@ -726,9 +726,14 @@ dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const 
 	}
 
 	/* Add the method's in parameters to the environment. */
-	node_info = dfsm_environment_get_dbus_node_info (priv->environment);
+	interfaces = dfsm_environment_get_interfaces (priv->environment);
 
-	interface_info = g_dbus_node_info_lookup_interface (node_info, interface_name);
+	for (i = 0; i < interfaces->len; i++) {
+		if (strcmp (interface_name, ((GDBusInterfaceInfo*) g_ptr_array_index (interfaces, i))->name) == 0) {
+			interface_info = g_ptr_array_index (interfaces, i);
+			break;
+		}
+	}
 
 	if (interface_info == NULL) {
 		g_warning (_("Runtime error in simulation: Couldn't find interface containing method ‘%s’."), method_name);

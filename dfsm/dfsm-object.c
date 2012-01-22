@@ -351,8 +351,7 @@ dfsm_object_factory_asts_from_files (const gchar *simulation_code, const gchar *
 
 		ast_object = g_ptr_array_index (ast_object_array, i);
 
-		dfsm_ast_node_sanity_check (DFSM_AST_NODE (ast_object));
-		dfsm_ast_node_pre_check_and_register (DFSM_AST_NODE (ast_object), dfsm_ast_object_get_environment (ast_object), &child_error);
+		dfsm_ast_object_initial_check (ast_object, &child_error);
 
 		if (child_error != NULL) {
 			/* Error! */
@@ -449,10 +448,10 @@ static void
 dfsm_object_dbus_signal_emission_cb (DfsmMachine *machine, const gchar *signal_name, GVariant *parameters, DfsmObject *self)
 {
 	DfsmObjectPrivate *priv;
-	GDBusNodeInfo *dbus_node_info;
-	GDBusInterfaceInfo **interfaces;
+	GPtrArray/*<GDBusInterfaceInfo>*/ *interfaces;
 	const gchar *interface_name = NULL;
 	GVariant *tuple_parameters;
+	guint i;
 	GError *child_error = NULL;
 
 	g_return_if_fail (DFSM_IS_OBJECT (self));
@@ -463,12 +462,14 @@ dfsm_object_dbus_signal_emission_cb (DfsmMachine *machine, const gchar *signal_n
 	g_assert (priv->registration_ids != NULL);
 
 	/* Find the name of the interface defining the signal. TODO: This is slow. Is there no better way? */
-	dbus_node_info = dfsm_environment_get_dbus_node_info (dfsm_machine_get_environment (priv->machine));
+	interfaces = dfsm_environment_get_interfaces (dfsm_machine_get_environment (priv->machine));
 
-	for (interfaces = dbus_node_info->interfaces; *interfaces != NULL; interfaces++) {
-		if (g_dbus_interface_info_lookup_signal (*interfaces, signal_name) != NULL) {
+	for (i = 0; i < interfaces->len; i++) {
+		GDBusInterfaceInfo *interface_info = (GDBusInterfaceInfo*) g_ptr_array_index (interfaces, i);
+
+		if (g_dbus_interface_info_lookup_signal (interface_info, signal_name) != NULL) {
 			/* Found the interface. */
-			interface_name = (*interfaces)->name;
+			interface_name = interface_info->name;
 			break;
 		}
 	}
@@ -659,7 +660,7 @@ dfsm_object_register_on_bus (DfsmObject *self, GDBusConnection *connection, GErr
 {
 	DfsmObjectPrivate *priv;
 	guint i;
-	GDBusNodeInfo *dbus_node_info;
+	GPtrArray/*<GDBusInterfaceInfo>*/ *interfaces;
 	GArray *registration_ids;
 	GError *child_error = NULL;
 
@@ -674,19 +675,24 @@ dfsm_object_register_on_bus (DfsmObject *self, GDBusConnection *connection, GErr
 		return;
 	}
 
-	dbus_node_info = dfsm_environment_get_dbus_node_info (dfsm_machine_get_environment (priv->machine));
+	interfaces = dfsm_environment_get_interfaces (dfsm_machine_get_environment (priv->machine));
 	registration_ids = g_array_sized_new (FALSE, FALSE, sizeof (guint), priv->interfaces->len);
 
 	/* Register on the bus for each of the interfaces we implement. */
 	for (i = 0; i < priv->interfaces->len; i++) {
 		const gchar *interface_name;
-		GDBusInterfaceInfo *interface_info;
-		guint registration_id;
+		GDBusInterfaceInfo *interface_info = NULL;
+		guint registration_id, j;
 
 		interface_name = g_ptr_array_index (priv->interfaces, i);
 
 		/* Look up the interface information. */
-		interface_info = g_dbus_node_info_lookup_interface (dbus_node_info, interface_name);
+		for (j = 0; j < interfaces->len; j++) {
+			if (strcmp (interface_name, ((GDBusInterfaceInfo*) g_ptr_array_index (interfaces, j))->name) == 0) {
+				interface_info = (GDBusInterfaceInfo*) g_ptr_array_index (interfaces, j);
+				break;
+			}
+		}
 
 		if (interface_info == NULL) {
 			/* Unknown interface! */
