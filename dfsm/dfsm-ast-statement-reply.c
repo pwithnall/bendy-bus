@@ -103,7 +103,7 @@ dfsm_ast_statement_reply_check (DfsmAstNode *node, DfsmEnvironment *environment,
 		return;
 	}
 
-	/* TODO: Check expression's type matches the method. */
+	/* Whether the expression's type matches the method triggering the containing transition is checked by the transition itself, not us. */
 }
 
 static GVariant *
@@ -147,4 +147,20 @@ dfsm_ast_statement_reply_new (DfsmAstExpression *expression)
 	priv->expression = g_object_ref (expression);
 
 	return DFSM_AST_STATEMENT (statement);
+}
+
+/**
+ * dfsm_ast_statement_reply_get_expression:
+ * @self: a #DfsmAstStatementReply
+ *
+ * Get the expression which forms the reply value.
+ *
+ * Return value: (transfer none): the statement's expression
+ */
+DfsmAstExpression *
+dfsm_ast_statement_reply_get_expression (DfsmAstStatementReply *self)
+{
+	g_return_val_if_fail (DFSM_IS_AST_STATEMENT_REPLY (self), NULL);
+
+	return self->priv->expression;
 }

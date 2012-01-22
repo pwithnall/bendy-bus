@@ -28,6 +28,7 @@
 #include "dfsm-ast-statement-reply.h"
 #include "dfsm-ast-statement-throw.h"
 #include "dfsm-ast-transition.h"
+#include "dfsm-internal.h"
 #include "dfsm-parser.h"
 #include "dfsm-parser-internal.h"
 #include "dfsm-utils.h"
@@ -46,7 +47,8 @@ struct _DfsmAstTransitionPrivate {
 	} trigger_params;
 	GPtrArray *preconditions; /* array of DfsmAstPreconditions */
 	GPtrArray *statements; /* array of DfsmAstStatements */
-	gboolean contains_throw_statement; /* cache of whether ->statements contains a DfsmAstStatementThrow */
+	DfsmAstStatementReply *reply_statement; /* cache of the DfsmAstStatementReply in ->statements, if it exists */
+	DfsmAstStatementThrow *throw_statement; /* cache of the DfsmAstStatementThrow in ->statements, if it exists */
 };
 
 G_DEFINE_TYPE (DfsmAstTransition, dfsm_ast_transition, DFSM_TYPE_AST_NODE)
@@ -77,6 +79,9 @@ static void
 dfsm_ast_transition_dispose (GObject *object)
 {
 	DfsmAstTransitionPrivate *priv = DFSM_AST_TRANSITION (object)->priv;
+
+	g_clear_object (&priv->throw_statement);
+	g_clear_object (&priv->reply_statement);
 
 	if (priv->statements != NULL) {
 		g_ptr_array_unref (priv->statements);
@@ -148,6 +153,16 @@ dfsm_ast_transition_sanity_check (DfsmAstNode *node)
 		g_assert (g_ptr_array_index (priv->statements, i) != NULL);
 		dfsm_ast_node_sanity_check (DFSM_AST_NODE (g_ptr_array_index (priv->statements, i)));
 	}
+
+	g_assert (priv->throw_statement == NULL || priv->reply_statement == NULL);
+
+	if (priv->throw_statement != NULL) {
+		g_assert (DFSM_IS_AST_STATEMENT_THROW (priv->throw_statement));
+	}
+
+	if (priv->reply_statement != NULL) {
+		g_assert (DFSM_IS_AST_STATEMENT_REPLY (priv->reply_statement));
+	}
 }
 
 static void
@@ -208,9 +223,14 @@ dfsm_ast_transition_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *
 		/* What type of statement is it? */
 		if (DFSM_IS_AST_STATEMENT_REPLY (statement)) {
 			reply_statement_count++;
+
+			g_clear_object (&priv->reply_statement);
+			priv->reply_statement = g_object_ref (statement);
 		} else if (DFSM_IS_AST_STATEMENT_THROW (statement)) {
 			throw_statement_count++;
-			priv->contains_throw_statement = TRUE;
+
+			g_clear_object (&priv->throw_statement);
+			priv->throw_statement = g_object_ref (statement);
 		}
 	}
 
@@ -279,10 +299,10 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 			if (method_info == NULL) {
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
 				             _("Undeclared D-Bus method referenced as a transition trigger: %s"), priv->trigger_params.method_name);
-				return;
+				goto done;
 			}
 
-			/* Add the method's parameters to the environment so they're available when checking sub-nodes. */
+			/* Add the method's parameters to the environment so they're available when checking sub-nodes and the reply statement. */
 			if (method_info->in_args != NULL) {
 				GDBusArgInfo **arg_infos;
 
@@ -293,6 +313,40 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 					dfsm_environment_set_variable_type (environment, DFSM_VARIABLE_SCOPE_LOCAL, (*arg_infos)->name, parameter_type);
 					g_variant_type_free (parameter_type);
 				}
+			}
+
+			/* Check the type of the reply statement, if one exists. If there are no out args, the statement has to have unit type.
+			 * Otherwise, the statement has to be a struct of the required arity.
+			 * Note that this has to be done after the parameters have been added to the environmen, as the parameters might be referenced
+			 * by the reply statement. */
+			if (priv->reply_statement != NULL) {
+				GVariantType *actual_out_type, *expected_out_type;
+
+				actual_out_type = dfsm_ast_expression_calculate_type (dfsm_ast_statement_reply_get_expression (priv->reply_statement),
+				                                                      environment);
+				expected_out_type = dfsm_internal_dbus_arg_info_array_to_variant_type ((const GDBusArgInfo**) method_info->out_args);
+
+				if (g_variant_type_is_subtype_of (actual_out_type, expected_out_type) == FALSE) {
+					gchar *actual_out_type_string, *expected_out_type_string;
+
+					actual_out_type_string = g_variant_type_dup_string (actual_out_type);
+					expected_out_type_string = g_variant_type_dup_string (expected_out_type);
+
+					g_variant_type_free (expected_out_type);
+					g_variant_type_free (actual_out_type);
+
+					g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+					             _("Type mismatch between formal and actual parameters to D-Bus reply statement: "
+					               "expects type ‘%s’ but received type ‘%s’."), expected_out_type_string, actual_out_type_string);
+
+					g_free (expected_out_type_string);
+					g_free (actual_out_type_string);
+
+					goto done;
+				}
+
+				g_variant_type_free (expected_out_type);
+				g_variant_type_free (actual_out_type);
 			}
 
 			break;
@@ -320,7 +374,7 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 			if (property_info == NULL) {
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
 				             _("Undeclared D-Bus property referenced as a transition trigger: %s"), priv->trigger_params.property_name);
-				return;
+				goto done;
 			}
 
 			/* Warn if the property isn't writeable. */
@@ -351,7 +405,7 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 		dfsm_ast_node_check (DFSM_AST_NODE (precondition), environment, error);
 
 		if (*error != NULL) {
-			return;
+			goto done;
 		}
 	}
 
@@ -363,10 +417,11 @@ dfsm_ast_transition_check (DfsmAstNode *node, DfsmEnvironment *environment, GErr
 		dfsm_ast_node_check (DFSM_AST_NODE (statement), environment, error);
 
 		if (*error != NULL) {
-			return;
+			goto done;
 		}
 	}
 
+done:
 	/* Restore the environment if this is a method- or property-triggered transition. */
 	if (priv->trigger == DFSM_AST_TRANSITION_METHOD_CALL && method_info->in_args != NULL) {
 		GDBusArgInfo **arg_infos;
@@ -586,5 +641,5 @@ dfsm_ast_transition_contains_throw_statement (DfsmAstTransition *self)
 {
 	g_return_val_if_fail (DFSM_IS_AST_TRANSITION (self), FALSE);
 
-	return self->priv->contains_throw_statement;
+	return (self->priv->throw_statement != NULL) ? TRUE : FALSE;
 }

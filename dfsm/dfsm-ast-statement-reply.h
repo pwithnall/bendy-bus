@@ -48,6 +48,8 @@ typedef struct {
 
 GType dfsm_ast_statement_reply_get_type (void) G_GNUC_CONST;
 
+DfsmAstExpression *dfsm_ast_statement_reply_get_expression (DfsmAstStatementReply *self) G_GNUC_PURE;
+
 G_END_DECLS
 
 #endif /* !DFSM_AST_STATEMENT_REPLY_H */
