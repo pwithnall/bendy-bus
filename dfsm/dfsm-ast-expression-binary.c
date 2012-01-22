@@ -31,7 +31,7 @@ static void dfsm_ast_expression_binary_sanity_check (DfsmAstNode *node);
 static void dfsm_ast_expression_binary_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static void dfsm_ast_expression_binary_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static GVariantType *dfsm_ast_expression_binary_calculate_type (DfsmAstExpression *self, DfsmEnvironment *environment);
-static GVariant *dfsm_ast_expression_binary_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment, GError **error);
+static GVariant *dfsm_ast_expression_binary_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment);
 static gdouble dfsm_ast_expression_binary_calculate_weight (DfsmAstExpression *self);
 
 struct _DfsmAstExpressionBinaryPrivate {
@@ -243,31 +243,14 @@ dfsm_ast_expression_binary_calculate_type (DfsmAstExpression *expression, DfsmEn
 }
 
 static GVariant *
-dfsm_ast_expression_binary_evaluate (DfsmAstExpression *expression, DfsmEnvironment *environment, GError **error)
+dfsm_ast_expression_binary_evaluate (DfsmAstExpression *expression, DfsmEnvironment *environment)
 {
 	DfsmAstExpressionBinaryPrivate *priv = DFSM_AST_EXPRESSION_BINARY (expression)->priv;
 	GVariant *left_value, *right_value, *binary_value;
-	GError *child_error = NULL;
 
 	/* Evaluate our sub-expressions first. */
-	left_value = dfsm_ast_expression_evaluate (priv->left_node, environment, &child_error);
-
-	if (child_error != NULL) {
-		g_assert (left_value == NULL);
-
-		g_propagate_error (error, child_error);
-		return NULL;
-	}
-
-	right_value = dfsm_ast_expression_evaluate (priv->right_node, environment, &child_error);
-
-	if (child_error != NULL) {
-		g_variant_unref (left_value);
-		g_assert (right_value == NULL);
-
-		g_propagate_error (error, child_error);
-		return NULL;
-	}
+	left_value = dfsm_ast_expression_evaluate (priv->left_node, environment);
+	right_value = dfsm_ast_expression_evaluate (priv->right_node, environment);
 
 	/* Do the actual evaluation. */
 	switch (priv->expression_type) {

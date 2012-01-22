@@ -515,7 +515,6 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
 		while (g_hash_table_iter_next (&iter, (gpointer*) &key, (gpointer*) &value_data_structure) == TRUE) {
 			GVariantType *new_type;
 			GVariant *new_value;
-			GError *child_error = NULL;
 
 			/* Check the value expression. */
 			dfsm_ast_node_check (DFSM_AST_NODE (value_data_structure), priv->environment, error);
@@ -528,15 +527,7 @@ dfsm_ast_object_check (DfsmAstNode *node, DfsmEnvironment *environment, GError *
 			new_type = dfsm_ast_data_structure_calculate_type (value_data_structure, priv->environment);
 
 			/* Evaluate the value expression. */
-			new_value = dfsm_ast_data_structure_to_variant (value_data_structure, priv->environment, &child_error);
-
-			if (child_error != NULL) {
-				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-				             _("Couldn't evaluate default value for variable ‘%s’: %s"), key, child_error->message);
-				g_error_free (child_error);
-
-				return;
-			}
+			new_value = dfsm_ast_data_structure_to_variant (value_data_structure, priv->environment);
 
 			/* Store the real type and value in the environment. */
 			dfsm_environment_set_variable_type (priv->environment, DFSM_VARIABLE_SCOPE_OBJECT, key, new_type);

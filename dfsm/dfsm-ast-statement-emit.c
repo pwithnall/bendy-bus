@@ -184,25 +184,14 @@ dfsm_ast_statement_emit_execute (DfsmAstStatement *statement, DfsmEnvironment *e
 {
 	DfsmAstStatementEmitPrivate *priv = DFSM_AST_STATEMENT_EMIT (statement)->priv;
 	GVariant *expression_value;
-	GError *child_error = NULL;
 
 	/* Evaluate the child expression first. */
-	expression_value = dfsm_ast_expression_evaluate (priv->expression, environment, &child_error);
-
-	if (child_error != NULL) {
-		g_propagate_error (error, child_error);
-		return NULL;
-	}
+	expression_value = dfsm_ast_expression_evaluate (priv->expression, environment);
 
 	/* Emit the signal. */
-	dfsm_environment_emit_signal (environment, priv->signal_name, expression_value, &child_error);
+	dfsm_environment_emit_signal (environment, priv->signal_name, expression_value);
 
 	g_variant_unref (expression_value);
-
-	if (child_error != NULL) {
-		g_propagate_error (error, child_error);
-		return NULL;
-	}
 
 	return NULL;
 }

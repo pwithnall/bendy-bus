@@ -32,7 +32,7 @@ static void dfsm_ast_expression_function_call_sanity_check (DfsmAstNode *node);
 static void dfsm_ast_expression_function_call_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static void dfsm_ast_expression_function_call_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static GVariantType *dfsm_ast_expression_function_call_calculate_type (DfsmAstExpression *self, DfsmEnvironment *environment);
-static GVariant *dfsm_ast_expression_function_call_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment, GError **error);
+static GVariant *dfsm_ast_expression_function_call_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment);
 static gdouble dfsm_ast_expression_function_call_calculate_weight (DfsmAstExpression *self);
 
 struct _DfsmAstExpressionFunctionCallPrivate {
@@ -158,32 +158,17 @@ dfsm_ast_expression_function_call_calculate_type (DfsmAstExpression *expression,
 }
 
 static GVariant *
-dfsm_ast_expression_function_call_evaluate (DfsmAstExpression *expression, DfsmEnvironment *environment, GError **error)
+dfsm_ast_expression_function_call_evaluate (DfsmAstExpression *expression, DfsmEnvironment *environment)
 {
 	DfsmAstExpressionFunctionCallPrivate *priv = DFSM_AST_EXPRESSION_FUNCTION_CALL (expression)->priv;
 	GVariant *parameters_value, *function_call_value;
-	GError *child_error = NULL;
 
 	/* Evaluate the parameters. */
-	parameters_value = dfsm_ast_expression_evaluate (priv->parameters, environment, &child_error);
-
-	if (child_error != NULL) {
-		g_assert (parameters_value == NULL);
-
-		g_propagate_error (error, child_error);
-		return NULL;
-	}
+	parameters_value = dfsm_ast_expression_evaluate (priv->parameters, environment);
 
 	/* Delegate evaluation of the function to the function's evaluation function. Function function function. */
-	function_call_value = dfsm_environment_function_evaluate (priv->function_name, parameters_value, environment, &child_error);
+	function_call_value = dfsm_environment_function_evaluate (priv->function_name, parameters_value, environment);
 	g_variant_unref (parameters_value);
-
-	if (child_error != NULL) {
-		g_assert (function_call_value == NULL);
-
-		g_propagate_error (error, child_error);
-		return NULL;
-	}
 
 	return function_call_value;
 }

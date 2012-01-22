@@ -50,8 +50,8 @@ GType dfsm_ast_variable_get_type (void) G_GNUC_CONST;
 
 GVariantType *dfsm_ast_variable_calculate_type (DfsmAstVariable *self, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
 
-GVariant *dfsm_ast_variable_to_variant (DfsmAstVariable *self, DfsmEnvironment *environment, GError **error) DFSM_CONSTRUCTOR;
-void dfsm_ast_variable_set_from_variant (DfsmAstVariable *self, DfsmEnvironment *environment, GVariant *new_value, GError **error);
+GVariant *dfsm_ast_variable_to_variant (DfsmAstVariable *self, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
+void dfsm_ast_variable_set_from_variant (DfsmAstVariable *self, DfsmEnvironment *environment, GVariant *new_value);
 
 G_END_DECLS
 

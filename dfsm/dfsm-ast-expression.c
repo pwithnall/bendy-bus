@@ -66,7 +66,6 @@ dfsm_ast_expression_calculate_type (DfsmAstExpression *self, DfsmEnvironment *en
  * dfsm_ast_expression_evaluate:
  * @self: a #DfsmAstExpression
  * @environment: a #DfsmEnvironment containing all defined variables
- * @error: (allow-none): a #GError, or %NULL
  *
  * Evaluate the given @expression in the given @environment. This will not modify the environment.
  *
@@ -75,28 +74,20 @@ dfsm_ast_expression_calculate_type (DfsmAstExpression *self, DfsmEnvironment *en
  * Return value: (transfer full): non-floating value of the expression
  */
 GVariant *
-dfsm_ast_expression_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment, GError **error)
+dfsm_ast_expression_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment)
 {
 	DfsmAstExpressionClass *klass;
 	GVariant *return_value;
-	GError *child_error = NULL;
 
 	g_return_val_if_fail (DFSM_IS_AST_EXPRESSION (self), NULL);
 	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), NULL);
-	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	klass = DFSM_AST_EXPRESSION_GET_CLASS (self);
 
 	g_assert (klass->evaluate != NULL);
-	return_value = klass->evaluate (self, environment, &child_error);
+	return_value = klass->evaluate (self, environment);
 
-	g_assert ((return_value == NULL) != (child_error == NULL));
-	g_assert (return_value == NULL || g_variant_is_floating (return_value) == FALSE);
-
-	/* We use our own child_error so that we can guarantee to virtual method implementations that error will be non-NULL. */
-	if (child_error != NULL) {
-		g_propagate_error (error, child_error);
-	}
+	g_assert (return_value != NULL && g_variant_is_floating (return_value) == FALSE);
 
 	return return_value;
 }

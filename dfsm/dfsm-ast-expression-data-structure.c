@@ -27,7 +27,7 @@ static void dfsm_ast_expression_data_structure_sanity_check (DfsmAstNode *node);
 static void dfsm_ast_expression_data_structure_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static void dfsm_ast_expression_data_structure_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static GVariantType *dfsm_ast_expression_data_structure_calculate_type (DfsmAstExpression *self, DfsmEnvironment *environment);
-static GVariant *dfsm_ast_expression_data_structure_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment, GError **error);
+static GVariant *dfsm_ast_expression_data_structure_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment);
 static gdouble dfsm_ast_expression_data_structure_calculate_weight (DfsmAstExpression *self);
 
 struct _DfsmAstExpressionDataStructurePrivate {
@@ -116,11 +116,11 @@ dfsm_ast_expression_data_structure_calculate_type (DfsmAstExpression *expression
 }
 
 static GVariant *
-dfsm_ast_expression_data_structure_evaluate (DfsmAstExpression *expression, DfsmEnvironment *environment, GError **error)
+dfsm_ast_expression_data_structure_evaluate (DfsmAstExpression *expression, DfsmEnvironment *environment)
 {
 	DfsmAstExpressionDataStructurePrivate *priv = DFSM_AST_EXPRESSION_DATA_STRUCTURE (expression)->priv;
 
-	return dfsm_ast_data_structure_to_variant (priv->data_structure, environment, error);
+	return dfsm_ast_data_structure_to_variant (priv->data_structure, environment);
 }
 
 static gdouble
@@ -157,20 +157,18 @@ dfsm_ast_expression_data_structure_new (DfsmAstDataStructure *data_structure)
  * dfsm_ast_expression_data_structure_to_variant:
  * @self: a #DfsmAstExpressionDataStructure
  * @environment: a #DfsmEnvironment containing any referenced variables
- * @error: (allow-none): a #GError, or %NULL
  *
  * Evaluate the data structure completely, returning a #GVariant which represents it with all variables, and nested expressions evaluated.
  *
  * Return value: (transfer full): a fully-evaluated #GVariant form of the data structure
  */
 GVariant *
-dfsm_ast_expression_data_structure_to_variant (DfsmAstExpressionDataStructure *self, DfsmEnvironment *environment, GError **error)
+dfsm_ast_expression_data_structure_to_variant (DfsmAstExpressionDataStructure *self, DfsmEnvironment *environment)
 {
 	g_return_val_if_fail (DFSM_IS_AST_EXPRESSION_DATA_STRUCTURE (self), NULL);
 	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), NULL);
-	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
-	return dfsm_ast_data_structure_to_variant (self->priv->data_structure, environment, error);
+	return dfsm_ast_data_structure_to_variant (self->priv->data_structure, environment);
 }
 
 /**
@@ -178,7 +176,6 @@ dfsm_ast_expression_data_structure_to_variant (DfsmAstExpressionDataStructure *s
  * @self: a #DfsmAstExpressionDataStructure
  * @environment: a #DfsmEnvironment containing any referenced variables
  * @new_value: the new value to assign to the data structure
- * @error: (allow-none): a #GError, or %NULL
  *
  * Recursively set the value of the data structure to @new_value. This will recursively assign to any variables in the data structure the equivalent
  * value from @new_value. This allows assignments of the form:
@@ -188,15 +185,13 @@ dfsm_ast_expression_data_structure_to_variant (DfsmAstExpressionDataStructure *s
  * to assign to three variables at once.
  */
 void
-dfsm_ast_expression_data_structure_set_from_variant (DfsmAstExpressionDataStructure *self, DfsmEnvironment *environment, GVariant *new_value,
-                                                     GError **error)
+dfsm_ast_expression_data_structure_set_from_variant (DfsmAstExpressionDataStructure *self, DfsmEnvironment *environment, GVariant *new_value)
 {
 	g_return_if_fail (DFSM_IS_AST_EXPRESSION_DATA_STRUCTURE (self));
 	g_return_if_fail (DFSM_IS_ENVIRONMENT (environment));
 	g_return_if_fail (new_value != NULL);
-	g_return_if_fail (error == NULL || *error == NULL);
 
-	dfsm_ast_data_structure_set_from_variant (self->priv->data_structure, environment, new_value, error);
+	dfsm_ast_data_structure_set_from_variant (self->priv->data_structure, environment, new_value);
 }
 
 /**

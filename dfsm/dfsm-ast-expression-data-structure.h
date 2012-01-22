@@ -51,10 +51,8 @@ typedef struct {
 
 GType dfsm_ast_expression_data_structure_get_type (void) G_GNUC_CONST;
 
-GVariant *dfsm_ast_expression_data_structure_to_variant (DfsmAstExpressionDataStructure *self, DfsmEnvironment *environment,
-                                                         GError **error) DFSM_CONSTRUCTOR;
-void dfsm_ast_expression_data_structure_set_from_variant (DfsmAstExpressionDataStructure *self, DfsmEnvironment *environment, GVariant *new_value,
-                                                          GError **error);
+GVariant *dfsm_ast_expression_data_structure_to_variant (DfsmAstExpressionDataStructure *self, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
+void dfsm_ast_expression_data_structure_set_from_variant (DfsmAstExpressionDataStructure *self, DfsmEnvironment *environment, GVariant *new_value);
 
 DfsmAstDataStructure *dfsm_ast_expression_data_structure_get_data_structure (DfsmAstExpressionDataStructure *self) G_GNUC_PURE;
 

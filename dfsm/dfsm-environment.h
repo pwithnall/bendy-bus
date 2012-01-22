@@ -66,10 +66,9 @@ void dfsm_environment_reset (DfsmEnvironment *self);
 gboolean dfsm_environment_function_exists (const gchar *function_name) G_GNUC_PURE;
 GVariantType *dfsm_environment_function_calculate_type (const gchar *function_name, const GVariantType *parameters_type,
                                                         GError **error) DFSM_CONSTRUCTOR;
-GVariant *dfsm_environment_function_evaluate (const gchar *function_name, GVariant *parameters, DfsmEnvironment *environment,
-                                              GError **error) DFSM_CONSTRUCTOR;
+GVariant *dfsm_environment_function_evaluate (const gchar *function_name, GVariant *parameters, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
 
-void dfsm_environment_emit_signal (DfsmEnvironment *self, const gchar *signal_name, GVariant *parameters, GError **error);
+void dfsm_environment_emit_signal (DfsmEnvironment *self, const gchar *signal_name, GVariant *parameters);
 
 GPtrArray/*<GDBusInterfaceInfo>*/ *dfsm_environment_get_interfaces (DfsmEnvironment *self) G_GNUC_PURE;
 

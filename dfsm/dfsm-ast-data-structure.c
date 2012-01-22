@@ -1548,7 +1548,7 @@ fuzz_type_signature (const gchar *default_value)
 
 /* Evaluate a data structure, ensuring that it's fuzzed in the process. A bit hacky. */
 static GVariant *
-fuzz_data_structure (DfsmAstDataStructure *data_structure, DfsmEnvironment *environment, GError **error)
+fuzz_data_structure (DfsmAstDataStructure *data_structure, DfsmEnvironment *environment)
 {
 	gdouble old_weight;
 	GVariant *variant;
@@ -1557,7 +1557,7 @@ fuzz_data_structure (DfsmAstDataStructure *data_structure, DfsmEnvironment *envi
 	old_weight = data_structure->priv->weight;
 	data_structure->priv->weight = MAX (1.0, old_weight);
 
-	variant = dfsm_ast_data_structure_to_variant (data_structure, environment, error);
+	variant = dfsm_ast_data_structure_to_variant (data_structure, environment);
 
 	data_structure->priv->weight = old_weight;
 
@@ -1568,7 +1568,6 @@ fuzz_data_structure (DfsmAstDataStructure *data_structure, DfsmEnvironment *envi
  * dfsm_ast_data_structure_to_variant:
  * @self: a #DfsmAstDataStructure
  * @environment: a #DfsmEnvironment containing all variables
- * @error: (allow-none): a #GError, or %NULL
  *
  * Convert the data structure given by @self to a #GVariant in the given @environment.
  *
@@ -1578,13 +1577,12 @@ fuzz_data_structure (DfsmAstDataStructure *data_structure, DfsmEnvironment *envi
  * Return value: (transfer full): the non-floating #GVariant representation of the data structure
  */
 GVariant *
-dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment *environment, GError **error)
+dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment *environment)
 {
 	DfsmAstDataStructurePrivate *priv;
 
 	g_return_val_if_fail (DFSM_IS_AST_DATA_STRUCTURE (self), NULL);
 	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), NULL);
-	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	priv = self->priv;
 
@@ -1794,7 +1792,6 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 				GVariant *child_value;
 				DfsmAstExpression *child_expression;
 				gdouble child_expression_weight;
-				GError *child_error = NULL;
 
 				/* Evaluate the child expression to get a GVariant value. */
 				child_expression = (DfsmAstExpression*) g_ptr_array_index (priv->array_val, i);
@@ -1805,16 +1802,7 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 					continue;
 				}
 
-				child_value = dfsm_ast_expression_evaluate (child_expression, environment, &child_error);
-
-				if (child_error != NULL) {
-					/* Error! */
-					g_propagate_error (error, child_error);
-
-					g_variant_builder_clear (&builder);
-
-					return NULL;
-				}
+				child_value = dfsm_ast_expression_evaluate (child_expression, environment);
 
 				/* Add it to the growing GVariant array. */
 				g_variant_builder_add_value (&builder, child_value);
@@ -1836,17 +1824,7 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 							DFSM_AST_EXPRESSION_DATA_STRUCTURE (child_expression));
 
 					/* Add the mutated value. */
-					child_value = fuzz_data_structure (child_data_structure, environment, &child_error);
-
-					if (child_error != NULL) {
-						/* Error! */
-						g_propagate_error (error, child_error);
-
-						g_variant_builder_clear (&builder);
-
-						return NULL;
-					}
-
+					child_value = fuzz_data_structure (child_data_structure, environment);
 					g_variant_builder_add_value (&builder, child_value);
 					g_variant_unref (child_value);
 				}
@@ -1868,17 +1846,10 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 			for (i = 0; i < priv->struct_val->len; i++) {
 				GVariant *child_value;
 				DfsmAstExpression *child_expression;
-				GError *child_error = NULL;
 
 				/* Evaluate the child expression to get a GVariant value. */
 				child_expression = (DfsmAstExpression*) g_ptr_array_index (priv->struct_val, i);
-				child_value = dfsm_ast_expression_evaluate (child_expression, environment, &child_error);
-
-				if (child_error != NULL) {
-					/* Error! */
-					g_propagate_error (error, child_error);
-					return NULL;
-				}
+				child_value = dfsm_ast_expression_evaluate (child_expression, environment);
 
 				/* Add it to the growing GVariant struct. */
 				g_variant_builder_add_value (&builder, child_value);
@@ -1890,7 +1861,6 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 		}
 		case DFSM_AST_DATA_VARIANT: {
 			GVariant *default_child_value, *child_value, *variant_value;
-			GError *child_error = NULL;
 
 			/* Fuzzing for variants can only be done in one way: fuzzing the type of the variant's value.
 			 *  • Changing the type of the variant's value happens with probability 0.2.
@@ -1904,12 +1874,7 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 			 * In the second case, fuzzing of the default value itself is performed by marking the default value as fuzzable, rather
 			 * than by marking the enclosing variant as fuzzable. */
 
-			default_child_value = dfsm_ast_expression_evaluate (priv->variant_val, environment, &child_error);
-
-			if (child_error != NULL) {
-				g_propagate_error (error, child_error);
-				return NULL;
-			}
+			default_child_value = dfsm_ast_expression_evaluate (priv->variant_val, environment);
 
 			if (should_be_fuzzed (self) == TRUE && DFSM_BIASED_COIN_FLIP (0.2)) {
 				/* Choose an arbitrary type and generate a value for it. See explanation above. */
@@ -1958,7 +1923,6 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 				GVariant *key_value, *value_value;
 				DfsmAstDictionaryEntry *dict_entry;
 				gdouble key_weight, value_weight;
-				GError *child_error = NULL;
 
 				/* Evaluate the child expressions to get GVariant values. */
 				dict_entry = (DfsmAstDictionaryEntry*) g_ptr_array_index (priv->dict_val, i);
@@ -1972,28 +1936,8 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 					continue;
 				}
 
-				key_value = dfsm_ast_expression_evaluate (dict_entry->key, environment, &child_error);
-
-				if (child_error != NULL) {
-					/* Error! */
-					g_variant_type_free (data_structure_type);
-
-					g_propagate_error (error, child_error);
-
-					return NULL;
-				}
-
-				value_value = dfsm_ast_expression_evaluate (dict_entry->value, environment, &child_error);
-
-				if (child_error != NULL) {
-					/* Error! */
-					g_variant_unref (key_value);
-					g_variant_type_free (data_structure_type);
-
-					g_propagate_error (error, child_error);
-
-					return NULL;
-				}
+				key_value = dfsm_ast_expression_evaluate (dict_entry->key, environment);
+				value_value = dfsm_ast_expression_evaluate (dict_entry->value, environment);
 
 				/* Add them to the growing GVariant dict. */
 				g_variant_builder_open (&builder, g_variant_type_element (data_structure_type));
@@ -2015,34 +1959,12 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 							DFSM_AST_EXPRESSION_DATA_STRUCTURE (dict_entry->value));
 
 					g_variant_unref (key_value);
-					key_value = fuzz_data_structure (key_data_structure, environment, &child_error);
-
-					if (child_error != NULL) {
-						/* Error! */
-						g_propagate_error (error, child_error);
-
-						g_variant_builder_clear (&builder);
-						g_variant_unref (value_value);
-						g_variant_type_free (data_structure_type);
-
-						return NULL;
-					}
+					key_value = fuzz_data_structure (key_data_structure, environment);
 
 					if (DFSM_BIASED_COIN_FLIP (0.5 * value_weight)) {
 						/* Mutate the value as well as the key. */
 						g_variant_unref (value_value);
-						value_value = fuzz_data_structure (value_data_structure, environment, &child_error);
-
-						if (child_error != NULL) {
-							/* Error! */
-							g_propagate_error (error, child_error);
-
-							g_variant_builder_clear (&builder);
-							g_variant_unref (key_value);
-							g_variant_type_free (data_structure_type);
-
-							return NULL;
-						}
+						value_value = fuzz_data_structure (value_data_structure, environment);
 					}
 
 					/* Add the mutated entry. */
@@ -2065,7 +1987,7 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
 			return g_variant_ref_sink (g_variant_new_uint32 (priv->unix_fd_val));
 		case DFSM_AST_DATA_VARIABLE:
 			/* Note: Fuzzing variables isn't currently supported, so we ignore any fuzzing here. */
-			return dfsm_ast_variable_to_variant (priv->variable_val, environment, error);
+			return dfsm_ast_variable_to_variant (priv->variable_val, environment);
 		default:
 			g_assert_not_reached ();
 	}
@@ -2076,7 +1998,6 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
  * @self: a #DfsmAstDataStructure
  * @environment: a #DfsmEnvironment containing all variables
  * @new_value: the #GVariant value to assign to @self
- * @error: (allow-none): a #GError, or %NULL
  *
  * Set the given @self's value in @environment to the #GVariant value given in @new_value. This will recursively assign to child data
  * structures inside the data structure (e.g. if the data structure is an array of variables, each of the variables will be assigned to).
@@ -2085,14 +2006,13 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
  * error to call this function with a @new_value which doesn't match the data structure's type and number of elements.
  */
 void
-dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnvironment *environment, GVariant *new_value, GError **error)
+dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnvironment *environment, GVariant *new_value)
 {
 	DfsmAstDataStructurePrivate *priv;
 
 	g_return_if_fail (DFSM_IS_AST_DATA_STRUCTURE (self));
 	g_return_if_fail (DFSM_IS_ENVIRONMENT (environment));
 	g_return_if_fail (new_value != NULL);
-	g_return_if_fail (error == NULL || *error == NULL);
 
 	priv = self->priv;
 
@@ -2111,7 +2031,7 @@ dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnviro
 		case DFSM_AST_DATA_SIGNATURE:
 		case DFSM_AST_DATA_VARIANT:
 		case DFSM_AST_DATA_UNIX_FD:
-			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid assignment to a basic data structure."));
+			g_error ("Invalid assignment to a basic data structure.");
 			break;
 		case DFSM_AST_DATA_ARRAY: {
 			guint i;
@@ -2121,7 +2041,6 @@ dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnviro
 			for (i = 0; i < priv->array_val->len; i++) {
 				GVariant *child_variant;
 				DfsmAstExpression *child_expression;
-				GError *child_error = NULL;
 
 				/* TODO: For the moment, we hackily assume that the child_expression is a DFSM_AST_EXPRESSION_DATA_STRUCTURE and
 				 * extract its data structure to recursively assign to. */
@@ -2133,15 +2052,9 @@ dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnviro
 
 				/* Recursively assign to the child data structure. */
 				dfsm_ast_expression_data_structure_set_from_variant (DFSM_AST_EXPRESSION_DATA_STRUCTURE (child_expression),
-				                                                     environment, child_variant, &child_error);
+				                                                     environment, child_variant);
 
 				g_variant_unref (child_variant);
-
-				if (child_error != NULL) {
-					/* Error! */
-					g_propagate_error (error, child_error);
-					return;
-				}
 			}
 
 			break;
@@ -2153,7 +2066,6 @@ dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnviro
 			for (i = 0; i < priv->struct_val->len; i++) {
 				GVariant *child_variant;
 				DfsmAstExpression *child_expression;
-				GError *child_error = NULL;
 
 				/* TODO: For the moment, we hackily assume that the child_expression is a DFSM_AST_EXPRESSION_DATA_STRUCTURE and
 				 * extract its data structure to recursively assign to. */
@@ -2165,15 +2077,9 @@ dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnviro
 
 				/* Recursively assign to the child data structure. */
 				dfsm_ast_expression_data_structure_set_from_variant (DFSM_AST_EXPRESSION_DATA_STRUCTURE (child_expression),
-				                                                     environment, child_variant, &child_error);
+				                                                     environment, child_variant);
 
 				g_variant_unref (child_variant);
-
-				if (child_error != NULL) {
-					/* Error! */
-					g_propagate_error (error, child_error);
-					return;
-				}
 			}
 
 			break;
@@ -2193,18 +2099,11 @@ dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnviro
 			for (i = 0; i < priv->dict_val->len; i++) {
 				DfsmAstDictionaryEntry *child_entry;
 				GVariant *key_variant;
-				GError *child_error = NULL;
 
 				child_entry = (DfsmAstDictionaryEntry*) g_ptr_array_index (priv->dict_val, i);
 
 				/* Evaluate the expression for the entry's key, but not its value. We'll store a pointer to the value verbatim. */
-				key_variant = dfsm_ast_expression_evaluate (child_entry->key, environment, &child_error);
-
-				if (child_error != NULL) {
-					g_hash_table_unref (data_structure_map);
-					g_propagate_error (error, child_error);
-					return;
-				}
+				key_variant = dfsm_ast_expression_evaluate (child_entry->key, environment);
 
 				/* Insert the entry into the map. */
 				g_hash_table_insert (data_structure_map, g_variant_ref (key_variant), g_object_ref (child_entry->value));
@@ -2220,7 +2119,6 @@ dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnviro
 			while ((child_entry_variant = g_variant_iter_next_value (&iter)) != NULL) {
 				GVariant *child_key_variant, *child_value_variant;
 				DfsmAstExpression *value_expression;
-				GError *child_error = NULL;
 
 				/* Get the child variant and its key and value. */
 				child_entry_variant = g_variant_get_child_value (new_value, i);
@@ -2240,16 +2138,9 @@ dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnviro
 
 				/* Recursively assign to the child data structure. */
 				dfsm_ast_expression_data_structure_set_from_variant (DFSM_AST_EXPRESSION_DATA_STRUCTURE (value_expression),
-				                                                     environment, child_value_variant, &child_error);
+				                                                     environment, child_value_variant);
 
 				g_variant_unref (child_value_variant);
-
-				if (child_error != NULL) {
-					/* Error! */
-					g_hash_table_unref (data_structure_map);
-					g_propagate_error (error, child_error);
-					return;
-				}
 			}
 
 			g_hash_table_unref (data_structure_map);
@@ -2257,7 +2148,7 @@ dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnviro
 			break;
 		}
 		case DFSM_AST_DATA_VARIABLE:
-			dfsm_ast_variable_set_from_variant (priv->variable_val, environment, new_value, error);
+			dfsm_ast_variable_set_from_variant (priv->variable_val, environment, new_value);
 			break;
 		default:
 			g_assert_not_reached ();

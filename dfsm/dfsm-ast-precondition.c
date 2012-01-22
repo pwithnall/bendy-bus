@@ -189,7 +189,6 @@ dfsm_ast_precondition_check_is_satisfied (DfsmAstPrecondition *self, DfsmEnviron
 	DfsmAstPreconditionPrivate *priv;
 	GVariant *condition_value;
 	gboolean condition_holds;
-	GError *child_error = NULL;
 
 	g_return_val_if_fail (DFSM_IS_AST_PRECONDITION (self), FALSE);
 	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), FALSE);
@@ -198,12 +197,7 @@ dfsm_ast_precondition_check_is_satisfied (DfsmAstPrecondition *self, DfsmEnviron
 	priv = self->priv;
 
 	/* Evaluate the condition. */
-	condition_value = dfsm_ast_expression_evaluate (priv->condition, environment, &child_error);
-
-	if (child_error != NULL) {
-		g_propagate_error (error, child_error);
-		return FALSE;
-	}
+	condition_value = dfsm_ast_expression_evaluate (priv->condition, environment);
 
 	/* If the condition doesn't hold and we have an error, throw that. */
 	condition_holds = g_variant_get_boolean (condition_value);

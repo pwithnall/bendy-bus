@@ -31,7 +31,7 @@ static void dfsm_ast_expression_unary_sanity_check (DfsmAstNode *node);
 static void dfsm_ast_expression_unary_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static void dfsm_ast_expression_unary_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static GVariantType *dfsm_ast_expression_unary_calculate_type (DfsmAstExpression *self, DfsmEnvironment *environment);
-static GVariant *dfsm_ast_expression_unary_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment, GError **error);
+static GVariant *dfsm_ast_expression_unary_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment);
 static gdouble dfsm_ast_expression_unary_calculate_weight (DfsmAstExpression *self);
 
 struct _DfsmAstExpressionUnaryPrivate {
@@ -161,21 +161,13 @@ dfsm_ast_expression_unary_calculate_type (DfsmAstExpression *expression, DfsmEnv
 }
 
 static GVariant *
-dfsm_ast_expression_unary_evaluate (DfsmAstExpression *expression, DfsmEnvironment *environment, GError **error)
+dfsm_ast_expression_unary_evaluate (DfsmAstExpression *expression, DfsmEnvironment *environment)
 {
 	DfsmAstExpressionUnaryPrivate *priv = DFSM_AST_EXPRESSION_UNARY (expression)->priv;
 	GVariant *child_value, *unary_value;
-	GError *child_error = NULL;
 
 	/* Evaluate our sub-expression first. */
-	child_value = dfsm_ast_expression_evaluate (priv->child_node, environment, &child_error);
-
-	if (child_error != NULL) {
-		g_assert (child_value == NULL);
-
-		g_propagate_error (error, child_error);
-		return NULL;
-	}
+	child_value = dfsm_ast_expression_evaluate (priv->child_node, environment);
 
 	/* Do the actual evaluation. */
 	switch (priv->expression_type) {

@@ -523,7 +523,7 @@ _keys_calculate_type (const GVariantType *parameters_type, GError **error)
 }
 
 static GVariant *
-_keys_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment, GError **error)
+_keys_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
 {
 	GVariantIter iter;
 	GVariantBuilder builder;
@@ -570,7 +570,7 @@ _pair_keys_calculate_type (const GVariantType *parameters_type, GError **error)
 }
 
 static GVariant *
-_pair_keys_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment, GError **error)
+_pair_keys_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
 {
 	GVariantBuilder builder;
 	GVariantIter iter;
@@ -635,7 +635,7 @@ _in_array_calculate_type (const GVariantType *parameters_type, GError **error)
 }
 
 static GVariant *
-_in_array_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment, GError **error)
+_in_array_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
 {
 	GVariantIter iter;
 	GVariant *needle, *haystack, *child_variant;
@@ -698,7 +698,7 @@ _array_get_calculate_type (const GVariantType *parameters_type, GError **error)
 }
 
 static GVariant *
-_array_get_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment, GError **error)
+_array_get_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
 {
 	GVariant *haystack, *default_value, *child_variant;
 	guint array_index;
@@ -761,7 +761,7 @@ _array_insert_calculate_type (const GVariantType *parameters_type, GError **erro
 }
 
 static GVariant *
-_array_insert_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment, GError **error)
+_array_insert_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
 {
 	GVariantIter iter;
 	GVariantBuilder builder;
@@ -820,7 +820,7 @@ _array_remove_calculate_type (const GVariantType *parameters_type, GError **erro
 }
 
 static GVariant *
-_array_remove_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment, GError **error)
+_array_remove_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
 {
 	GVariantIter iter;
 	GVariantBuilder builder;
@@ -908,7 +908,7 @@ _dict_set_calculate_type (const GVariantType *parameters_type, GError **error)
 }
 
 static GVariant *
-_dict_set_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment, GError **error)
+_dict_set_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
 {
 	GVariantIter iter;
 	GVariantBuilder builder;
@@ -1006,7 +1006,7 @@ _dict_unset_calculate_type (const GVariantType *parameters_type, GError **error)
 }
 
 static GVariant *
-_dict_unset_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment, GError **error)
+_dict_unset_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
 {
 	GVariantIter iter;
 	GVariantBuilder builder;
@@ -1096,7 +1096,7 @@ _dict_get_calculate_type (const GVariantType *parameters_type, GError **error)
 }
 
 static GVariant *
-_dict_get_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment, GError **error)
+_dict_get_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
 {
 	GVariantIter iter;
 	GVariant *key, *dict, *default_value, *output_value = NULL, *child_entry;
@@ -1154,7 +1154,7 @@ _struct_head_calculate_type (const GVariantType *parameters_type, GError **error
 }
 
 static GVariant *
-_struct_head_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment, GError **error)
+_struct_head_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
 {
 	GVariant *_struct, *output_value;
 
@@ -1170,7 +1170,7 @@ typedef struct {
 	const gchar *name;
 	GVariantType *(*calculate_type_func) (const GVariantType *parameters_type, GError **error);
 	/* Return value of evaluate_func must not be floating. */
-	GVariant *(*evaluate_func) (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment, GError **error);
+	GVariant *(*evaluate_func) (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment);
 } DfsmFunctionInfo;
 
 static const DfsmFunctionInfo _function_info[] = {
@@ -1273,17 +1273,17 @@ dfsm_environment_function_calculate_type (const gchar *function_name, const GVar
  * @function_name: name of the function to evaluate
  * @parameters: the value of the input parameter (or parameters, if it's a tuple)
  * @environment: an environment containing all defined variables
- * @error: (allow-none): a #GError, or %NULL
  *
  * Evaluate @function_name when passed an input parameter, @parameters. The return value will have type as given by
  * dfsm_environment_function_calculate_type() for the type of @parameters.
  *
- * It is an error to pass an incompatible type in @parameters; or to pass a non-existent @function_name.
+ * It is an error to pass an incompatible type in @parameters; or to pass a non-existent @function_name. The parameters must have previously been
+ * type checked using dfsm_environment_function_calculate_type().
  *
  * Return value: (transfer full): return value of the function
  */
 GVariant *
-dfsm_environment_function_evaluate (const gchar *function_name, GVariant *parameters, DfsmEnvironment *environment, GError **error)
+dfsm_environment_function_evaluate (const gchar *function_name, GVariant *parameters, DfsmEnvironment *environment)
 {
 	const DfsmFunctionInfo *function_info;
 	GVariantType *return_type;
@@ -1293,7 +1293,6 @@ dfsm_environment_function_evaluate (const gchar *function_name, GVariant *parame
 	g_return_val_if_fail (function_name != NULL && *function_name != '\0', NULL);
 	g_return_val_if_fail (parameters != NULL, NULL);
 	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), NULL);
-	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	function_info = _get_function_info (function_name);
 	g_assert (function_info != NULL);
@@ -1301,21 +1300,13 @@ dfsm_environment_function_evaluate (const gchar *function_name, GVariant *parame
 
 	/* Calculate the return type. This has the added side-effect of dynamically type checking the input parameters. */
 	return_type = dfsm_environment_function_calculate_type (function_name, g_variant_get_type (parameters), &child_error);
-
-	if (child_error != NULL) {
-		goto error;
-	}
+	g_assert (child_error == NULL);
 
 	/* Evaluate the function. */
-	return_value = function_info->evaluate_func (parameters, return_type, environment, &child_error);
-	g_assert ((return_value == NULL) != (child_error == NULL));
+	return_value = function_info->evaluate_func (parameters, return_type, environment);
+	g_assert (return_value != NULL);
 
 	g_variant_type_free (return_type);
-
-error:
-	if (child_error != NULL) {
-		g_propagate_error (error, child_error);
-	}
 
 	return return_value;
 }
@@ -1325,21 +1316,19 @@ error:
  * @self: a #DfsmEnvironment
  * @signal_name: the name of the D-Bus signal to emit
  * @parameters: value of the parameters to the signal
- * @error: (allow-none): a #GError, or %NULL
  *
  * Emit a signal indicating that the calling code intends for a D-Bus signal to be emitted with name @signal_name and parameters given by @parameters.
  * Note that this won't actually emit the signal on a bus instance; that's the responsibility of wrapper code listening to the
  * #DfsmEnvironment::signal-emission signal.
  */
 void
-dfsm_environment_emit_signal (DfsmEnvironment *self, const gchar *signal_name, GVariant *parameters, GError **error)
+dfsm_environment_emit_signal (DfsmEnvironment *self, const gchar *signal_name, GVariant *parameters)
 {
 	gchar *parameters_string;
 
 	g_return_if_fail (DFSM_IS_ENVIRONMENT (self));
 	g_return_if_fail (signal_name != NULL);
 	g_return_if_fail (parameters != NULL);
-	g_return_if_fail (error == NULL || *error == NULL);
 
 	parameters_string = g_variant_print (parameters, FALSE);
 	g_debug ("Emitting signal ‘%s’ in environment %p with parameters: %s", signal_name, self, parameters_string);

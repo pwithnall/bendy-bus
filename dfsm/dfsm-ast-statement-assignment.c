@@ -150,26 +150,15 @@ dfsm_ast_statement_assignment_execute (DfsmAstStatement *statement, DfsmEnvironm
 {
 	DfsmAstStatementAssignmentPrivate *priv = DFSM_AST_STATEMENT_ASSIGNMENT (statement)->priv;
 	GVariant *rvalue;
-	GError *child_error = NULL;
 
 	/* Evaluate the rvalue */
-	rvalue = dfsm_ast_expression_evaluate (priv->expression, environment, &child_error);
-	g_assert ((rvalue == NULL) != (child_error == NULL));
-
-	if (child_error != NULL) {
-		g_propagate_error (error, child_error);
-		return NULL;
-	}
+	rvalue = dfsm_ast_expression_evaluate (priv->expression, environment);
+	g_assert (rvalue != NULL);
 
 	/* Perform the assignment */
-	dfsm_ast_data_structure_set_from_variant (priv->data_structure, environment, rvalue, &child_error);
+	dfsm_ast_data_structure_set_from_variant (priv->data_structure, environment, rvalue);
 
 	g_variant_unref (rvalue);
-
-	if (child_error != NULL) {
-		g_propagate_error (error, child_error);
-		return NULL;
-	}
 
 	return NULL;
 }

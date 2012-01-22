@@ -160,7 +160,6 @@ dfsm_ast_variable_calculate_type (DfsmAstVariable *self, DfsmEnvironment *enviro
  * dfsm_ast_variable_to_variable:
  * @self: a #DfsmAstVariable
  * @environment: a #DfsmEnvironment containing all variables
- * @error: (allow-none): a #GError, or %NULL
  *
  * Convert the value stored by @self to a #GVariant in the given @environment.
  *
@@ -169,13 +168,12 @@ dfsm_ast_variable_calculate_type (DfsmAstVariable *self, DfsmEnvironment *enviro
  * Return value: (transfer full): the #GVariant version of the variable's value
  */
 GVariant *
-dfsm_ast_variable_to_variant (DfsmAstVariable *self, DfsmEnvironment *environment, GError **error)
+dfsm_ast_variable_to_variant (DfsmAstVariable *self, DfsmEnvironment *environment)
 {
 	GVariant *return_value;
 
 	g_return_val_if_fail (DFSM_IS_AST_VARIABLE (self), NULL);
 	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), NULL);
-	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	return_value = dfsm_environment_dup_variable_value (environment, self->priv->scope, self->priv->variable_name);
 	g_assert (return_value != NULL && g_variant_is_floating (return_value) == FALSE);
@@ -188,18 +186,16 @@ dfsm_ast_variable_to_variant (DfsmAstVariable *self, DfsmEnvironment *environmen
  * @self: a #DfsmAstVariable
  * @environment: a #DfsmEnvironment containing all variables
  * @new_value: the new value to assign to the variable
- * @error: (allow-none): a #GError, or %NULL
  *
  * Set the given variable's value in @environment to the #GVariant value given in @new_value. This will overwrite any existing value stored for
  * the given variable, and won't recursively assign to structures inside the variable's existing value.
  */
 void
-dfsm_ast_variable_set_from_variant (DfsmAstVariable *self, DfsmEnvironment *environment, GVariant *new_value, GError **error)
+dfsm_ast_variable_set_from_variant (DfsmAstVariable *self, DfsmEnvironment *environment, GVariant *new_value)
 {
 	g_return_if_fail (DFSM_IS_AST_VARIABLE (self));
 	g_return_if_fail (DFSM_IS_ENVIRONMENT (environment));
 	g_return_if_fail (new_value != NULL);
-	g_return_if_fail (error == NULL || *error == NULL);
 
 	dfsm_environment_set_variable_value (environment, self->priv->scope, self->priv->variable_name, new_value);
 }

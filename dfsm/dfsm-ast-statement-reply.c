@@ -111,16 +111,10 @@ dfsm_ast_statement_reply_execute (DfsmAstStatement *statement, DfsmEnvironment *
 {
 	DfsmAstStatementReplyPrivate *priv = DFSM_AST_STATEMENT_REPLY (statement)->priv;
 	GVariant *value;
-	GError *child_error = NULL;
 
 	/* Evaluate the expression */
-	value = dfsm_ast_expression_evaluate (priv->expression, environment, &child_error);
-	g_assert ((value == NULL) != (child_error == NULL));
-
-	if (child_error != NULL) {
-		g_propagate_error (error, child_error);
-		return NULL;
-	}
+	value = dfsm_ast_expression_evaluate (priv->expression, environment);
+	g_assert (value != NULL);
 
 	return value;
 }

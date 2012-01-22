@@ -39,7 +39,6 @@ dfsm_ast_statement_init (DfsmAstStatement *self)
  * dfsm_ast_statement_execute:
  * @self: a #DfsmAstStatement
  * @environment: the environment to execute the statement in
- * @error: a #GError
  *
  * Execute a given state machine statement. This may modify the @environment.
  *

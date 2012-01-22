@@ -105,8 +105,8 @@ gdouble dfsm_ast_data_structure_get_weight (DfsmAstDataStructure *self) G_GNUC_P
 
 GVariantType *dfsm_ast_data_structure_calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
 
-GVariant *dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment *environment, GError **error) DFSM_CONSTRUCTOR;
-void dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnvironment *environment, GVariant *new_value, GError **error);
+GVariant *dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
+void dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnvironment *environment, GVariant *new_value);
 
 G_END_DECLS
 
