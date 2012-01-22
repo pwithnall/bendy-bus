@@ -111,6 +111,7 @@ dfsm_ast_statement_assignment_check (DfsmAstNode *node, DfsmEnvironment *environ
 	DfsmAstStatementAssignmentPrivate *priv = DFSM_AST_STATEMENT_ASSIGNMENT (node)->priv;
 	GVariantType *lvalue_type, *rvalue_type;
 
+	/* Check the sub-nodes first .*/
 	dfsm_ast_node_check (DFSM_AST_NODE (priv->data_structure), environment, error);
 
 	if (*error != NULL) {
@@ -123,6 +124,17 @@ dfsm_ast_statement_assignment_check (DfsmAstNode *node, DfsmEnvironment *environ
 		return;
 	}
 
+	/* Check that the l-value can actually be assigned to: it has to be a data structure with leaf nodes which are only variables (apart from
+	 * dictionary keys, which can have any type). */
+	if (dfsm_ast_data_structure_is_variable (priv->data_structure) == FALSE) {
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+		             _("Non-variable data structure as the l-value of an assignment: "
+		               "only data structures consisting of only variables may be assigned to."));
+
+		return;
+	}
+
+	/* Check the types of the l- and r-values are compatible. */
 	lvalue_type = dfsm_ast_data_structure_calculate_type (priv->data_structure, environment);
 	rvalue_type = dfsm_ast_expression_calculate_type (priv->expression, environment);
 

@@ -108,6 +108,8 @@ GVariantType *dfsm_ast_data_structure_calculate_type (DfsmAstDataStructure *self
 GVariant *dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
 void dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnvironment *environment, GVariant *new_value);
 
+gboolean dfsm_ast_data_structure_is_variable (DfsmAstDataStructure *self);
+
 G_END_DECLS
 
 #endif /* !DFSM_AST_DATA_STRUCTURE_H */

@@ -2003,7 +2003,8 @@ dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment 
  * structures inside the data structure (e.g. if the data structure is an array of variables, each of the variables will be assigned to).
  *
  * It's an error to call this function with a data structure which isn't comprised entirely of variables or structures of them. Similarly, it's an
- * error to call this function with a @new_value which doesn't match the data structure's type and number of elements.
+ * error to call this function with a @new_value which doesn't match the data structure's type and number of elements. These conditions can be checked
+ * using dfsm_ast_data_structure_is_variable().
  */
 void
 dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnvironment *environment, GVariant *new_value)
@@ -2017,22 +2018,6 @@ dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnviro
 	priv = self->priv;
 
 	switch (priv->data_structure_type) {
-		case DFSM_AST_DATA_BYTE:
-		case DFSM_AST_DATA_BOOLEAN:
-		case DFSM_AST_DATA_INT16:
-		case DFSM_AST_DATA_UINT16:
-		case DFSM_AST_DATA_INT32:
-		case DFSM_AST_DATA_UINT32:
-		case DFSM_AST_DATA_INT64:
-		case DFSM_AST_DATA_UINT64:
-		case DFSM_AST_DATA_DOUBLE:
-		case DFSM_AST_DATA_STRING:
-		case DFSM_AST_DATA_OBJECT_PATH:
-		case DFSM_AST_DATA_SIGNATURE:
-		case DFSM_AST_DATA_VARIANT:
-		case DFSM_AST_DATA_UNIX_FD:
-			g_error ("Invalid assignment to a basic data structure.");
-			break;
 		case DFSM_AST_DATA_ARRAY: {
 			guint i;
 
@@ -2042,9 +2027,9 @@ dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnviro
 				GVariant *child_variant;
 				DfsmAstExpression *child_expression;
 
-				/* TODO: For the moment, we hackily assume that the child_expression is a DFSM_AST_EXPRESSION_DATA_STRUCTURE and
-				 * extract its data structure to recursively assign to. */
-				child_expression = (DfsmAstExpression*) g_ptr_array_index (priv->array_val, i);
+				/* We assume that the child_expression is a DFSM_AST_EXPRESSION_DATA_STRUCTURE and extract its data structure to
+				 * recursively assign to. */
+				child_expression = DFSM_AST_EXPRESSION (g_ptr_array_index (priv->array_val, i));
 				g_assert (DFSM_IS_AST_EXPRESSION_DATA_STRUCTURE (child_expression));
 
 				/* Get the child variant. */
@@ -2067,9 +2052,9 @@ dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnviro
 				GVariant *child_variant;
 				DfsmAstExpression *child_expression;
 
-				/* TODO: For the moment, we hackily assume that the child_expression is a DFSM_AST_EXPRESSION_DATA_STRUCTURE and
-				 * extract its data structure to recursively assign to. */
-				child_expression = (DfsmAstExpression*) g_ptr_array_index (priv->struct_val, i);
+				/* We assume that the child_expression is a DFSM_AST_EXPRESSION_DATA_STRUCTURE and extract its data structure to
+				 * recursively assign to. */
+				child_expression = DFSM_AST_EXPRESSION (g_ptr_array_index (priv->struct_val, i));
 				g_assert (DFSM_IS_AST_EXPRESSION_DATA_STRUCTURE (child_expression));
 
 				/* Get the child variant. */
@@ -2132,8 +2117,8 @@ dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnviro
 
 				g_variant_unref (child_key_variant);
 
-				/* TODO: For the moment, we hackily assume that the child_expression is a DFSM_AST_EXPRESSION_DATA_STRUCTURE and
-				 * extract its data structure to recursively assign to. */
+				/* We assume that the child_expression is a DFSM_AST_EXPRESSION_DATA_STRUCTURE and extract its data structure to
+				 * recursively assign to. */
 				g_assert (DFSM_IS_AST_EXPRESSION_DATA_STRUCTURE (value_expression));
 
 				/* Recursively assign to the child data structure. */
@@ -2148,8 +2133,122 @@ dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnviro
 			break;
 		}
 		case DFSM_AST_DATA_VARIABLE:
+			/* Base case. */
 			dfsm_ast_variable_set_from_variant (priv->variable_val, environment, new_value);
 			break;
+		case DFSM_AST_DATA_BYTE:
+		case DFSM_AST_DATA_BOOLEAN:
+		case DFSM_AST_DATA_INT16:
+		case DFSM_AST_DATA_UINT16:
+		case DFSM_AST_DATA_INT32:
+		case DFSM_AST_DATA_UINT32:
+		case DFSM_AST_DATA_INT64:
+		case DFSM_AST_DATA_UINT64:
+		case DFSM_AST_DATA_DOUBLE:
+		case DFSM_AST_DATA_STRING:
+		case DFSM_AST_DATA_OBJECT_PATH:
+		case DFSM_AST_DATA_SIGNATURE:
+		case DFSM_AST_DATA_VARIANT:
+		case DFSM_AST_DATA_UNIX_FD:
+			/* It's an error to call this function with these data structures. */
+		default:
+			g_assert_not_reached ();
+	}
+}
+
+static gboolean
+check_expression_is_variable (DfsmAstExpression *expression)
+{
+	DfsmAstDataStructure *data_structure;
+
+	/* Check that the expression is a DFSM_AST_EXPRESSION_DATA_STRUCTURE. */
+	if (DFSM_IS_AST_EXPRESSION_DATA_STRUCTURE (expression) == FALSE) {
+		return FALSE;
+	}
+
+	/* Recursively check. */
+	data_structure = dfsm_ast_expression_data_structure_get_data_structure (DFSM_AST_EXPRESSION_DATA_STRUCTURE (expression));
+
+	return dfsm_ast_data_structure_is_variable (data_structure);
+}
+
+/**
+ * dfsm_ast_data_structure_is_variable:
+ * @self: a #DfsmAstDataStructure
+ *
+ * Check whether the given #DfsmAstDataStructure has only variables at its leaf nodes (except dictionary keys, which can have any type). This is
+ * required for data structures which are assigned to, as assignments can only be made to variables. As such, this function must be called successfully
+ * before dfsm_ast_data_structure_set_from_variant() can be called.
+ *
+ * Return value: %TRUE if the data structure has only variables at its leaves, %FALSE otherwise
+ */
+gboolean
+dfsm_ast_data_structure_is_variable (DfsmAstDataStructure *self)
+{
+	DfsmAstDataStructurePrivate *priv;
+
+	g_return_val_if_fail (DFSM_IS_AST_DATA_STRUCTURE (self), FALSE);
+
+	priv = self->priv;
+
+	switch (priv->data_structure_type) {
+		case DFSM_AST_DATA_ARRAY: {
+			guint i;
+
+			for (i = 0; i < priv->array_val->len; i++) {
+				if (check_expression_is_variable (DFSM_AST_EXPRESSION (g_ptr_array_index (priv->array_val, i))) == FALSE) {
+					return FALSE;
+				}
+			}
+
+			return TRUE;
+		}
+		case DFSM_AST_DATA_STRUCT: {
+			guint i;
+
+			for (i = 0; i < priv->struct_val->len; i++) {
+				if (check_expression_is_variable (DFSM_AST_EXPRESSION (g_ptr_array_index (priv->struct_val, i))) == FALSE) {
+					return FALSE;
+				}
+			}
+
+			return TRUE;
+		}
+		case DFSM_AST_DATA_DICT: {
+			guint i;
+
+			for (i = 0; i < priv->dict_val->len; i++) {
+				DfsmAstDictionaryEntry *child_entry;
+
+				/* We check that the value is a variable data structure, but we don't care about the key. It can be anything. */
+				child_entry = (DfsmAstDictionaryEntry*) g_ptr_array_index (priv->dict_val, i);
+
+				if (check_expression_is_variable (child_entry->value) == FALSE) {
+					return FALSE;
+				}
+			}
+
+			return TRUE;
+		}
+		case DFSM_AST_DATA_VARIABLE:
+			/* True base case. */
+			return TRUE;
+		case DFSM_AST_DATA_BYTE:
+		case DFSM_AST_DATA_BOOLEAN:
+		case DFSM_AST_DATA_INT16:
+		case DFSM_AST_DATA_UINT16:
+		case DFSM_AST_DATA_INT32:
+		case DFSM_AST_DATA_UINT32:
+		case DFSM_AST_DATA_INT64:
+		case DFSM_AST_DATA_UINT64:
+		case DFSM_AST_DATA_DOUBLE:
+		case DFSM_AST_DATA_STRING:
+		case DFSM_AST_DATA_OBJECT_PATH:
+		case DFSM_AST_DATA_SIGNATURE:
+		case DFSM_AST_DATA_VARIANT:
+		case DFSM_AST_DATA_UNIX_FD:
+			/* False base cases. */
+			return FALSE;
 		default:
 			g_assert_not_reached ();
 	}
