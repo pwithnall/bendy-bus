@@ -118,7 +118,7 @@ object at /org/freedesktop/Telepathy/ConnectionManager/cmname, org.freedesktop.T
 		/* Other variables */
 		_ConnectionObjectPath = @o "/org/freedesktop/Telepathy/ConnectionManager/cmname"; /* nonsensical default value */
 		_ConnectionBusName = "org.freedesktop.Telepathy.ConnectionManager.cmname";
-		_Params = @a(suv) [];
+		_Params = @a(susv) [];
 	}
 
 	states {
@@ -128,11 +128,11 @@ object at /org/freedesktop/Telepathy/ConnectionManager/cmname, org.freedesktop.T
 	transition inside Main on method GetParameters {
 		precondition throwing NotImplemented { inArray(Protocol, keys object->Protocols) }
 
-		reply object->_Params;
+		reply (object->_Params);
 	}
 
 	transition inside Main on method ListProtocols {
-		reply keys object->Protocols;
+		reply (keys object->Protocols);
 	}
 
 	transition inside Main on method RequestConnection {
@@ -219,7 +219,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 	}
 
 	transition inside Disconnected, inside Connecting, inside Connected on method GetInterfaces {
-		reply object->Interfaces;
+		reply (object->Interfaces);
 	}
 
 	/* Potentially simulate an older CM */
@@ -228,19 +228,19 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 	}
 
 	transition inside Disconnected on method GetProtocol {
-		reply object->_Protocol;
+		reply (object->_Protocol);
 	}
 
 	/* Deprecated. Empathy keeps calling it, though, which may be a bug. TODO: Investigate. */
 	transition inside Disconnected on method GetSelfHandle {
-		reply 0u;
+		reply (0u);
 	}
 	transition inside Connecting, inside Connected on method GetSelfHandle {
-		reply object->SelfHandle;
+		reply (object->SelfHandle);
 	}
 
 	transition inside Disconnected, inside Connecting, inside Connected on method GetStatus {
-		reply object->Status;
+		reply (object->Status);
 	}
 
 	transition inside Disconnected on method HoldHandles {
@@ -266,6 +266,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 	transition inside Disconnected on method Connect {
 		object->_DesiredStatus = 0u;
 		/* Status change is effected as a random transition */
+		reply ();
 	}
 
 	/* TODO: transition inside Disconnected on method Disconnect {} */
@@ -295,7 +296,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 	}
 
 	transition inside Connecting, inside Connected on method GetContactAttributes {
-		reply pairKeys (Handles, { /* TODO: Hacky */
+		reply (pairKeys (Handles, { /* TODO: Hacky */
 			"org.freedesktop.Telepathy.Connection/contact-id" : <""?>,
 			"org.freedesktop.Telepathy.Connection.Interface.Aliasing/alias" : <""?>,
 			"org.freedesktop.Telepathy.Connection.Interface.Avatars/token" : <""?>,
@@ -310,7 +311,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 				]?,
 			)]?>,
 			/* etc. */
-		}?);
+		}?));
 	}
 
 	transition inside Connecting, inside Connected on method EnsureChannel {
@@ -374,7 +375,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 	}
 
 	transition inside Connecting, inside Connected on method GetAliasFlags {
-		reply 0u?;
+		reply (0u?);
 	}
 
 	transition inside Disconnected, inside Connecting, inside Connected on random {
@@ -453,6 +454,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe i
 
 	transition from Open to Closed on method Close {
 		emit Closed ();
+		reply ();
 	}
 
 	transition inside Open on random {
@@ -532,6 +534,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/group1 impl
 
 	transition from Open to Closed on method Close {
 		emit Closed ();
+		reply ();
 	}
 
 	transition inside Open on random {

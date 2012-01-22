@@ -64,7 +64,7 @@ object at /org/freedesktop/Telepathy/ConnectionManager/cmname, org.freedesktop.T
 		/* Other variables */
 		_ConnectionObjectPath = @o "/org/freedesktop/Telepathy/ConnectionManager/cmname"; /* nonsensical default value */
 		_ConnectionBusName = "org.freedesktop.Telepathy.ConnectionManager.cmname";
-		_Params = @a(suv) [];
+		_Params = @a(susv) [];
 	}
 
 	states {
@@ -74,11 +74,11 @@ object at /org/freedesktop/Telepathy/ConnectionManager/cmname, org.freedesktop.T
 	transition inside Main on method GetParameters {
 		precondition throwing NotImplemented { inArray(Protocol, keys object->Protocols) }
 
-		reply object->_Params;
+		reply (object->_Params);
 	}
 
 	transition inside Main on method ListProtocols {
-		reply keys object->Protocols;
+		reply (keys object->Protocols);
 	}
 
 	transition inside Main on method RequestConnection {
@@ -158,19 +158,19 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 	}
 
 	transition inside Connected on method GetInterfaces {
-		reply object->Interfaces;
+		reply (object->Interfaces);
 	}
 
 	transition inside Connected on method GetSelfHandle {
-		reply object->SelfHandle;
+		reply (object->SelfHandle);
 	}
 
 	transition inside Connected on method GetStatus {
-		reply object->Status;
+		reply (object->Status);
 	}
 
 	transition inside Connected on method GetContactAttributes {
-		reply pairKeys (Handles, { /* TODO: Hacky */
+		reply (pairKeys (Handles, { /* TODO: Hacky */
 			"org.freedesktop.Telepathy.Connection/contact-id" : <"foo@example.com"?>,
 			"org.freedesktop.Telepathy.Connection.Interface.Aliasing/alias" : <""?>,
 			"org.freedesktop.Telepathy.Connection.Interface.Avatars/token" : <""?>,
@@ -194,7 +194,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 				("url", ["type=home"]?, ["http://example.com/"]?),
 			]?>,
 			/* etc. */
-		}?);
+		}?));
 	}
 
 	transition inside Connected on method EnsureChannel {
@@ -250,7 +250,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 	}
 
 	transition inside Connected on method GetAliasFlags {
-		reply 0u?;
+		reply (0u?);
 	}
 
 	transition inside Connected on random {

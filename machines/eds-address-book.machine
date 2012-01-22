@@ -9,7 +9,7 @@ object at /org/gnome/evolution/dataserver/AddressBookFactory, org.gnome.evolutio
 
 	transition inside Main on method get_book {
 		/* Why doesn't this have type @o? */
-		reply "/org/gnome/evolution/dataserver/AddressBook/2170/0";
+		reply ("/org/gnome/evolution/dataserver/AddressBook/2170/0");
 	}
 }
 
