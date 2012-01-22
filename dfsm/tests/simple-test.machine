@@ -12,16 +12,16 @@ object at /uk/ac/cam/cl/DBusSimulator/SimpleTest implements uk.ac.cam.cl.DBusSim
 
 	transition from Main to Main on method SingleStateEcho {
 		emit SingleStateSignal (object->stored_greeting);
-		reply greeting;
+		reply (greeting);
 	}
 
 	transition from Main to Other on method TwoStateEcho {
 		object->stored_greeting = greeting;
-		reply "Greeting stored";
+		reply ("Greeting stored");
 	}
 
 	transition from Other to Main on method TwoStateEcho {
-		reply object->stored_greeting;
+		reply (object->stored_greeting);
 	}
 
 	transition from Main to Main on random {
