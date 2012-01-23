@@ -555,26 +555,37 @@ _pair_keys_evaluate (DfsmAstExpression *parameters_expression, const GVariantTyp
 {
 	GVariantBuilder builder;
 	GVariantIter iter;
-	GVariant *parameters, *keys, *value, *child_variant;
+	GVariant *parameters, *keys, *child_variant;
 
 	parameters = dfsm_ast_expression_evaluate (parameters_expression, environment);
 	keys = g_variant_get_child_value (parameters, 0);
-	value = g_variant_get_child_value (parameters, 1);
 	g_variant_unref (parameters);
 
 	g_variant_builder_init (&builder, return_type);
 	g_variant_iter_init (&iter, keys);
 
 	while ((child_variant = g_variant_iter_next_value (&iter)) != NULL) {
+		GVariant *value;
+
+		/* Re-evaluate the parameters so that the value is re-evaluated. This call-by-reference behaviour is useful because pairKeys is
+		 * typically called using a fuzzy value:
+		 *  pairKeys (["key1", "key2", "key3"], "some-value"?)
+		 * If we used call-by-value, the same fuzzy value would be assigned to all of the keys, which is a bit rubbish.
+		 * Unfortunately, this does mean we have to re-evaluate all of the input parameters (including the array of keys), since the
+		 * AST expression could be another function call, or something else other than a data structure expression. Oh well. */
+		parameters = dfsm_ast_expression_evaluate (parameters_expression, environment);
+		value = g_variant_get_child_value (parameters, 1);
+		g_variant_unref (parameters);
+
 		g_variant_builder_open (&builder, g_variant_type_element (return_type));
 		g_variant_builder_add_value (&builder, child_variant);
 		g_variant_builder_add_value (&builder, value);
 		g_variant_builder_close (&builder);
 
+		g_variant_unref (value);
 		g_variant_unref (child_variant);
 	}
 
-	g_variant_unref (value);
 	g_variant_unref (keys);
 
 	return g_variant_ref_sink (g_variant_builder_end (&builder));
