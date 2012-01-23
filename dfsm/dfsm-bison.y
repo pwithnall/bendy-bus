@@ -36,6 +36,11 @@
 	static void yyerror (YYLTYPE *yylloc, DfsmParserData *parser_data, GError **error, const char *message);
 
 	#define YYLEX_PARAM parser_data->yyscanner
+
+	/* Bison is a bit lax about including default cases in switch statements, so we ignore such errors in this file. */
+	#ifdef __GNUC__
+		#pragma GCC diagnostic ignored "-Wswitch-default"
+	#endif
 }
 
 %union {

@@ -28,9 +28,11 @@
 	#define YY_INPUT(buf, result, max_size) result = yy_input_proc (buf, max_size, yyscanner)
 	static int yy_input_proc (gchar *out_buf, gint size, yyscan_t yyscanner);
 
-	/* Flex is a bit lax about including default cases in switch statements, so we ignore such errors in this file. */
+	/* Flex is a bit lax about including default cases in switch statements, so we ignore such errors in this file.
+	 * It also (despite our best efforts with "%option nounistd") redeclares isatty(). Ignore that too. */
 	#ifdef __GNUC__
 		#pragma GCC diagnostic ignored "-Wswitch-default"
+		#pragma GCC diagnostic ignored "-Wredundant-decls"
 	#endif
 
 	/* Locations */
