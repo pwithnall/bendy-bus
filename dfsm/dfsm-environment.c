@@ -502,14 +502,16 @@ _keys_calculate_type (const GVariantType *parameters_type, GError **error)
 }
 
 static GVariant *
-_keys_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
+_keys_evaluate (DfsmAstExpression *parameters_expression, const GVariantType *return_type, DfsmEnvironment *environment)
 {
 	GVariantIter iter;
 	GVariantBuilder builder;
-	GVariant *child_variant;
+	GVariant *parameters, *child_variant;
 
+	parameters = dfsm_ast_expression_evaluate (parameters_expression, environment);
 	g_variant_builder_init (&builder, return_type);
 	g_variant_iter_init (&iter, parameters);
+	g_variant_unref (parameters);
 
 	while ((child_variant = g_variant_iter_next_value (&iter)) != NULL) {
 		/* child_variant is a dictionary entry of any type; we want its key. */
@@ -549,14 +551,16 @@ _pair_keys_calculate_type (const GVariantType *parameters_type, GError **error)
 }
 
 static GVariant *
-_pair_keys_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
+_pair_keys_evaluate (DfsmAstExpression *parameters_expression, const GVariantType *return_type, DfsmEnvironment *environment)
 {
 	GVariantBuilder builder;
 	GVariantIter iter;
-	GVariant *keys, *value, *child_variant;
+	GVariant *parameters, *keys, *value, *child_variant;
 
+	parameters = dfsm_ast_expression_evaluate (parameters_expression, environment);
 	keys = g_variant_get_child_value (parameters, 0);
 	value = g_variant_get_child_value (parameters, 1);
+	g_variant_unref (parameters);
 
 	g_variant_builder_init (&builder, return_type);
 	g_variant_iter_init (&iter, keys);
@@ -614,14 +618,16 @@ _in_array_calculate_type (const GVariantType *parameters_type, GError **error)
 }
 
 static GVariant *
-_in_array_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
+_in_array_evaluate (DfsmAstExpression *parameters_expression, const GVariantType *return_type, DfsmEnvironment *environment)
 {
 	GVariantIter iter;
-	GVariant *needle, *haystack, *child_variant;
+	GVariant *parameters, *needle, *haystack, *child_variant;
 	gboolean found = FALSE;
 
+	parameters = dfsm_ast_expression_evaluate (parameters_expression, environment);
 	needle = g_variant_get_child_value (parameters, 0);
 	haystack = g_variant_get_child_value (parameters, 1);
+	g_variant_unref (parameters);
 
 	g_variant_iter_init (&iter, haystack);
 
@@ -677,14 +683,16 @@ _array_get_calculate_type (const GVariantType *parameters_type, GError **error)
 }
 
 static GVariant *
-_array_get_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
+_array_get_evaluate (DfsmAstExpression *parameters_expression, const GVariantType *return_type, DfsmEnvironment *environment)
 {
-	GVariant *haystack, *default_value, *child_variant;
+	GVariant *parameters, *haystack, *default_value, *child_variant;
 	guint array_index;
 
+	parameters = dfsm_ast_expression_evaluate (parameters_expression, environment);
 	haystack = g_variant_get_child_value (parameters, 0);
 	g_variant_get_child (parameters, 1, "u", &array_index);
 	default_value = g_variant_get_child_value (parameters, 2);
+	g_variant_unref (parameters);
 
 	if (array_index >= g_variant_n_children (haystack)) {
 		/* If the index is out of bounds, return the default value. */
@@ -740,16 +748,18 @@ _array_insert_calculate_type (const GVariantType *parameters_type, GError **erro
 }
 
 static GVariant *
-_array_insert_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
+_array_insert_evaluate (DfsmAstExpression *parameters_expression, const GVariantType *return_type, DfsmEnvironment *environment)
 {
 	GVariantIter iter;
 	GVariantBuilder builder;
-	GVariant *new_value, *old_array, *child_variant;
+	GVariant *parameters, *new_value, *old_array, *child_variant;
 	guint array_index;
 
+	parameters = dfsm_ast_expression_evaluate (parameters_expression, environment);
 	old_array = g_variant_get_child_value (parameters, 0);
 	g_variant_get_child (parameters, 1, "u", &array_index);
 	new_value = g_variant_get_child_value (parameters, 2);
+	g_variant_unref (parameters);
 
 	/* Silently clamp the insertion index to the size of the input array. */
 	array_index = MIN (array_index, g_variant_n_children (old_array));
@@ -799,15 +809,17 @@ _array_remove_calculate_type (const GVariantType *parameters_type, GError **erro
 }
 
 static GVariant *
-_array_remove_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
+_array_remove_evaluate (DfsmAstExpression *parameters_expression, const GVariantType *return_type, DfsmEnvironment *environment)
 {
 	GVariantIter iter;
 	GVariantBuilder builder;
-	GVariant *old_array, *child_variant;
+	GVariant *parameters, *old_array, *child_variant;
 	guint array_index;
 
+	parameters = dfsm_ast_expression_evaluate (parameters_expression, environment);
 	old_array = g_variant_get_child_value (parameters, 0);
 	g_variant_get_child (parameters, 1, "u", &array_index);
+	g_variant_unref (parameters);
 
 	/* Silently clamp the removal index to the size of the input array. */
 	array_index = MIN (array_index, g_variant_n_children (old_array) - 1);
@@ -887,16 +899,18 @@ _dict_set_calculate_type (const GVariantType *parameters_type, GError **error)
 }
 
 static GVariant *
-_dict_set_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
+_dict_set_evaluate (DfsmAstExpression *parameters_expression, const GVariantType *return_type, DfsmEnvironment *environment)
 {
 	GVariantIter iter;
 	GVariantBuilder builder;
-	GVariant *new_key, *new_value, *old_dict, *child_entry;
+	GVariant *parameters, *new_key, *new_value, *old_dict, *child_entry;
 	gboolean found = FALSE;
 
+	parameters = dfsm_ast_expression_evaluate (parameters_expression, environment);
 	old_dict = g_variant_get_child_value (parameters, 0);
 	new_key = g_variant_get_child_value (parameters, 1);
 	new_value = g_variant_get_child_value (parameters, 2);
+	g_variant_unref (parameters);
 
 	/* Copy the old dict, inserting the new key-value pair. */
 	g_variant_builder_init (&builder, return_type);
@@ -985,14 +999,16 @@ _dict_unset_calculate_type (const GVariantType *parameters_type, GError **error)
 }
 
 static GVariant *
-_dict_unset_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
+_dict_unset_evaluate (DfsmAstExpression *parameters_expression, const GVariantType *return_type, DfsmEnvironment *environment)
 {
 	GVariantIter iter;
 	GVariantBuilder builder;
-	GVariant *old_key, *old_dict, *child_entry;
+	GVariant *parameters, *old_key, *old_dict, *child_entry;
 
+	parameters = dfsm_ast_expression_evaluate (parameters_expression, environment);
 	old_dict = g_variant_get_child_value (parameters, 0);
 	old_key = g_variant_get_child_value (parameters, 1);
+	g_variant_unref (parameters);
 
 	/* Copy the old dict, removing the old key if it exists. */
 	g_variant_builder_init (&builder, return_type);
@@ -1075,14 +1091,16 @@ _dict_get_calculate_type (const GVariantType *parameters_type, GError **error)
 }
 
 static GVariant *
-_dict_get_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
+_dict_get_evaluate (DfsmAstExpression *parameters_expression, const GVariantType *return_type, DfsmEnvironment *environment)
 {
 	GVariantIter iter;
-	GVariant *key, *dict, *default_value, *output_value = NULL, *child_entry;
+	GVariant *parameters, *key, *dict, *default_value, *output_value = NULL, *child_entry;
 
+	parameters = dfsm_ast_expression_evaluate (parameters_expression, environment);
 	dict = g_variant_get_child_value (parameters, 0);
 	key = g_variant_get_child_value (parameters, 1);
 	default_value = g_variant_get_child_value (parameters, 2);
+	g_variant_unref (parameters);
 
 	/* Search through the dict for the given key. If it doesn't exist, return the default value (third parameter). */
 	g_variant_iter_init (&iter, dict);
@@ -1133,13 +1151,15 @@ _struct_head_calculate_type (const GVariantType *parameters_type, GError **error
 }
 
 static GVariant *
-_struct_head_evaluate (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment)
+_struct_head_evaluate (DfsmAstExpression *parameters_expression, const GVariantType *return_type, DfsmEnvironment *environment)
 {
-	GVariant *_struct, *output_value;
+	GVariant *parameters, *_struct, *output_value;
 
+	parameters = dfsm_ast_expression_evaluate (parameters_expression, environment);
 	_struct = g_variant_get_child_value (parameters, 0);
 	output_value = g_variant_get_child_value (_struct, 0);
 	g_variant_unref (_struct);
+	g_variant_unref (parameters);
 
 	/* Return the output value. */
 	return output_value;
@@ -1149,7 +1169,7 @@ typedef struct {
 	const gchar *name;
 	GVariantType *(*calculate_type_func) (const GVariantType *parameters_type, GError **error);
 	/* Return value of evaluate_func must not be floating. */
-	GVariant *(*evaluate_func) (GVariant *parameters, const GVariantType *return_type, DfsmEnvironment *environment);
+	GVariant *(*evaluate_func) (DfsmAstExpression *parameters_expression, const GVariantType *return_type, DfsmEnvironment *environment);
 } DfsmFunctionInfo;
 
 static const DfsmFunctionInfo _function_info[] = {
@@ -1250,27 +1270,29 @@ dfsm_environment_function_calculate_type (const gchar *function_name, const GVar
 /**
  * dfsm_environment_function_evaluate:
  * @function_name: name of the function to evaluate
- * @parameters: the value of the input parameter (or parameters, if it's a tuple)
+ * @parameters_expression: an AST expression giving the input parameters
  * @environment: an environment containing all defined variables
  *
- * Evaluate @function_name when passed an input parameter, @parameters. The return value will have type as given by
- * dfsm_environment_function_calculate_type() for the type of @parameters.
+ * Evaluate @function_name when passed an input parameter expression, @parameters_expression. The return value will have type as given by
+ * dfsm_environment_function_calculate_type() for the type of @parameters_expression.
  *
- * It is an error to pass an incompatible type in @parameters; or to pass a non-existent @function_name. The parameters must have previously been
- * type checked using dfsm_environment_function_calculate_type().
+ * It is an error to pass an incompatible type in @parameters_expression; or to pass a non-existent @function_name. The parameters must have
+ * previously been type checked using dfsm_environment_function_calculate_type().
+ *
+ * Individual functions may behave as call-by-value or call-by-reference as necessary, evaluating @parameters_expression as they see fit.
  *
  * Return value: (transfer full): return value of the function
  */
 GVariant *
-dfsm_environment_function_evaluate (const gchar *function_name, GVariant *parameters, DfsmEnvironment *environment)
+dfsm_environment_function_evaluate (const gchar *function_name, DfsmAstExpression *parameters_expression, DfsmEnvironment *environment)
 {
 	const DfsmFunctionInfo *function_info;
-	GVariantType *return_type;
+	GVariantType *parameters_type, *return_type;
 	GVariant *return_value = NULL;
 	GError *child_error = NULL;
 
 	g_return_val_if_fail (function_name != NULL && *function_name != '\0', NULL);
-	g_return_val_if_fail (parameters != NULL, NULL);
+	g_return_val_if_fail (DFSM_IS_AST_EXPRESSION (parameters_expression), NULL);
 	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), NULL);
 
 	function_info = _get_function_info (function_name);
@@ -1278,11 +1300,14 @@ dfsm_environment_function_evaluate (const gchar *function_name, GVariant *parame
 	g_assert (function_info->evaluate_func != NULL);
 
 	/* Calculate the return type. This has the added side-effect of dynamically type checking the input parameters. */
-	return_type = dfsm_environment_function_calculate_type (function_name, g_variant_get_type (parameters), &child_error);
+	parameters_type = dfsm_ast_expression_calculate_type (parameters_expression, environment);
+	return_type = dfsm_environment_function_calculate_type (function_name, parameters_type, &child_error);
+	g_variant_type_free (parameters_type);
+
 	g_assert (child_error == NULL);
 
 	/* Evaluate the function. */
-	return_value = function_info->evaluate_func (parameters, return_type, environment);
+	return_value = function_info->evaluate_func (parameters_expression, return_type, environment);
 	g_assert (return_value != NULL);
 
 	g_variant_type_free (return_type);

@@ -63,10 +63,14 @@ void dfsm_environment_unset_variable_value (DfsmEnvironment *self, DfsmVariableS
 void dfsm_environment_save_reset_point (DfsmEnvironment *self);
 void dfsm_environment_reset (DfsmEnvironment *self);
 
+/* Break the dependency loop between dfsm-environment.h and dfsm-ast-expression.h. The actual definition's in dfsm-ast-expression.h. */
+typedef struct _DfsmAstExpression DfsmAstExpression;
+
 gboolean dfsm_environment_function_exists (const gchar *function_name) G_GNUC_PURE;
 GVariantType *dfsm_environment_function_calculate_type (const gchar *function_name, const GVariantType *parameters_type,
                                                         GError **error) DFSM_CONSTRUCTOR;
-GVariant *dfsm_environment_function_evaluate (const gchar *function_name, GVariant *parameters, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
+GVariant *dfsm_environment_function_evaluate (const gchar *function_name, DfsmAstExpression *parameters_expression,
+                                              DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
 
 GPtrArray/*<GDBusInterfaceInfo>*/ *dfsm_environment_get_interfaces (DfsmEnvironment *self) G_GNUC_PURE;
 

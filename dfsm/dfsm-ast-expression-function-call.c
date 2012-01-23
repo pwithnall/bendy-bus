@@ -161,16 +161,10 @@ static GVariant *
 dfsm_ast_expression_function_call_evaluate (DfsmAstExpression *expression, DfsmEnvironment *environment)
 {
 	DfsmAstExpressionFunctionCallPrivate *priv = DFSM_AST_EXPRESSION_FUNCTION_CALL (expression)->priv;
-	GVariant *parameters_value, *function_call_value;
 
-	/* Evaluate the parameters. */
-	parameters_value = dfsm_ast_expression_evaluate (priv->parameters, environment);
-
-	/* Delegate evaluation of the function to the function's evaluation function. Function function function. */
-	function_call_value = dfsm_environment_function_evaluate (priv->function_name, parameters_value, environment);
-	g_variant_unref (parameters_value);
-
-	return function_call_value;
+	/* Delegate evaluation of the function to the function's evaluation function. Function function function.
+	 * We pass the parameters by reference; the function's evaluation function can evaluate them if it wants call-by-value instead. */
+	return dfsm_environment_function_evaluate (priv->function_name, priv->parameters, environment);
 }
 
 static gdouble
