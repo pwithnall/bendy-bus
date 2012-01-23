@@ -149,4 +149,29 @@
       <arg type="s" name="view"/>
     </signal>
   </interface>
+
+  <interface name="org.gnome.evolution.dataserver.AddressBookView">
+    <method name="start"/>
+    <method name="stop"/>
+    <method name="dispose"/>
+    <method name="set_fields_of_interest">
+      <arg type="as" name="fields_of_interest" direction="in"/>
+    </method>
+    <signal name="objects_added">
+      <arg type="as" name="objects"/>
+    </signal>
+    <signal name="objects_modified">
+      <arg type="as" name="objects"/>
+    </signal>
+    <signal name="objects_removed">
+      <arg type="as" name="uids"/>
+    </signal>
+    <signal name="progress">
+      <arg type="u" name="percent"/>
+      <arg type="s" name="message"/>
+    </signal>
+    <signal name="complete">
+      <arg type="as" name="error"/>
+    </signal>
+  </interface>
 </node>

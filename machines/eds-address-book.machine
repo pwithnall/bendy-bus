@@ -7,9 +7,18 @@ object at /org/gnome/evolution/dataserver/AddressBookFactory, org.gnome.evolutio
 		throw NoSuchBook;
 	}
 
+	data {
+		_got_book = false;
+	}
+
 	transition inside Main on method get_book {
+		precondition { object->_got_book == false }
+
 		/* Why doesn't this have type @o? */
 		reply ("/org/gnome/evolution/dataserver/AddressBook/2170/0");
+
+		/* Only return the AddressBook object once so that Evo and Bendy Bus don't get their states out of sync. */
+		object->_got_book = true;
 	}
 }
 
@@ -25,30 +34,40 @@ object at /org/gnome/evolution/dataserver/AddressBook/2170/0 implements org.gnom
 	}
 
 	/* Unsuccessful async open call. */
-	transition inside Closed on method open {
+	/*transition inside Closed on method open {
 		throw ArbitraryError;
-	}
+	}*/
 
 	/* Successful async open call with authentication. */
-	transition from Closed to Opening on method open {
+	/*transition from Closed to Opening on method open {
 		reply (object->_opid_counter);
 		emit auth_required (["credential1"?, "credential2"?]?);
 	}
-	transition from Opening to Authenticated on method authenticate_user {
-		emit open_done (object->_opid_counter, ""?, ""?);
+	transition from Opening to Authenticated, inside Authenticated on method authenticate_user {
+		emit open_done (object->_opid_counter, "", "");
 
 		object->_opid_counter = object->_opid_counter + 1u;
 		reply ();
-	}
+	}*/
 
 	/* Failed authentication. */
-	transition from Opening to Authenticated on method authenticate_user {
+	/*transition from Opening to Authenticated on method authenticate_user {
 		throw ArbitraryError;
+	}*/
+
+	/* Successful async open call without authentication. */
+	transition from Closed to Authenticated on method open {
+		reply (object->_opid_counter);
+
+		emit opened (["", ""]);
+		emit open_done (object->_opid_counter, "", "");
+
+		object->_opid_counter = object->_opid_counter + 1u;
 	}
 
 	/* Already open. */
 	transition inside Opening, inside Authenticated on method open {
-		emit open_done (object->_opid_counter, ""?, ""?);
+		emit open_done (object->_opid_counter, "", "");
 		reply (object->_opid_counter);
 
 		object->_opid_counter = object->_opid_counter + 1u;
@@ -60,13 +79,137 @@ object at /org/gnome/evolution/dataserver/AddressBook/2170/0 implements org.gnom
 		reply ();
 	}
 
-	transition inside Closed, inside Opening, inside Authenticated on method close {
+	/*transition inside Closed, inside Opening, inside Authenticated on method close {
 		throw ArbitraryError;
-	}
+	}*/
 
 	/* Arbitrary online/opened/readonly errors. */
-	transition inside Closed, inside Opening, inside Authenticated on random { emit online (true?); }
-	transition inside Closed, inside Opening, inside Authenticated on random { emit opened (["foobar"]?); }
+	/*transition inside Closed, inside Opening, inside Authenticated on random { emit online (true?); }
+	transition inside Closed, inside Opening, inside Authenticated on random { emit opened (["", ""]); }
 	transition inside Closed, inside Opening, inside Authenticated on random { emit readonly (false?); }
-	transition inside Closed, inside Opening, inside Authenticated on random { emit backend_property_changed (["key"?, "value"?]?); /* This API is mental */ }
+	transition inside Closed, inside Opening, inside Authenticated on random { emit backend_property_changed (["key"?, "value"?]?);*/ /* This API is mental */ /*}*/
+
+	/* Properties. */
+	transition inside Authenticated on method get_backend_property {
+		precondition { prop_name == "capabilities" }
+
+		reply (object->_opid_counter);
+		emit get_backend_property_done (object->_opid_counter, "", "", "local,do-initial-query,bulk-removes,contact-lists");
+		object->_opid_counter = object->_opid_counter + 1u;
+	}
+
+	transition inside Authenticated on method get_backend_property {
+		reply (object->_opid_counter);
+		emit get_backend_property_done (object->_opid_counter, "", "", "value"?);
+		object->_opid_counter = object->_opid_counter + 1u;
+	}
+
+	/* View. */
+	transition inside Authenticated on method get_view {
+		reply (object->_opid_counter);
+		emit get_view_done (object->_opid_counter, "", "", "/org/gnome/evolution/dataserver/AddressBookView/2170/0");
+		object->_opid_counter = object->_opid_counter + 1u;
+	}
 }
+
+object at /org/gnome/evolution/dataserver/AddressBookView/2170/0 implements org.gnome.evolution.dataserver.AddressBookView {
+	states {
+		Stopped;
+		Started;
+	}
+
+	/* State management. */
+	transition from Stopped to Started on method start { reply (); }
+	transition from Started to Stopped on method stop { reply (); }
+
+	transition inside Started on random {
+		emit progress (0u?, "Loading"?);
+	}
+
+	transition inside Started on random {
+		emit complete (["", ""]);
+	}
+
+	transition inside Started on random {
+		emit objects_added ([
+			"BEGIN:VCARD" "\n"
+			"VERSION:3.0" "\n"
+			"TEL;X-EVOLUTION-UI-SLOT=2;TYPE=CELL:0123456789" "\n"
+			"TEL;X-EVOLUTION-UI-SLOT=1;TYPE=HOME,VOICE:0123456789" "\n"
+			"NICKNAME:Fooful Baz" "\n"
+			"FN:Henry J. Foobaz" "\n"
+			"N:Foobaz;Henry;J.;;" "\n"
+			"UID:pas-id-asdfghjkl" "\n"
+			"REV:2011-08-19T07:06:32Z" "\n"
+			"ADR;TYPE=HOME:;;Castle House;Castlington;Castleshire;CA57LE;England" "\n"
+			"URL:http://example.com/" "\n"
+			"X-EVOLUTION-BLOG-URL:http://blog.example.com/" "\n"
+			"CALURI:" "\n"
+			"ROLE:" "\n"
+			"ORG:;;" "\n"
+			"X-EVOLUTION-MANAGER:" "\n"
+			"TITLE:" "\n"
+			"X-EVOLUTION-ASSISTANT:" "\n"
+			"BDAY:2000-01-01" "\n"
+			"X-EVOLUTION-SPOUSE:Mrs. Henry J. Foobaz" "\n"
+			"NOTE:A sharp." "\n"
+			"FBURL:http://freebusy.example.com/" "\n"
+			"X-EVOLUTION-VIDEO-URL:http://voip.example.com/" "\n"
+			"X-MOZILLA-HTML:TRUE" "\n"
+			"LABEL;TYPE=HOME:Castle House\nCastlington\, Castleshire\nCA57LE\nEngland" "\n"
+			"CATEGORIES:Family" "\n"
+			"X-EVOLUTION-FILE-AS:Foobaz\, Brian" "\n"
+			"EMAIL;X-EVOLUTION-UI-SLOT=1;TYPE=OTHER:baz@example.com" "\n"
+			"EMAIL;X-EVOLUTION-UI-SLOT=2;TYPE=OTHER:bar@example.com" "\n"
+			"EMAIL;X-EVOLUTION-UI-SLOT=3;TYPE=HOME:baz@gmail.com" "\n"
+			"X-JABBER;X-EVOLUTION-UI-SLOT=2;TYPE=HOME:baz@gmail.com" "\n"
+			"X-MSN;X-EVOLUTION-UI-SLOT=1;TYPE=HOME:baz@hotmail.com" "\n"
+			"END:VCARD"
+		]?);
+	}
+
+	transition inside Started on random {
+		emit objects_modified ([
+			"BEGIN:VCARD" "\n"
+			"VERSION:3.0" "\n"
+			"TEL;X-EVOLUTION-UI-SLOT=2;TYPE=CELL:0123456789" "\n"
+			"TEL;X-EVOLUTION-UI-SLOT=1;TYPE=HOME,VOICE:0123456789" "\n"
+			"NICKNAME:Fooful Baz" "\n"
+			"FN:Henry J. Foobaz" "\n"
+			"N:Foobaz;Henry;J.;;" "\n"
+			"UID:pas-id-asdfghjkl" "\n"
+			"REV:2011-08-19T07:06:32Z" "\n"
+			"ADR;TYPE=HOME:;;Castle House;Castlington;Castleshire;CA57LE;England" "\n"
+			"URL:http://example.com/" "\n"
+			"X-EVOLUTION-BLOG-URL:http://blog.example.com/" "\n"
+			"CALURI:" "\n"
+			"ROLE:" "\n"
+			"ORG:;;" "\n"
+			"X-EVOLUTION-MANAGER:" "\n"
+			"TITLE:" "\n"
+			"X-EVOLUTION-ASSISTANT:" "\n"
+			"BDAY:2000-01-01" "\n"
+			"X-EVOLUTION-SPOUSE:Mrs. Henry J. Foobaz" "\n"
+			"NOTE:A sharp." "\n"
+			"FBURL:http://freebusy.example.com/" "\n"
+			"X-EVOLUTION-VIDEO-URL:http://voip.example.com/" "\n"
+			"X-MOZILLA-HTML:TRUE" "\n"
+			"LABEL;TYPE=HOME:Castle House\nCastlington\, Castleshire\nCA57LE\nEngland" "\n"
+			"CATEGORIES:Family" "\n"
+			"X-EVOLUTION-FILE-AS:Foobaz\, Brian" "\n"
+			"EMAIL;X-EVOLUTION-UI-SLOT=1;TYPE=OTHER:baz@example.com" "\n"
+			"EMAIL;X-EVOLUTION-UI-SLOT=2;TYPE=OTHER:bar@example.com" "\n"
+			"EMAIL;X-EVOLUTION-UI-SLOT=3;TYPE=HOME:baz@gmail.com" "\n"
+			"X-JABBER;X-EVOLUTION-UI-SLOT=2;TYPE=HOME:baz@gmail.com" "\n"
+			"X-MSN;X-EVOLUTION-UI-SLOT=1;TYPE=HOME:baz@hotmail.com" "\n"
+			"END:VCARD"
+		]?);
+	}
+
+	transition inside Started on random {
+		emit objects_removed ([
+			"pas-id-asdfghjkl",
+		]?);
+	}
+}
+
