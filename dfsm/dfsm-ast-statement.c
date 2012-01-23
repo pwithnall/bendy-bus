@@ -39,37 +39,26 @@ dfsm_ast_statement_init (DfsmAstStatement *self)
  * dfsm_ast_statement_execute:
  * @self: a #DfsmAstStatement
  * @environment: the environment to execute the statement in
+ * @output_sequence: an output sequence to append the effects of the statement to
  *
  * Execute a given state machine statement. This may modify the @environment.
  *
- * If the statement is successful (i.e. a D-Bus reply is the result), the parameters of the reply will be returned. If the statement is unsuccessful
- * (i.e. a D-Bus error is thrown) the error will be returned in @error.
+ * Any effects caused by execution of the statement will be appended (in execution order) to @output_sequence, which can later be evaluated by the
+ * caller. For example, all D-Bus signal emissions, method replies and error replies to D-Bus method calls are appended to @output_sequence in this
+ * manner.
  *
  * Return value: (transfer full): reply parameters from the statement, or %NULL
  */
-GVariant *
-dfsm_ast_statement_execute (DfsmAstStatement *self, DfsmEnvironment *environment, GError **error)
+void
+dfsm_ast_statement_execute (DfsmAstStatement *self, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence)
 {
 	DfsmAstStatementClass *klass;
-	GVariant *return_value;
-	GError *child_error = NULL;
 
-	g_return_val_if_fail (DFSM_IS_AST_STATEMENT (self), NULL);
-	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), NULL);
-	g_return_val_if_fail (error != NULL && *error == NULL, NULL);
+	g_return_if_fail (DFSM_IS_AST_STATEMENT (self));
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (environment));
 
 	klass = DFSM_AST_STATEMENT_GET_CLASS (self);
 
 	g_assert (klass->execute != NULL);
-	return_value = klass->execute (self, environment, &child_error);
-
-	g_assert (return_value == NULL || child_error == NULL);
-	g_assert (return_value == NULL || g_variant_is_floating (return_value) == FALSE);
-
-	/* Use our own child_error so that we can guarantee the error is non-NULL in implementations of the virtual method. */
-	if (child_error != NULL) {
-		g_propagate_error (error, child_error);
-	}
-
-	return return_value;
+	klass->execute (self, environment, output_sequence);
 }

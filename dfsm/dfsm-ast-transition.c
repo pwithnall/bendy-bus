@@ -483,37 +483,54 @@ dfsm_ast_transition_new (const DfsmParserTransitionDetails *details, GPtrArray/*
  * dfsm_ast_transition_check_preconditions:
  * @self: a #DfsmAstTransition
  * @environment: the environment to execute the transition in
- * @error: a #GError
+ * @output_sequence: (allow-none): an output sequence to append the precondition error to if necessary
+ * @will_throw_error: (allow-none) (out caller-allocates): return location for %TRUE if the transition will throw an error to @output_sequence on
+ * precondition failure, %FALSE otherwise
  *
  * Check the preconditions of the given transition in the state given by @environment. The @environment will not be modified.
  *
  * If the preconditions are satisfied, %TRUE will be returned; %FALSE will be returned otherwise. If the preconditions are not satisfied and they
- * specified a D-Bus error to be thrown on failure, the error will be set in @error and %FALSE will be returned.
+ * specified a D-Bus error to be thrown on failure, the error will be appended to @output_sequence (if @output_sequence is non-%NULL) and %FALSE will
+ * be returned. @will_throw_error will always reflect whether precondition failures will modify @output_sequence, so this function may be called with
+ * @output_sequence set to %NULL to determine whether precondition failures will cause D-Bus errors.
  *
  * Return value: %TRUE if the transition's preconditions are satisfied; %FALSE otherwise
  */
 gboolean
-dfsm_ast_transition_check_preconditions (DfsmAstTransition *self, DfsmEnvironment *environment, GError **error)
+dfsm_ast_transition_check_preconditions (DfsmAstTransition *self, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence,
+                                         gboolean *will_throw_error)
 {
 	DfsmAstTransitionPrivate *priv;
 	guint i;
 
 	g_return_val_if_fail (DFSM_IS_AST_TRANSITION (self), FALSE);
 	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), FALSE);
-	g_return_val_if_fail (error != NULL && *error == NULL, FALSE);
+	g_return_val_if_fail (output_sequence == NULL || DFSM_IS_OUTPUT_SEQUENCE (output_sequence), FALSE);
 
 	priv = self->priv;
 
 	/* Check each of the preconditions in order and return when the first one fails. */
 	for (i = 0; i < priv->preconditions->len; i++) {
-		DfsmAstPrecondition *precondition = (DfsmAstPrecondition*) g_ptr_array_index (priv->preconditions, i);
+		DfsmAstPrecondition *precondition = DFSM_AST_PRECONDITION (g_ptr_array_index (priv->preconditions, i));
 
-		if (dfsm_ast_precondition_check_is_satisfied (precondition, environment, error) == FALSE) {
+		if (dfsm_ast_precondition_check_is_satisfied (precondition, environment) == FALSE) {
+			/* If called with an output_sequence, will we throw an error? */
+			if (will_throw_error != NULL) {
+				*will_throw_error = (dfsm_ast_precondition_get_error_name (precondition) != NULL) ? TRUE : FALSE;
+			}
+
+			/* If an output sequence has been provided, append an error to it. */
+			if (output_sequence != NULL) {
+				dfsm_ast_precondition_throw_error (precondition, output_sequence);
+			}
+
 			return FALSE;
 		}
 	}
 
-	g_assert (*error == NULL);
+	if (will_throw_error != NULL) {
+		*will_throw_error = FALSE;
+	}
 
 	return TRUE;
 }
@@ -522,26 +539,26 @@ dfsm_ast_transition_check_preconditions (DfsmAstTransition *self, DfsmEnvironmen
  * dfsm_ast_transition_execute:
  * @self: a #DfsmAstTransition
  * @environment: the environment to execute the transition in
+ * @output_sequence: an output sequence to append the transition's effects to
  * @error: a #GError
  *
  * Execute a given state machine transition. This may modify the @environment. It assumes that dfsm_ast_transition_check_preconditions() has already
  * been called for this transition and @environment and has returned %TRUE. It is an error to call this function otherwise.
  *
- * If the transition is successful (i.e. a D-Bus reply is the result), the parameters of the reply will be returned. If the transition is unsuccessful
- * (i.e. a D-Bus error is thrown) the error will be returned in @error.
+ * Any effects caused by the transition (such as D-Bus signal emissions, method replies and error replies to D-Bus method calls) will be appended to
+ * @output_sequence in execution order. The caller may then use dfsm_output_sequence_output() to push the effects out onto the bus.
  *
  * Return value: (transfer full): reply parameters from the transition, or %NULL
  */
-GVariant *
-dfsm_ast_transition_execute (DfsmAstTransition *self, DfsmEnvironment *environment, GError **error)
+void
+dfsm_ast_transition_execute (DfsmAstTransition *self, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence)
 {
 	DfsmAstTransitionPrivate *priv;
-	GVariant *return_value = NULL;
 	guint i;
 
-	g_return_val_if_fail (DFSM_IS_AST_TRANSITION (self), NULL);
-	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), NULL);
-	g_return_val_if_fail (error != NULL && *error == NULL, NULL);
+	g_return_if_fail (DFSM_IS_AST_TRANSITION (self));
+	g_return_if_fail (DFSM_IS_ENVIRONMENT (environment));
+	g_return_if_fail (DFSM_IS_OUTPUT_SEQUENCE (output_sequence));
 
 	priv = self->priv;
 
@@ -549,26 +566,10 @@ dfsm_ast_transition_execute (DfsmAstTransition *self, DfsmEnvironment *environme
 
 	for (i = 0; i < priv->statements->len; i++) {
 		DfsmAstStatement *statement;
-		GVariant *_return_value;
-		GError *child_error = NULL;
 
 		statement = g_ptr_array_index (priv->statements, i);
-		_return_value = dfsm_ast_statement_execute (statement, environment, &child_error);
-
-		g_assert (_return_value == NULL || return_value == NULL);
-		g_assert (_return_value == NULL || child_error == NULL);
-
-		if (_return_value != NULL) {
-			return_value = _return_value;
-		} else if (child_error != NULL) {
-			g_propagate_error (error, child_error);
-			return NULL;
-		}
+		dfsm_ast_statement_execute (statement, environment, output_sequence);
 	}
-
-	g_assert (return_value == NULL || g_variant_is_floating (return_value) == FALSE);
-
-	return return_value;
 }
 
 /**

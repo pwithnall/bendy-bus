@@ -24,6 +24,7 @@
 #include <glib-object.h>
 
 #include <dfsm/dfsm-ast-node.h>
+#include <dfsm/dfsm-output-sequence.h>
 
 G_BEGIN_DECLS
 
@@ -61,8 +62,9 @@ typedef struct {
 
 GType dfsm_ast_transition_get_type (void) G_GNUC_CONST;
 
-gboolean dfsm_ast_transition_check_preconditions (DfsmAstTransition *transition, DfsmEnvironment *environment, GError **error);
-GVariant *dfsm_ast_transition_execute (DfsmAstTransition *transition, DfsmEnvironment *environment, GError **error) DFSM_CONSTRUCTOR;
+gboolean dfsm_ast_transition_check_preconditions (DfsmAstTransition *transition, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence,
+                                                  gboolean *will_throw_error);
+void dfsm_ast_transition_execute (DfsmAstTransition *transition, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence);
 
 DfsmAstTransitionTrigger dfsm_ast_transition_get_trigger (DfsmAstTransition *self) G_GNUC_PURE;
 const gchar *dfsm_ast_transition_get_trigger_method_name (DfsmAstTransition *self) G_GNUC_PURE;

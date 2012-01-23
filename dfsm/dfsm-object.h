@@ -27,6 +27,21 @@
 
 G_BEGIN_DECLS
 
+/**
+ * DfsmSimulationStatus:
+ * @DFSM_SIMULATION_STATUS_STOPPED: Simulation is not running.
+ * @DFSM_SIMULATION_STATUS_STARTED: Simulation is running.
+ *
+ * The current status of the simulation. This is not equivalent to the current state number of the simulated DFSM.
+ */
+typedef enum {
+	DFSM_SIMULATION_STATUS_STOPPED = 0,
+	DFSM_SIMULATION_STATUS_STARTED,
+} DfsmSimulationStatus;
+
+#define DFSM_TYPE_SIMULATION_STATUS dfsm_simulation_status_get_type ()
+GType dfsm_simulation_status_get_type (void) G_GNUC_CONST;
+
 #define DFSM_TYPE_OBJECT		(dfsm_object_get_type ())
 #define DFSM_OBJECT(o)			(G_TYPE_CHECK_INSTANCE_CAST ((o), DFSM_TYPE_OBJECT, DfsmObject))
 #define DFSM_OBJECT_CLASS(k)		(G_TYPE_CHECK_CLASS_CAST((k), DFSM_TYPE_OBJECT, DfsmObjectClass))

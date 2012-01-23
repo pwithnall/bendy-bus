@@ -174,17 +174,17 @@ dfsm_ast_precondition_new (const gchar *error_name /* nullable */, DfsmAstExpres
  * dfsm_ast_precondition_check_is_satisfied:
  * @self: a #DfsmAstPrecondition
  * @environment: a #DfsmEnvironment containing all variables
- * @error: a #GError
  *
  * Check whether the precondition is satisfied by the given @environment. This will evaluate the precondition's statement in the given @environment,
  * and return the boolean value of the statement.
  *
- * If an error is encountered while evaluating the statement, @error will be set and %FALSE will be returned.
+ * If the precondition is not satisfied and has specified a D-Bus error to be thrown, %FALSE will be returned. You must call
+ * dfsm_ast_precondition_throw_error() to get the D-Bus error instance.
  *
  * Return value: %TRUE if the precondition is satisfied by @environment, %FALSE otherwise
  */
 gboolean
-dfsm_ast_precondition_check_is_satisfied (DfsmAstPrecondition *self, DfsmEnvironment *environment, GError **error)
+dfsm_ast_precondition_check_is_satisfied (DfsmAstPrecondition *self, DfsmEnvironment *environment)
 {
 	DfsmAstPreconditionPrivate *priv;
 	GVariant *condition_value;
@@ -192,21 +192,54 @@ dfsm_ast_precondition_check_is_satisfied (DfsmAstPrecondition *self, DfsmEnviron
 
 	g_return_val_if_fail (DFSM_IS_AST_PRECONDITION (self), FALSE);
 	g_return_val_if_fail (DFSM_IS_ENVIRONMENT (environment), FALSE);
-	g_return_val_if_fail (error != NULL && *error == NULL, FALSE);
 
 	priv = self->priv;
 
 	/* Evaluate the condition. */
 	condition_value = dfsm_ast_expression_evaluate (priv->condition, environment);
-
-	/* If the condition doesn't hold and we have an error, throw that. */
 	condition_holds = g_variant_get_boolean (condition_value);
-
-	if (condition_holds == FALSE && priv->error_name != NULL) {
-		g_dbus_error_set_dbus_error (error, priv->error_name, _("Precondition failed."), NULL);
-	}
-
 	g_variant_unref (condition_value);
 
 	return condition_holds;
+}
+
+/**
+ * dfsm_ast_precondition_throw_error:
+ * @self: a #DfsmAstPrecondition
+ * @output_sequence: an output sequence to append the D-Bus error to
+ *
+ * If the precondition has an error name set, append a D-Bus error of this type to @output_sequence, regardless of whether the precondition's condition
+ * is satisfied. If the precondition has no error name set, @output_sequence is not modified.
+ */
+void
+dfsm_ast_precondition_throw_error (DfsmAstPrecondition *self, DfsmOutputSequence *output_sequence)
+{
+	DfsmAstPreconditionPrivate *priv;
+
+	g_return_if_fail (DFSM_IS_AST_PRECONDITION (self));
+	g_return_if_fail (DFSM_IS_OUTPUT_SEQUENCE (output_sequence));
+
+	priv = self->priv;
+
+	if (priv->error_name != NULL) {
+		GError *child_error = g_dbus_error_new_for_dbus_error (priv->error_name, _("Precondition failed."));
+		dfsm_output_sequence_add_throw (output_sequence, child_error);
+		g_error_free (child_error);
+	}
+}
+
+/**
+ * dfsm_ast_precondition_get_error_name:
+ * @self: a #DfsmAstPrecondition
+ *
+ * Get the error name to be thrown by this precondition if its condition fails at runtime. If no error name is set, %NULL is returned.
+ *
+ * Return value: a D-Bus error name, or %NULL
+ */
+const gchar *
+dfsm_ast_precondition_get_error_name (DfsmAstPrecondition *self)
+{
+	g_return_val_if_fail (DFSM_IS_AST_PRECONDITION (self), NULL);
+
+	return self->priv->error_name;
 }

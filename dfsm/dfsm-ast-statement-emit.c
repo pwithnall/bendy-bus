@@ -32,10 +32,11 @@ static void dfsm_ast_statement_emit_finalize (GObject *object);
 static void dfsm_ast_statement_emit_sanity_check (DfsmAstNode *node);
 static void dfsm_ast_statement_emit_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static void dfsm_ast_statement_emit_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
-static GVariant *dfsm_ast_statement_emit_execute (DfsmAstStatement *statement, DfsmEnvironment *environment, GError **error);
+static void dfsm_ast_statement_emit_execute (DfsmAstStatement *statement, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence);
 
 struct _DfsmAstStatementEmitPrivate {
 	gchar *signal_name;
+	gchar *interface_name; /* initially NULL; set in check() */
 	DfsmAstExpression *expression;
 };
 
@@ -83,6 +84,7 @@ dfsm_ast_statement_emit_finalize (GObject *object)
 	DfsmAstStatementEmitPrivate *priv = DFSM_AST_STATEMENT_EMIT (object)->priv;
 
 	g_free (priv->signal_name);
+	g_free (priv->interface_name);
 
 	/* Chain up to the parent class */
 	G_OBJECT_CLASS (dfsm_ast_statement_emit_parent_class)->finalize (object);
@@ -141,6 +143,7 @@ dfsm_ast_statement_emit_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 
 		if (signal_info != NULL) {
 			/* Found the interface defining signal_name. */
+			priv->interface_name = g_strdup (interface_info->name);
 			break;
 		}
 	}
@@ -151,6 +154,8 @@ dfsm_ast_statement_emit_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 		             _("Undeclared D-Bus signal referenced by an ‘emit’ statement: %s"), priv->signal_name);
 		return;
 	}
+
+	g_assert (priv->interface_name != NULL);
 
 	/* Check the expression's type is a tuple. */
 	expr_parameters_type = dfsm_ast_expression_calculate_type (priv->expression, environment);
@@ -179,21 +184,16 @@ dfsm_ast_statement_emit_check (DfsmAstNode *node, DfsmEnvironment *environment, 
 	g_variant_type_free (expr_parameters_type);
 }
 
-static GVariant *
-dfsm_ast_statement_emit_execute (DfsmAstStatement *statement, DfsmEnvironment *environment, GError **error)
+static void
+dfsm_ast_statement_emit_execute (DfsmAstStatement *statement, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence)
 {
 	DfsmAstStatementEmitPrivate *priv = DFSM_AST_STATEMENT_EMIT (statement)->priv;
 	GVariant *expression_value;
 
-	/* Evaluate the child expression first. */
+	/* Evaluate the child expression to get the signal parameters, then emit the signal. */
 	expression_value = dfsm_ast_expression_evaluate (priv->expression, environment);
-
-	/* Emit the signal. */
-	dfsm_environment_emit_signal (environment, priv->signal_name, expression_value);
-
+	dfsm_output_sequence_add_emit (output_sequence, priv->interface_name, priv->signal_name, expression_value);
 	g_variant_unref (expression_value);
-
-	return NULL;
 }
 
 /**

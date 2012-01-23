@@ -25,6 +25,7 @@
 
 #include <dfsm/dfsm-ast-node.h>
 #include <dfsm/dfsm-environment.h>
+#include <dfsm/dfsm-output-sequence.h>
 
 G_BEGIN_DECLS
 
@@ -46,12 +47,12 @@ typedef struct {
 	DfsmAstNodeClass parent;
 
 	/* Virtual methods */
-	GVariant *(*execute) (DfsmAstStatement *self, DfsmEnvironment *environment, GError **error /* guaranteed to be non-NULL */);
+	void (*execute) (DfsmAstStatement *self, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence);
 } DfsmAstStatementClass;
 
 GType dfsm_ast_statement_get_type (void) G_GNUC_CONST;
 
-GVariant *dfsm_ast_statement_execute (DfsmAstStatement *self, DfsmEnvironment *environment, GError **error) DFSM_CONSTRUCTOR;
+void dfsm_ast_statement_execute (DfsmAstStatement *self, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence);
 
 G_END_DECLS
 

@@ -27,6 +27,8 @@
 #include <dfsm/dfsm-environment.h>
 #include <dfsm/dfsm-machine.h>
 #include <dfsm/dfsm-object.h>
+#include <dfsm/dfsm-dbus-output-sequence.h>
+#include <dfsm/dfsm-output-sequence.h>
 #include <dfsm/dfsm-utils.h>
 
 #endif /* !DFSM_H */

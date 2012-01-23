@@ -26,6 +26,7 @@
 #include <dfsm/dfsm-ast-node.h>
 #include <dfsm/dfsm-ast-expression.h>
 #include <dfsm/dfsm-environment.h>
+#include <dfsm/dfsm-output-sequence.h>
 
 G_BEGIN_DECLS
 
@@ -49,7 +50,9 @@ typedef struct {
 
 GType dfsm_ast_precondition_get_type (void) G_GNUC_CONST;
 
-gboolean dfsm_ast_precondition_check_is_satisfied (DfsmAstPrecondition *precondition, DfsmEnvironment *environment, GError **error);
+gboolean dfsm_ast_precondition_check_is_satisfied (DfsmAstPrecondition *precondition, DfsmEnvironment *environment);
+void dfsm_ast_precondition_throw_error (DfsmAstPrecondition *self, DfsmOutputSequence *output_sequence);
+const gchar *dfsm_ast_precondition_get_error_name (DfsmAstPrecondition *self) G_GNUC_PURE;
 
 G_END_DECLS
 

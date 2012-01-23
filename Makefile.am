@@ -18,9 +18,11 @@ lib_LTLIBRARIES += dfsm/libdfsm.la
 
 dfsm_main_header = dfsm/dfsm.h
 dfsm_public_headers = \
+	dfsm/dfsm-dbus-output-sequence.h \
 	dfsm/dfsm-environment.h \
 	dfsm/dfsm-machine.h \
 	dfsm/dfsm-object.h \
+	dfsm/dfsm-output-sequence.h \
 	dfsm/dfsm-parser.h \
 	dfsm/dfsm-utils.h \
 	$(NULL)
@@ -60,12 +62,14 @@ dfsm_sources = \
 	dfsm/dfsm-ast-statement-reply.h \
 	dfsm/dfsm-ast-variable.c \
 	dfsm/dfsm-ast-variable.h \
+	dfsm/dfsm-dbus-output-sequence.c \
 	dfsm/dfsm-parser.c \
 	dfsm/dfsm-parser-internal.h \
 	dfsm/dfsm-probabilities.c \
 	dfsm/dfsm-probabilities.h \
 	dfsm/dfsm-machine.c \
 	dfsm/dfsm-object.c \
+	dfsm/dfsm-output-sequence.c \
 	dfsm/dfsm-environment.c \
 	dfsm/dfsm-internal.c \
 	dfsm/dfsm-internal.h \

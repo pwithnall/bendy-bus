@@ -71,13 +71,6 @@ enum {
 	PROP_INTERFACES = 1,
 };
 
-enum {
-	SIGNAL_SIGNAL_EMISSION,
-	LAST_SIGNAL,
-};
-
-static guint environment_signals[LAST_SIGNAL] = { 0, };
-
 G_DEFINE_TYPE (DfsmEnvironment, dfsm_environment, G_TYPE_OBJECT)
 
 static void
@@ -102,20 +95,6 @@ dfsm_environment_class_init (DfsmEnvironmentClass *klass)
 	                                                     "Information about the D-Bus interfaces in use by objects using this environment.",
 	                                                     G_TYPE_PTR_ARRAY,
 	                                                     G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
-	/**
-	 * DfsmEnvironment::signal-emission:
-	 * @parameters: the non-floating parameter (or structure of parameters) passed to the signal emission
-	 *
-	 * Emitted whenever a piece of code in a simulated DFSM emits a D-Bus signal. No code in the simulator or the environment will actually emit
-	 * this D-Bus signal on a bus instance, but (for example) a wrapper which was listening to this signal could do so.
-	 */
-	environment_signals[SIGNAL_SIGNAL_EMISSION] = g_signal_new ("signal-emission",
-	                                                            G_TYPE_FROM_CLASS (klass),
-	                                                            G_SIGNAL_RUN_LAST | G_SIGNAL_DETAILED,
-	                                                            0, NULL, NULL,
-	                                                            dfsm_marshal_VOID__STRING_VARIANT,
-	                                                            G_TYPE_NONE, 2, G_TYPE_STRING, G_TYPE_VARIANT);
 }
 
 static void
@@ -1309,33 +1288,6 @@ dfsm_environment_function_evaluate (const gchar *function_name, GVariant *parame
 	g_variant_type_free (return_type);
 
 	return return_value;
-}
-
-/**
- * dfsm_environment_emit_signal:
- * @self: a #DfsmEnvironment
- * @signal_name: the name of the D-Bus signal to emit
- * @parameters: value of the parameters to the signal
- *
- * Emit a signal indicating that the calling code intends for a D-Bus signal to be emitted with name @signal_name and parameters given by @parameters.
- * Note that this won't actually emit the signal on a bus instance; that's the responsibility of wrapper code listening to the
- * #DfsmEnvironment::signal-emission signal.
- */
-void
-dfsm_environment_emit_signal (DfsmEnvironment *self, const gchar *signal_name, GVariant *parameters)
-{
-	gchar *parameters_string;
-
-	g_return_if_fail (DFSM_IS_ENVIRONMENT (self));
-	g_return_if_fail (signal_name != NULL);
-	g_return_if_fail (parameters != NULL);
-
-	parameters_string = g_variant_print (parameters, FALSE);
-	g_debug ("Emitting signal ‘%s’ in environment %p with parameters: %s", signal_name, self, parameters_string);
-	g_free (parameters_string);
-
-	/* Emit the signal. */
-	g_signal_emit (self, environment_signals[SIGNAL_SIGNAL_EMISSION], g_quark_from_string (signal_name), signal_name, parameters);
 }
 
 /**

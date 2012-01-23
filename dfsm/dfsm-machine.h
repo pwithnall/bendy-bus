@@ -24,32 +24,10 @@
 #include <glib-object.h>
 
 #include "dfsm-environment.h"
+#include "dfsm-output-sequence.h"
 #include "dfsm-utils.h"
 
 G_BEGIN_DECLS
-
-typedef enum {
-	DFSM_SIMULATION_ERROR_INVALID_STATUS,
-	DFSM_SIMULATION_ERROR_UNKNOWN_INTERFACE,
-} DfsmSimulationError;
-
-#define DFSM_SIMULATION_ERROR dfsm_simulation_error_quark ()
-GQuark dfsm_simulation_error_quark (void) G_GNUC_CONST;
-
-/**
- * DfsmSimulationStatus:
- * @DFSM_SIMULATION_STATUS_STOPPED: Simulation is not running.
- * @DFSM_SIMULATION_STATUS_STARTED: Simulation is running.
- *
- * The current status of the simulation. This is not equivalent to the current state number of the simulated DFSM.
- */
-typedef enum {
-	DFSM_SIMULATION_STATUS_STOPPED = 0,
-	DFSM_SIMULATION_STATUS_STARTED,
-} DfsmSimulationStatus;
-
-#define DFSM_TYPE_SIMULATION_STATUS dfsm_simulation_status_get_type ()
-GType dfsm_simulation_status_get_type (void) G_GNUC_CONST;
 
 /**
  * DfsmMachineStateNumber:
@@ -85,13 +63,13 @@ typedef struct {
 
 GType dfsm_machine_get_type (void) G_GNUC_CONST;
 
-void dfsm_machine_start_simulation (DfsmMachine *self);
-void dfsm_machine_stop_simulation (DfsmMachine *self);
-void dfsm_machine_reset_simulation (DfsmMachine *self);
+void dfsm_machine_reset_state (DfsmMachine *self);
 
-GVariant *dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const gchar *method_name, GVariant *parameters,
-                                    GError **error) DFSM_CONSTRUCTOR;
-gboolean dfsm_machine_set_property (DfsmMachine *self, const gchar *interface_name, const gchar *property_name, GVariant *value, GError **error);
+void dfsm_machine_call_method (DfsmMachine *self, DfsmOutputSequence *output_sequence, const gchar *interface_name, const gchar *method_name,
+                               GVariant *parameters);
+gboolean dfsm_machine_set_property (DfsmMachine *self, DfsmOutputSequence *output_sequence, const gchar *interface_name, const gchar *property_name,
+                                    GVariant *value);
+void dfsm_machine_make_arbitrary_transition (DfsmMachine *self, DfsmOutputSequence *output_sequence);
 
 DfsmEnvironment *dfsm_machine_get_environment (DfsmMachine *self) G_GNUC_PURE;
 

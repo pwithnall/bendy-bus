@@ -26,7 +26,7 @@ static void dfsm_ast_statement_reply_dispose (GObject *object);
 static void dfsm_ast_statement_reply_sanity_check (DfsmAstNode *node);
 static void dfsm_ast_statement_reply_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static void dfsm_ast_statement_reply_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
-static GVariant *dfsm_ast_statement_reply_execute (DfsmAstStatement *statement, DfsmEnvironment *environment, GError **error);
+static void dfsm_ast_statement_reply_execute (DfsmAstStatement *statement, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence);
 
 struct _DfsmAstStatementReplyPrivate {
 	DfsmAstExpression *expression;
@@ -106,8 +106,8 @@ dfsm_ast_statement_reply_check (DfsmAstNode *node, DfsmEnvironment *environment,
 	/* Whether the expression's type matches the method triggering the containing transition is checked by the transition itself, not us. */
 }
 
-static GVariant *
-dfsm_ast_statement_reply_execute (DfsmAstStatement *statement, DfsmEnvironment *environment, GError **error)
+static void
+dfsm_ast_statement_reply_execute (DfsmAstStatement *statement, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence)
 {
 	DfsmAstStatementReplyPrivate *priv = DFSM_AST_STATEMENT_REPLY (statement)->priv;
 	GVariant *value;
@@ -116,7 +116,7 @@ dfsm_ast_statement_reply_execute (DfsmAstStatement *statement, DfsmEnvironment *
 	value = dfsm_ast_expression_evaluate (priv->expression, environment);
 	g_assert (value != NULL);
 
-	return value;
+	dfsm_output_sequence_add_reply (output_sequence, value);
 }
 
 /**

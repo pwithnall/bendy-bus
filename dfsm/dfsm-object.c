@@ -24,16 +24,38 @@
 
 #include "dfsm-object.h"
 #include "dfsm-ast.h"
+#include "dfsm-dbus-output-sequence.h"
 #include "dfsm-machine.h"
 #include "dfsm-parser.h"
 #include "dfsm-parser-internal.h"
+
+GType
+dfsm_simulation_status_get_type (void)
+{
+	static GType etype = 0;
+
+	if (etype == 0) {
+		static const GEnumValue values[] = {
+			{ DFSM_SIMULATION_STATUS_STOPPED, "DFSM_SIMULATION_STATUS_STOPPED", "stopped" },
+			{ DFSM_SIMULATION_STATUS_STARTED, "DFSM_SIMULATION_STATUS_STARTED", "started" },
+			{ 0, NULL, NULL }
+		};
+
+		etype = g_enum_register_static ("DfsmSimulationStatus", values);
+	}
+
+	return etype;
+}
+
+/* Arbitrarily-chosen min. and max. values for the arbitrary transition timeout callbacks. */
+#define MIN_TIMEOUT 50 /* ms */
+#define MAX_TIMEOUT 200 /* ms */
 
 static void dfsm_object_dispose (GObject *object);
 static void dfsm_object_finalize (GObject *object);
 static void dfsm_object_get_property (GObject *object, guint property_id, GValue *value, GParamSpec *pspec);
 static void dfsm_object_set_property (GObject *object, guint property_id, const GValue *value, GParamSpec *pspec);
 
-static void dfsm_object_dbus_signal_emission_cb (DfsmMachine *machine, const gchar *signal_name, GVariant *parameters, DfsmObject *self);
 static void dfsm_object_dbus_method_call (GDBusConnection *connection, const gchar *sender, const gchar *object_path, const gchar *interface_name,
                                           const gchar *method_name, GVariant *parameters, GDBusMethodInvocation *invocation, gpointer user_data);
 static GVariant *dfsm_object_dbus_get_property (GDBusConnection *connection, const gchar *sender, const gchar *object_path,
@@ -50,7 +72,8 @@ static const GDBusInterfaceVTable dbus_interface_vtable = {
 struct _DfsmObjectPrivate {
 	GDBusConnection *connection; /* NULL if the object isn't registered on a bus */
 	DfsmMachine *machine;
-	gulong signal_emission_handler;
+	DfsmSimulationStatus simulation_status;
+	guint timeout_id;
 	gchar *object_path;
 	GPtrArray/*<string>*/ *bus_names;
 	GPtrArray/*<string>*/ *interfaces;
@@ -65,6 +88,7 @@ enum {
 	PROP_WELL_KNOWN_BUS_NAMES,
 	PROP_INTERFACES,
 	PROP_DBUS_ACTIVITY_COUNT,
+	PROP_SIMULATION_STATUS,
 };
 
 G_DEFINE_TYPE (DfsmObject, dfsm_object, G_TYPE_OBJECT)
@@ -152,6 +176,17 @@ dfsm_object_class_init (DfsmObjectClass *klass)
 	                                                    "D-Bus activity count", "A count of the number of D-Bus activities which have occurred.",
 	                                                    0, G_MAXUINT, 0,
 	                                                    G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+	/**
+	 * DfsmObject:simulation-status:
+	 *
+	 * The status of the simulation; i.e. whether it's currently started or stopped.
+	 */
+	g_object_class_install_property (gobject_class, PROP_SIMULATION_STATUS,
+	                                 g_param_spec_enum ("simulation-status",
+	                                                    "Simulation status", "The status of the simulation.",
+	                                                    DFSM_TYPE_SIMULATION_STATUS, DFSM_SIMULATION_STATUS_STOPPED,
+	                                                    G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 }
 
 static void
@@ -180,7 +215,6 @@ dfsm_object_dispose (GObject *object)
 	}
 
 	if (priv->machine != NULL) {
-		g_signal_handler_disconnect (priv->machine, priv->signal_emission_handler);
 		g_object_unref (priv->machine);
 		priv->machine = NULL;
 	}
@@ -189,6 +223,9 @@ dfsm_object_dispose (GObject *object)
 
 	/* Shouldn't leak this. */
 	g_assert (priv->registration_ids == NULL);
+
+	/* Make sure we're not leaking a callback. */
+	g_assert (priv->timeout_id == 0);
 
 	/* Chain up to the parent class */
 	G_OBJECT_CLASS (dfsm_object_parent_class)->dispose (object);
@@ -229,6 +266,9 @@ dfsm_object_get_property (GObject *object, guint property_id, GValue *value, GPa
 		case PROP_DBUS_ACTIVITY_COUNT:
 			g_value_set_uint (value, priv->dbus_activity_count);
 			break;
+		case PROP_SIMULATION_STATUS:
+			g_value_set_enum (value, priv->simulation_status);
+			break;
 		default:
 			/* We don't have any other property... */
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -245,8 +285,6 @@ dfsm_object_set_property (GObject *object, guint property_id, const GValue *valu
 		case PROP_MACHINE:
 			/* Construct-only */
 			priv->machine = g_value_dup_object (value);
-			priv->signal_emission_handler = g_signal_connect (priv->machine, "signal-emission",
-			                                                  (GCallback) dfsm_object_dbus_signal_emission_cb, object);
 			break;
 		case PROP_OBJECT_PATH:
 			/* Construct-only */
@@ -263,6 +301,8 @@ dfsm_object_set_property (GObject *object, guint property_id, const GValue *valu
 		case PROP_CONNECTION:
 			/* Read-only */
 		case PROP_DBUS_ACTIVITY_COUNT:
+			/* Read-only */
+		case PROP_SIMULATION_STATUS:
 			/* Read-only */
 		default:
 			/* We don't have any other property... */
@@ -445,68 +485,12 @@ dfsm_object_factory_from_files (const gchar *simulation_code, const gchar *intro
 }
 
 static void
-dfsm_object_dbus_signal_emission_cb (DfsmMachine *machine, const gchar *signal_name, GVariant *parameters, DfsmObject *self)
-{
-	DfsmObjectPrivate *priv;
-	GPtrArray/*<GDBusInterfaceInfo>*/ *interfaces;
-	const gchar *interface_name = NULL;
-	GVariant *tuple_parameters;
-	guint i;
-	GError *child_error = NULL;
-
-	g_return_if_fail (DFSM_IS_OBJECT (self));
-
-	priv = self->priv;
-
-	/* This should only ever get called while the simulation's running. */
-	g_assert (priv->registration_ids != NULL);
-
-	/* Find the name of the interface defining the signal. TODO: This is slow. Is there no better way? */
-	interfaces = dfsm_environment_get_interfaces (dfsm_machine_get_environment (priv->machine));
-
-	for (i = 0; i < interfaces->len; i++) {
-		GDBusInterfaceInfo *interface_info = (GDBusInterfaceInfo*) g_ptr_array_index (interfaces, i);
-
-		if (g_dbus_interface_info_lookup_signal (interface_info, signal_name) != NULL) {
-			/* Found the interface. */
-			interface_name = interface_info->name;
-			break;
-		}
-	}
-
-	if (interface_name == NULL) {
-		g_warning (_("Runtime error in simulation: Couldn't find interface containing signal ‘%s’."), signal_name);
-		return;
-	}
-
-	/* Emit the signal. If the parameter is not a tuple, wrap it in one to satisfy GDBus. */
-	if (g_variant_is_of_type (parameters, G_VARIANT_TYPE_TUPLE) == TRUE) {
-		tuple_parameters = g_variant_ref (parameters);
-	} else {
-		GVariantBuilder builder;
-
-		g_variant_builder_init (&builder, G_VARIANT_TYPE_TUPLE);
-		g_variant_builder_add_value (&builder, parameters);
-		tuple_parameters = g_variant_ref_sink (g_variant_builder_end (&builder));
-	}
-
-	g_dbus_connection_emit_signal (priv->connection, NULL, priv->object_path, interface_name, signal_name, tuple_parameters, &child_error);
-
-	g_variant_unref (tuple_parameters);
-
-	if (child_error != NULL) {
-		g_warning (_("Runtime error in simulation while emitting D-Bus signal ‘%s’: %s"), signal_name, child_error->message);
-		g_clear_error (&child_error);
-	}
-}
-
-static void
 dfsm_object_dbus_method_call (GDBusConnection *connection, const gchar *sender, const gchar *object_path, const gchar *interface_name,
                               const gchar *method_name, GVariant *parameters, GDBusMethodInvocation *invocation, gpointer user_data)
 {
 	DfsmObjectPrivate *priv = DFSM_OBJECT (user_data)->priv;
-	GVariant *return_value;
 	gchar *parameters_string;
+	DfsmOutputSequence *output_sequence;
 	GError *child_error = NULL;
 
 	/* Debug output. */
@@ -520,53 +504,21 @@ dfsm_object_dbus_method_call (GDBusConnection *connection, const gchar *sender, 
 	g_object_notify (G_OBJECT (user_data), "dbus-activity-count");
 
 	/* Pass the method call through to the DFSM. */
-	return_value = dfsm_machine_call_method (priv->machine, interface_name, method_name, parameters, &child_error);
+	output_sequence = DFSM_OUTPUT_SEQUENCE (dfsm_dbus_output_sequence_new (connection, object_path, invocation));
+	dfsm_machine_call_method (priv->machine, output_sequence, interface_name, method_name, parameters);
+
+	/* Output the effect sequence resulting from the method call. */
+	dfsm_output_sequence_output (output_sequence, &child_error);
+
+	g_object_unref (output_sequence);
 
 	if (child_error != NULL) {
-		/* Debug output. */
-		g_debug ("…Unsuccessful, with error: %s", child_error->message);
-
-		/* Error. It's either a runtime error from within the simulator, or a thrown D-Bus error from user code. */
-		if (g_dbus_error_is_remote_error (child_error) == TRUE) {
-			/* Thrown D-Bus error. */
-			g_dbus_method_invocation_return_gerror (invocation, child_error);
-		} else {
-			/* Runtime error. Replace it with a generic D-Bus error so as not to expose internals of the
-			 * simulator to programs under test. */
-			g_warning (_("Runtime error in simulation while handling D-Bus method call ‘%s’: %s"), method_name, child_error->message);
-			g_dbus_method_invocation_return_dbus_error (invocation, "org.freedesktop.DBus.Error.Failed", child_error->message);
-		}
+		/* Runtime error. Replace it with a generic D-Bus error so as not to expose internals of the
+		 * simulator to programs under test. */
+		g_warning (_("Runtime error in simulation while handling D-Bus method call ‘%s’: %s"), method_name, child_error->message);
+		g_dbus_method_invocation_return_dbus_error (invocation, "org.freedesktop.DBus.Error.Failed", child_error->message);
 
 		g_clear_error (&child_error);
-	} else if (return_value != NULL) {
-		GVariant *tuple_return_value;
-		gchar *tuple_return_value_string;
-
-		/* Success! Return this value as a reply. If it's not a tuple, wrap it in one to satisfy GDBus. */
-		if (g_variant_is_of_type (return_value, G_VARIANT_TYPE_TUPLE) == TRUE) {
-			tuple_return_value = g_variant_ref (return_value);
-		} else {
-			GVariantBuilder builder;
-
-			g_variant_builder_init (&builder, G_VARIANT_TYPE_TUPLE);
-			g_variant_builder_add_value (&builder, return_value);
-			tuple_return_value = g_variant_ref_sink (g_variant_builder_end (&builder));
-		}
-
-		/* Debug output. */
-		tuple_return_value_string = g_variant_print (tuple_return_value, FALSE);
-		g_debug ("…Successful, with return value: %s", tuple_return_value_string);
-		g_free (tuple_return_value_string);
-
-		/* Return the tuple. */
-		g_dbus_method_invocation_return_value (invocation, tuple_return_value);
-
-		g_variant_unref (tuple_return_value);
-		g_variant_unref (return_value);
-	} else {
-		/* Success, but no value to return. */
-		g_debug ("…Successful, with no return value.");
-		g_dbus_method_invocation_return_value (invocation, NULL);
 	}
 }
 
@@ -604,6 +556,7 @@ dfsm_object_dbus_set_property (GDBusConnection *connection, const gchar *sender,
 {
 	DfsmObjectPrivate *priv = DFSM_OBJECT (user_data)->priv;
 	gchar *value_string;
+	DfsmOutputSequence *output_sequence;
 	GError *child_error = NULL;
 
 	value_string = g_variant_print (value, FALSE);
@@ -616,22 +569,26 @@ dfsm_object_dbus_set_property (GDBusConnection *connection, const gchar *sender,
 	g_object_notify (G_OBJECT (user_data), "dbus-activity-count");
 
 	/* Set the property on the machine. */
-	if (dfsm_machine_set_property (priv->machine, interface_name, property_name, value, &child_error) == TRUE) {
-		GVariantBuilder *builder;
-		GError *signal_error = NULL;
+	output_sequence = DFSM_OUTPUT_SEQUENCE (dfsm_dbus_output_sequence_new (connection, object_path, NULL));
 
-		/* Emit a notification. */
+	if (dfsm_machine_set_property (priv->machine, output_sequence, interface_name, property_name, value) == TRUE) {
+		GVariantBuilder *builder;
+		GVariant *parameters;
+
+		/* Schedule a notification. */
 		builder = g_variant_builder_new (G_VARIANT_TYPE_ARRAY);
 		g_variant_builder_add (builder, "{sv}", property_name, value);
-		g_dbus_connection_emit_signal (connection, NULL, object_path, "org.freedesktop.DBus.Properties", "PropertiesChanged",
-		                               g_variant_new ("(sa{sv}as)", interface_name, builder, NULL), &signal_error);
+		parameters = g_variant_new ("(sa{sv}as)", interface_name, builder, NULL);
 
-		if (signal_error != NULL) {
-			g_warning (_("Runtime error in simulation while notifying of update to D-Bus property ‘%s’: %s"), property_name,
-			           child_error->message);
-			g_clear_error (&signal_error);
-		}
+		dfsm_output_sequence_add_emit (output_sequence, "org.freedesktop.DBus.Properties", "PropertiesChanged", parameters);
+
+		g_variant_unref (parameters);
 	}
+
+	/* Output effects of the transition. */
+	dfsm_output_sequence_output (output_sequence, &child_error);
+
+	g_object_unref (output_sequence);
 
 	if (child_error != NULL) {
 		g_propagate_error (error, child_error);
@@ -639,6 +596,51 @@ dfsm_object_dbus_set_property (GDBusConnection *connection, const gchar *sender,
 	}
 
 	return TRUE;
+}
+
+static void schedule_arbitrary_transition (DfsmObject *self);
+
+/* This gets called continuously at random intervals while the simulation's running. It checks whether any arbitrary transitions can be taken,
+ * and if so, follows one of them. */
+static gboolean
+arbitrary_transition_timeout_cb (DfsmObject *self)
+{
+	DfsmObjectPrivate *priv = self->priv;
+	DfsmOutputSequence *output_sequence;
+	GError *child_error = NULL;
+
+	/* Make an arbitrary transition. */
+	output_sequence = DFSM_OUTPUT_SEQUENCE (dfsm_dbus_output_sequence_new (priv->connection, priv->object_path, NULL));
+	dfsm_machine_make_arbitrary_transition (self->priv->machine, output_sequence);
+
+	/* Output the transition's effects. */
+	dfsm_output_sequence_output (output_sequence, &child_error);
+
+	g_object_unref (output_sequence);
+
+	if (child_error != NULL) {
+		g_warning ("Runtime error when outputting the effects of an arbitrary transition: %s", child_error->message);
+		g_error_free (child_error);
+	}
+
+	/* Schedule the next arbitrary transition. */
+	priv->timeout_id = 0;
+	schedule_arbitrary_transition (self);
+
+	return FALSE; /* rescheduled with a different timeout above */
+}
+
+static void
+schedule_arbitrary_transition (DfsmObject *self)
+{
+	guint32 timeout_period;
+
+	g_assert (self->priv->timeout_id == 0);
+
+	/* Add a random timeout to the next potential arbitrary transition. */
+	timeout_period = g_random_int_range (MIN_TIMEOUT, MAX_TIMEOUT);
+	g_debug ("Scheduling the next arbitrary transition in %u ms.", timeout_period);
+	self->priv->timeout_id = g_timeout_add (timeout_period, (GSourceFunc) arbitrary_transition_timeout_cb, self);
 }
 
 /**
@@ -686,7 +688,8 @@ dfsm_object_register_on_bus (DfsmObject *self, GDBusConnection *connection, GErr
 
 		interface_name = g_ptr_array_index (priv->interfaces, i);
 
-		/* Look up the interface information. */
+		/* Look up the interface information. This should always be present, since dfsm_environment_get_interfaces() is instantiated from
+		 * priv->interfaces. */
 		for (j = 0; j < interfaces->len; j++) {
 			if (strcmp (interface_name, ((GDBusInterfaceInfo*) g_ptr_array_index (interfaces, j))->name) == 0) {
 				interface_info = (GDBusInterfaceInfo*) g_ptr_array_index (interfaces, j);
@@ -694,12 +697,7 @@ dfsm_object_register_on_bus (DfsmObject *self, GDBusConnection *connection, GErr
 			}
 		}
 
-		if (interface_info == NULL) {
-			/* Unknown interface! */
-			g_set_error (&child_error, DFSM_SIMULATION_ERROR, DFSM_SIMULATION_ERROR_UNKNOWN_INTERFACE,
-			             _("D-Bus interface ‘%s’ not found in introspection XML."), interface_name);
-			goto error;
-		}
+		g_assert (interface_info != NULL);
 
 		/* Register on the bus. */
 		registration_id = g_dbus_connection_register_object (connection, priv->object_path, interface_info, &dbus_interface_vtable, self,
@@ -727,7 +725,14 @@ dfsm_object_register_on_bus (DfsmObject *self, GDBusConnection *connection, GErr
 	g_object_notify (G_OBJECT (self), "dbus-activity-count");
 
 	/* Start the DFSM. */
-	dfsm_machine_start_simulation (priv->machine);
+	g_debug ("Starting the simulation.");
+
+	/* Add a random timeout to the next potential arbitrary transition. */
+	schedule_arbitrary_transition (self);
+
+	/* Change simulation status. */
+	priv->simulation_status = DFSM_SIMULATION_STATUS_STARTED;
+	g_object_notify (G_OBJECT (self), "simulation-status");
 
 	return;
 
@@ -775,7 +780,16 @@ dfsm_object_unregister_on_bus (DfsmObject *self)
 	}
 
 	/* Stop the DFSM. */
-	dfsm_machine_stop_simulation (priv->machine);
+	g_debug ("Stopping the simulation.");
+
+	/* Cancel any outstanding potential arbitrary transition. */
+	g_debug ("Cancelling outstanding arbitrary transitions.");
+	g_source_remove (priv->timeout_id);
+	priv->timeout_id = 0;
+
+	/* Change simulation status. */
+	priv->simulation_status = DFSM_SIMULATION_STATUS_STOPPED;
+	g_object_notify (G_OBJECT (self), "simulation-status");
 
 	/* Unregister all the interfaces from the bus. */
 	for (i = 0; i < priv->registration_ids->len; i++) {
@@ -799,9 +813,21 @@ dfsm_object_unregister_on_bus (DfsmObject *self)
 void
 dfsm_object_reset (DfsmObject *self)
 {
+	DfsmObjectPrivate *priv;
+
 	g_return_if_fail (DFSM_IS_OBJECT (self));
 
-	dfsm_machine_reset_simulation (self->priv->machine);
+	priv = self->priv;
+
+	if (priv->simulation_status == DFSM_SIMULATION_STATUS_STARTED) {
+		if (priv->timeout_id != 0) {
+			g_debug ("Cancelling outstanding arbitrary transitions.");
+			g_source_remove (priv->timeout_id);
+			priv->timeout_id = 0;
+		}
+
+		schedule_arbitrary_transition (self);
+	}
 
 	self->priv->dbus_activity_count = 0;
 	g_object_notify (G_OBJECT (self), "dbus-activity-count");

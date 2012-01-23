@@ -68,8 +68,6 @@ GVariantType *dfsm_environment_function_calculate_type (const gchar *function_na
                                                         GError **error) DFSM_CONSTRUCTOR;
 GVariant *dfsm_environment_function_evaluate (const gchar *function_name, GVariant *parameters, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
 
-void dfsm_environment_emit_signal (DfsmEnvironment *self, const gchar *signal_name, GVariant *parameters);
-
 GPtrArray/*<GDBusInterfaceInfo>*/ *dfsm_environment_get_interfaces (DfsmEnvironment *self) G_GNUC_PURE;
 
 G_END_DECLS

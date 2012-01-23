@@ -30,7 +30,7 @@ static void dfsm_ast_statement_assignment_dispose (GObject *object);
 static void dfsm_ast_statement_assignment_sanity_check (DfsmAstNode *node);
 static void dfsm_ast_statement_assignment_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
 static void dfsm_ast_statement_assignment_check (DfsmAstNode *node, DfsmEnvironment *environment, GError **error);
-static GVariant *dfsm_ast_statement_assignment_execute (DfsmAstStatement *statement, DfsmEnvironment *environment, GError **error);
+static void dfsm_ast_statement_assignment_execute (DfsmAstStatement *statement, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence);
 
 struct _DfsmAstStatementAssignmentPrivate {
 	DfsmAstDataStructure *data_structure; /* lvalue */
@@ -157,8 +157,8 @@ dfsm_ast_statement_assignment_check (DfsmAstNode *node, DfsmEnvironment *environ
 	g_variant_type_free (rvalue_type);
 }
 
-static GVariant *
-dfsm_ast_statement_assignment_execute (DfsmAstStatement *statement, DfsmEnvironment *environment, GError **error)
+static void
+dfsm_ast_statement_assignment_execute (DfsmAstStatement *statement, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence)
 {
 	DfsmAstStatementAssignmentPrivate *priv = DFSM_AST_STATEMENT_ASSIGNMENT (statement)->priv;
 	GVariant *rvalue;
@@ -171,8 +171,6 @@ dfsm_ast_statement_assignment_execute (DfsmAstStatement *statement, DfsmEnvironm
 	dfsm_ast_data_structure_set_from_variant (priv->data_structure, environment, rvalue);
 
 	g_variant_unref (rvalue);
-
-	return NULL;
 }
 
 /**

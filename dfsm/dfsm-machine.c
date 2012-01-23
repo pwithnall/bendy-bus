@@ -27,51 +27,19 @@
 #include "dfsm-environment.h"
 #include "dfsm-machine.h"
 #include "dfsm-marshal.h"
+#include "dfsm-output-sequence.h"
 #include "dfsm-parser.h"
 #include "dfsm-parser-internal.h"
 #include "dfsm-probabilities.h"
-
-GQuark
-dfsm_simulation_error_quark (void)
-{
-	return g_quark_from_static_string ("dfsm-simulation-error-quark");
-}
-
-GType
-dfsm_simulation_status_get_type (void)
-{
-	static GType etype = 0;
-
-	if (etype == 0) {
-		static const GEnumValue values[] = {
-			{ DFSM_SIMULATION_STATUS_STOPPED, "DFSM_SIMULATION_STATUS_STOPPED", "stopped" },
-			{ DFSM_SIMULATION_STATUS_STARTED, "DFSM_SIMULATION_STATUS_STARTED", "started" },
-			{ 0, NULL, NULL }
-		};
-
-		etype = g_enum_register_static ("DfsmSimulationStatus", values);
-	}
-
-	return etype;
-}
-
-/* Arbitrarily-chosen min. and max. values for the arbitrary transition timeout callbacks. */
-#define MIN_TIMEOUT 50 /* ms */
-#define MAX_TIMEOUT 200 /* ms */
 
 static void dfsm_machine_dispose (GObject *object);
 static void dfsm_machine_get_gobject_property (GObject *object, guint property_id, GValue *value, GParamSpec *pspec);
 static void dfsm_machine_set_gobject_property (GObject *object, guint property_id, const GValue *value, GParamSpec *pspec);
 
-static void environment_signal_emission_cb (DfsmEnvironment *environment, const gchar *signal_name, GVariant *parameters, DfsmMachine *self);
-
 struct _DfsmMachinePrivate {
 	/* Simulation data */
 	DfsmMachineStateNumber machine_state;
 	DfsmEnvironment *environment;
-	gulong signal_emission_handler;
-	DfsmSimulationStatus simulation_status;
-	guint timeout_id;
 
 	/* Static data */
 	GPtrArray/*<string>*/ *state_names; /* (indexed by DfsmMachineStateNumber) */
@@ -84,16 +52,8 @@ struct _DfsmMachinePrivate {
 
 enum {
 	PROP_MACHINE_STATE = 1,
-	PROP_SIMULATION_STATUS,
 	PROP_ENVIRONMENT,
 };
-
-enum {
-	SIGNAL_SIGNAL_EMISSION,
-	LAST_SIGNAL,
-};
-
-static guint machine_signals[LAST_SIGNAL] = { 0, };
 
 G_DEFINE_TYPE (DfsmMachine, dfsm_machine, G_TYPE_OBJECT)
 
@@ -120,17 +80,6 @@ dfsm_machine_class_init (DfsmMachineClass *klass)
 	                                                    G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
 	/**
-	 * DfsmMachine:simulation-status:
-	 *
-	 * The status of the simulation; i.e. whether it's currently started or stopped.
-	 */
-	g_object_class_install_property (gobject_class, PROP_SIMULATION_STATUS,
-	                                 g_param_spec_enum ("simulation-status",
-	                                                    "Simulation status", "The status of the simulation.",
-	                                                    DFSM_TYPE_SIMULATION_STATUS, DFSM_SIMULATION_STATUS_STOPPED,
-	                                                    G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
-
-	/**
 	 * DfsmMachine:environment:
 	 *
 	 * The execution environment this machine simulation is using.
@@ -140,22 +89,6 @@ dfsm_machine_class_init (DfsmMachineClass *klass)
 	                                                      "Environment", "The execution environment this machine simulation is using.",
 	                                                      DFSM_TYPE_ENVIRONMENT,
 	                                                      G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
-
-	/**
-	 * DfsmMachine::signal-emission:
-	 * @parameters: the non-floating parameter (or structure of parameters) passed to the signal emission
-	 *
-	 * Emitted whenever a piece of code in a simulated DFSM emits a D-Bus signal. No code in the simulator will actually emit this D-Bus signal on
-	 * a bus instance, but (for example) a wrapper which was listening to this signal could do so.
-	 *
-	 * This is just a pass-through of #DfsmEnvironment::signal-emission.
-	 */
-	machine_signals[SIGNAL_SIGNAL_EMISSION] = g_signal_new ("signal-emission",
-	                                                        G_TYPE_FROM_CLASS (klass),
-	                                                        G_SIGNAL_RUN_LAST | G_SIGNAL_DETAILED,
-	                                                        0, NULL, NULL,
-	                                                        dfsm_marshal_VOID__STRING_VARIANT,
-	                                                        G_TYPE_NONE, 2, G_TYPE_STRING, G_TYPE_VARIANT);
 }
 
 static void
@@ -170,12 +103,8 @@ dfsm_machine_dispose (GObject *object)
 {
 	DfsmMachinePrivate *priv = DFSM_MACHINE (object)->priv;
 
-	/* Stop the simulation first. */
-	dfsm_machine_stop_simulation (DFSM_MACHINE (object));
-
 	/* Free things. */
 	if (priv->environment != NULL) {
-		g_signal_handler_disconnect (priv->environment, priv->signal_emission_handler);
 		g_object_unref (priv->environment);
 		priv->environment = NULL;
 	}
@@ -200,9 +129,6 @@ dfsm_machine_dispose (GObject *object)
 		priv->transitions.arbitrarily_triggered = NULL;
 	}
 
-	/* Make sure we're not leaking a callback. */
-	g_assert (priv->timeout_id == 0);
-
 	/* Chain up to the parent class */
 	G_OBJECT_CLASS (dfsm_machine_parent_class)->dispose (object);
 }
@@ -215,9 +141,6 @@ dfsm_machine_get_gobject_property (GObject *object, guint property_id, GValue *v
 	switch (property_id) {
 		case PROP_MACHINE_STATE:
 			g_value_set_uint (value, priv->machine_state);
-			break;
-		case PROP_SIMULATION_STATUS:
-			g_value_set_enum (value, priv->simulation_status);
 			break;
 		case PROP_ENVIRONMENT:
 			g_value_set_object (value, priv->environment);
@@ -238,13 +161,9 @@ dfsm_machine_set_gobject_property (GObject *object, guint property_id, const GVa
 		case PROP_ENVIRONMENT:
 			/* Construct-only */
 			priv->environment = g_value_dup_object (value);
-			priv->signal_emission_handler = g_signal_connect (priv->environment, "signal-emission",
-			                                                  (GCallback) environment_signal_emission_cb, object);
 			dfsm_environment_save_reset_point (priv->environment);
 			break;
 		case PROP_MACHINE_STATE:
-			/* Read-only */
-		case PROP_SIMULATION_STATUS:
 			/* Read-only */
 		default:
 			/* We don't have any other property... */
@@ -259,59 +178,41 @@ get_state_name (DfsmMachine *self, DfsmMachineStateNumber state_number)
 	return (const gchar*) g_ptr_array_index (self->priv->state_names, state_number);
 }
 
-static GVariant *
-execute_transition (DfsmMachine *self, DfsmAstObjectTransition *object_transition, gboolean *executed_transition, GError **error)
+/* Return value: whether the machine changed state */
+static gboolean
+execute_transition (DfsmMachine *self, DfsmAstObjectTransition *object_transition, DfsmOutputSequence *output_sequence)
 {
 	DfsmMachinePrivate *priv = self->priv;
-	GVariant *return_value = NULL;
-	GError *child_error = NULL;
-
-	g_assert (executed_transition != NULL);
-	*executed_transition = FALSE;
 
 	g_debug ("…Executing transition %p from ‘%s’ to ‘%s’.", object_transition->transition, get_state_name (self, object_transition->from_state),
 	         get_state_name (self, object_transition->to_state));
-	return_value = dfsm_ast_transition_execute (object_transition->transition, priv->environment, &child_error);
+	dfsm_ast_transition_execute (object_transition->transition, priv->environment, output_sequence);
 
 	/* Various possibilities for return values. */
-	if (child_error == NULL) {
-		gchar *return_value_string;
-
+	if (dfsm_ast_transition_contains_throw_statement (object_transition->transition) == FALSE) {
 		/* Success, with or without a return value. */
-		return_value_string = (return_value != NULL) ? g_variant_print (return_value, TRUE) : g_strdup ("(null)");
-		g_debug ("…(Successful, with return value: %s.)", return_value_string);
-		g_free (return_value_string);
-
-		*executed_transition = TRUE;
+		g_debug ("…(Successful.)");
 
 		/* Change machine state. */
 		priv->machine_state = object_transition->to_state;
 		g_object_notify (G_OBJECT (self), "machine-state");
-	} else if (return_value == NULL && child_error != NULL) {
-		/* Error, either during execution or as a result of a throw statement. Don't change states. */
-		g_debug ("…(Error: %s)", child_error->message);
 
-		g_propagate_error (error, child_error);
-		*executed_transition = FALSE;
+		return TRUE;
 	} else {
-		g_assert_not_reached ();
-	}
+		/* A ‘throw’ statement was executed. Don't change states. */
+		g_debug ("…(Threw error.)");
 
-	return return_value;
+		return FALSE;
+	}
 }
 
-static GVariant *
-find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstObjectTransition>*/ *possible_transitions, gboolean *executed_transition,
-                                    GError **error)
+static gboolean
+find_and_execute_random_transition (DfsmMachine *self, DfsmOutputSequence *output_sequence, GPtrArray/*<DfsmAstObjectTransition>*/ *possible_transitions)
 {
 	DfsmMachinePrivate *priv = self->priv;
 	guint i, rand_offset;
-	DfsmAstObjectTransition *candidate_object_transition = NULL;
-	GVariant *return_value = NULL;
-	GError *child_error = NULL, *precondition_error = NULL;
-
-	g_assert (executed_transition != NULL);
-	*executed_transition = FALSE;
+	DfsmAstObjectTransition *candidate_object_transition = NULL, *precondition_failure_transition = NULL;
+	gboolean outputted = FALSE; /* have we outputted a reply or thrown an error? */
 
 	g_debug ("Finding a transition out of %u possibles.", possible_transitions->len);
 
@@ -337,6 +238,7 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstObject
 	for (i = 0; i < possible_transitions->len; i++) {
 		DfsmAstObjectTransition *object_transition;
 		DfsmAstTransition *transition;
+		gboolean will_throw_error = FALSE;
 
 		object_transition = g_ptr_array_index (possible_transitions, (i + rand_offset) % possible_transitions->len);
 		transition = object_transition->transition;
@@ -350,20 +252,16 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstObject
 		}
 
 		/* If this transition's preconditions are satisfied, continue down to execute it. Otherwise, loop round and try the next transition. */
-		if (dfsm_ast_transition_check_preconditions (transition, priv->environment, &child_error) == FALSE) {
+		if (dfsm_ast_transition_check_preconditions (transition, priv->environment, NULL, &will_throw_error) == FALSE) {
+			/* If the transition will throw a D-Bus error as a result of its precondition failures, store it. If we don't find any
+			 * transitions which have no precondition failures, we can come back to the first one _with_ precondition failures and
+			 * throw its D-Bus errors. */
+			if (precondition_failure_transition == NULL && will_throw_error == TRUE) {
+				precondition_failure_transition = object_transition;
+			}
+
 			g_debug ("…Skipping transition %p from ‘%s’ to ‘%s’ due to precondition failures.", transition,
 			         get_state_name (self, object_transition->from_state), get_state_name (self, object_transition->to_state));
-
-			/* Errors? These will either be runtime errors in evaluating the condition, or (more likely) errors thrown as a result of
-			 * precondition failure. In either case, we store the first occurrence and loop round to try the next transition instead. */
-			if (child_error != NULL) {
-				if (precondition_error == NULL) {
-					precondition_error = child_error;
-					child_error = NULL;
-				}
-
-				g_clear_error (&child_error);
-			}
 
 			continue;
 		}
@@ -373,6 +271,7 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstObject
 			/* Skip the transition, but keep a record of it in case we find there are no other transitions whose preconditions pass and
 			 * which don't contain ‘throw’ statements. */
 			candidate_object_transition = object_transition;
+			precondition_failure_transition = NULL;
 
 			g_debug ("…Skipping transition %p from ‘%s’ to ‘%s’ due to it containing a throw statement.", transition,
 			         get_state_name (self, object_transition->from_state), get_state_name (self, object_transition->to_state));
@@ -381,106 +280,71 @@ find_and_execute_random_transition (DfsmMachine *self, GPtrArray/*<DfsmAstObject
 		}
 
 		/* We're found a transition whose preconditions pass, so forget about any previous precondition failures. Execute the transition. */
-		g_clear_error (&precondition_error);
+		precondition_failure_transition = NULL;
 		candidate_object_transition = NULL;
-		return_value = execute_transition (self, object_transition, executed_transition, &child_error);
+
+		execute_transition (self, object_transition, output_sequence);
+		outputted = TRUE;
 
 		break;
 	}
 
 	/* If we didn't manage to find/execute any transitions, return the error from the first precondition failure. */
-	if (precondition_error != NULL) {
-		child_error = precondition_error;
-		precondition_error = NULL;
-
-		g_propagate_error (error, child_error);
+	if (precondition_failure_transition != NULL) {
+		dfsm_ast_transition_check_preconditions (precondition_failure_transition->transition, priv->environment, output_sequence, NULL);
+		outputted = TRUE;
 	}
 
 	/* If we found a candidate transition but then skipped it due to it containing ‘throw’ statements, and didn't subsequently find a better
 	 * transition, execute the previous candidate transition now. */
 	if (candidate_object_transition != NULL) {
-		return_value = execute_transition (self, candidate_object_transition, executed_transition, &child_error);
+		execute_transition (self, candidate_object_transition, output_sequence);
+		outputted = TRUE;
 	}
 
 done:
-	g_assert ((*executed_transition == TRUE && child_error == NULL) ||
-	          (*executed_transition == FALSE && return_value == NULL));
+	g_assert (precondition_failure_transition == NULL || candidate_object_transition == NULL);
+	g_assert (outputted == TRUE || (precondition_failure_transition == NULL && candidate_object_transition == NULL));
 
-	if (child_error != NULL) {
-		g_propagate_error (error, child_error);
-	}
-
-	return return_value;
+	return outputted;
 }
 
-static void schedule_arbitrary_transition (DfsmMachine *self);
-
-/* This gets called continuously at random intervals while the simulation's running. It checks whether any arbitrary transitions can be taken,
- * and if so, follows one of them. */
-static gboolean
-arbitrary_transition_timeout_cb (DfsmMachine *self)
+/**
+ * dfsm_machine_make_arbitrary_transition:
+ * @self: a #DfsmMachine
+ * @output_sequence: an output sequence to append effects of the transition to
+ *
+ * Make an arbitrary (i.e. triggered randomly) transition in the machine's state, if one is available to be taken at the moment (e.g. its preconditions
+ * are met). This should typically be called on a timer.
+ *
+ * If a transition is taken, any effects of the transition's code will be appended to @output_sequence in execution order. The caller may then push
+ * those effects out onto the bus using dfsm_output_sequence_output().
+ */
+void
+dfsm_machine_make_arbitrary_transition (DfsmMachine *self, DfsmOutputSequence *output_sequence)
 {
 	DfsmMachinePrivate *priv;
 	GPtrArray/*<DfsmAstTransition>*/ *possible_transitions;
 	gboolean executed_transition = FALSE;
-	GVariant *return_value = NULL;
-	GError *child_error = NULL;
 
-	g_return_val_if_fail (DFSM_IS_MACHINE (self), FALSE);
+	g_return_if_fail (DFSM_IS_MACHINE (self));
+	g_return_if_fail (DFSM_IS_OUTPUT_SEQUENCE (output_sequence));
 
 	priv = self->priv;
-
-	g_assert (priv->simulation_status == DFSM_SIMULATION_STATUS_STARTED);
 
 	/* At this point, all arbitrary transitions are possible */
 	possible_transitions = priv->transitions.arbitrarily_triggered;
 
 	/* Find and potentially execute a transition. */
-	return_value = find_and_execute_random_transition (self, possible_transitions, &executed_transition, &child_error);
+	executed_transition = find_and_execute_random_transition (self, output_sequence, possible_transitions);
 
-	if (executed_transition == FALSE && child_error == NULL) {
+	if (executed_transition == FALSE) {
 		/* If we failed to execute a transition, log it and ignore it. */
 		g_debug ("Couldn't find any arbitrary DFSM transitions eligible to be executed as a result of a timeout. Ignoring.");
-	} else if (executed_transition == TRUE) {
+	} else {
 		/* Success! */
 		g_debug ("Successfully executed an arbitrary DFSM transition as a result of a timeout.");
-
-		/* Swallow the result. */
-		if (return_value != NULL) {
-			g_variant_unref (return_value);
-		}
-	} else {
-		/* Error or precondition failure */
-		g_debug ("Error executing an arbitrary DFSM transition as a result of a timeout: %s", child_error->message);
-		g_error_free (child_error);
 	}
-
-	/* Schedule the next arbitrary transition. */
-	priv->timeout_id = 0;
-	schedule_arbitrary_transition (self);
-
-	return FALSE;
-}
-
-static void
-schedule_arbitrary_transition (DfsmMachine *self)
-{
-	guint32 timeout_period;
-
-	g_assert (self->priv->timeout_id == 0);
-
-	/* Add a random timeout to the next potential arbitrary transition. */
-	timeout_period = g_random_int_range (MIN_TIMEOUT, MAX_TIMEOUT);
-	g_debug ("Scheduling the next arbitrary transition in %u ms.", timeout_period);
-	self->priv->timeout_id = g_timeout_add (timeout_period, (GSourceFunc) arbitrary_transition_timeout_cb, self);
-}
-
-static void
-environment_signal_emission_cb (DfsmEnvironment *environment, const gchar *signal_name, GVariant *parameters, DfsmMachine *self)
-{
-	/* Re-emit the signal as a pass-through */
-	g_assert (parameters != NULL && g_variant_is_floating (parameters) == FALSE);
-	g_signal_emit (self, machine_signals[SIGNAL_SIGNAL_EMISSION], g_quark_from_string (signal_name), signal_name, parameters);
 }
 
 /*
@@ -568,83 +432,14 @@ _dfsm_machine_new (DfsmEnvironment *environment, GPtrArray/*<string>*/ *state_na
 }
 
 /**
- * dfsm_machine_start_simulation:
- * @self: a #DfsmMachine
- *
- * Start the simulation. This permits dfsm_machine_call_method() to be called in order to trigger transitions by incoming D-Bus method calls. It also
- * starts a timer for arbitrary transitions to be triggered off.
- *
- * If the simulation is already running, this function returns immediately. Otherwise, #DfsmMachine:simulation-status will be set to
- * %DFSM_SIMULATION_STATUS_STARTED before this function returns.
- */
-void
-dfsm_machine_start_simulation (DfsmMachine *self)
-{
-	DfsmMachinePrivate *priv;
-
-	g_return_if_fail (DFSM_IS_MACHINE (self));
-
-	priv = self->priv;
-
-	/* No-op? */
-	if (priv->simulation_status == DFSM_SIMULATION_STATUS_STARTED) {
-		return;
-	}
-
-	g_debug ("Starting the simulation.");
-
-	/* Add a random timeout to the next potential arbitrary transition. */
-	schedule_arbitrary_transition (self);
-
-	/* Change simulation status. */
-	priv->simulation_status = DFSM_SIMULATION_STATUS_STARTED;
-	g_object_notify (G_OBJECT (self), "simulation-status");
-}
-
-/**
- * dfsm_machine_stop_simulation:
- * @self: a #DfsmMachine
- *
- * Stop the simulation. This stops the timer for triggering arbitrary permissions, and prohibits dfsm_machine_call_method() from being called again.
- *
- * If the simulation is already stopped, this function returns immediately. Otherwise, #DfsmMachine:simulation-status will be set to
- * %DFSM_SIMULATION_STATUS_STOPPED before this function returns.
- */
-void
-dfsm_machine_stop_simulation (DfsmMachine *self)
-{
-	DfsmMachinePrivate *priv;
-
-	g_return_if_fail (DFSM_IS_MACHINE (self));
-
-	priv = self->priv;
-
-	/* No-op? */
-	if (priv->simulation_status == DFSM_SIMULATION_STATUS_STOPPED) {
-		return;
-	}
-
-	g_debug ("Stopping the simulation.");
-
-	/* Cancel any outstanding potential arbitrary transition. */
-	g_debug ("Cancelling outstanding arbitrary transitions.");
-	g_source_remove (priv->timeout_id);
-	priv->timeout_id = 0;
-
-	/* Change simulation status. */
-	priv->simulation_status = DFSM_SIMULATION_STATUS_STOPPED;
-	g_object_notify (G_OBJECT (self), "simulation-status");
-}
-
-/**
  * dfsm_machine_reset_simulation:
  * @self: a #DfsmMachine
  *
- * Reset the simulation. This can be called whether the simulation is currently running or stopped. In both cases, it resets the DFSM to its starting
- * state, resets the environment, and resets the arbitrary transition timer.
+ * Reset the simulation's state. This can be called whether the simulation is currently running or stopped. In both cases, it resets the DFSM to its
+ * starting state and resets the environment.
  */
 void
-dfsm_machine_reset_simulation (DfsmMachine *self)
+dfsm_machine_reset_state (DfsmMachine *self)
 {
 	DfsmMachinePrivate *priv;
 
@@ -660,60 +455,40 @@ dfsm_machine_reset_simulation (DfsmMachine *self)
 
 	/* Reset the environment. */
 	dfsm_environment_reset (priv->environment);
-
-	if (priv->simulation_status == DFSM_SIMULATION_STATUS_STARTED) {
-		if (priv->timeout_id != 0) {
-			g_debug ("Cancelling outstanding arbitrary transitions.");
-			g_source_remove (priv->timeout_id);
-			priv->timeout_id = 0;
-		}
-
-		schedule_arbitrary_transition (self);
-	}
 }
 
 /**
  * dfsm_machine_call_method:
  * @self: a #DfsmMachine
+ * @output_sequence: output sequence for results and effects of the method
  * @interface_name: the name of the D-Bus interface that @method_name is defined on
  * @method_name: the name of the D-Bus method to call
  * @parameters: parameters for the D-Bus method
- * @error: a #GError
  *
- * Call the given @method_name on the DFSM machine with the given @parameters as input. The method will be called synchronously, and its result returned
- * as a #GVariant. If the method throws an error, the return value will be %NULL and the error will be set in @error.
+ * Call the given @method_name on the DFSM machine with the given @parameters as input. The method will be called synchronously, and its effects added
+ * to the given @output_sequence, including its return value (if any). If the method throws a D-Bus error, that will be set in @output_sequence.
  *
- * Any signal emissions and property changes which occur as a result of the method call will be made while this function is running.
- *
- * Return value: (transfer full): non-floating return value from the method call, or %NULL
+ * Any signal emissions and property changes which occur as a result of the method call will be added to the @output_sequence.
  */
-GVariant *
-dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const gchar *method_name, GVariant *parameters, GError **error)
+void
+dfsm_machine_call_method (DfsmMachine *self, DfsmOutputSequence *output_sequence, const gchar *interface_name, const gchar *method_name,
+                          GVariant *parameters)
 {
 	DfsmMachinePrivate *priv;
 	GPtrArray/*<DfsmAstObjectTransition>*/ *possible_transitions;
 	gboolean executed_transition = FALSE;
-	GVariant *return_value = NULL;
 	GPtrArray/*<GDBusInterfaceInfo>*/ *interfaces;
 	GDBusInterfaceInfo *interface_info = NULL;
 	GDBusMethodInfo *method_info;
 	guint i;
-	GError *child_error = NULL;
 
-	g_return_val_if_fail (DFSM_IS_MACHINE (self), NULL);
-	g_return_val_if_fail (interface_name != NULL && *interface_name != '\0', NULL);
-	g_return_val_if_fail (method_name != NULL && *method_name != '\0', NULL);
-	g_return_val_if_fail (parameters != NULL, NULL);
-	g_return_val_if_fail (error != NULL && *error == NULL, NULL);
+	g_return_if_fail (DFSM_IS_MACHINE (self));
+	g_return_if_fail (DFSM_IS_OUTPUT_SEQUENCE (output_sequence));
+	g_return_if_fail (interface_name != NULL && *interface_name != '\0');
+	g_return_if_fail (method_name != NULL && *method_name != '\0');
+	g_return_if_fail (parameters != NULL);
 
 	priv = self->priv;
-
-	/* Can't call a method if the simulation isn't running. */
-	if (priv->simulation_status != DFSM_SIMULATION_STATUS_STARTED) {
-		g_set_error (&child_error, DFSM_SIMULATION_ERROR, DFSM_SIMULATION_ERROR_INVALID_STATUS,
-		             _("Can't call a D-Bus method if the simulation isn't running."));
-		goto done;
-	}
 
 	/* Look up the method name in our set of transitions which are triggered by method calls */
 	possible_transitions = g_hash_table_lookup (priv->transitions.method_call_triggered, method_name);
@@ -771,7 +546,7 @@ dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const 
 	}
 
 	/* Find and potentially execute a transition from the array. */
-	return_value = find_and_execute_random_transition (self, possible_transitions, &executed_transition, &child_error);
+	executed_transition = find_and_execute_random_transition (self, output_sequence, possible_transitions);
 
 	/* Restore the environment. */
 	if (method_info->in_args != NULL) {
@@ -782,58 +557,49 @@ dfsm_machine_call_method (DfsmMachine *self, const gchar *interface_name, const 
 	}
 
 done:
-	/* If we failed to execute a transition, warn and return the unit tuple. */
-	if (executed_transition == FALSE && child_error == NULL) {
+	/* If we failed to find and execute a transition, warn and return the unit tuple. */
+	if (executed_transition == FALSE) {
+		GVariant *return_value;
+
 		g_warning (_("Failed to execute any DFSM transitions as a result of method call ‘%s’. Ignoring method call."), method_name);
+
 		return_value = g_variant_ref_sink (g_variant_new_tuple (NULL, 0));
-	} else if (executed_transition == FALSE || return_value == NULL) {
-		/* Error or precondition failure */
-		g_propagate_error (error, child_error);
+		dfsm_output_sequence_add_reply (output_sequence, return_value);
+		g_variant_unref (return_value);
 	}
-
-	g_assert (return_value == NULL || g_variant_is_floating (return_value) == FALSE);
-	g_assert ((return_value != NULL) != (child_error != NULL));
-
-	return return_value;
 }
 
 /**
  * dfsm_machine_set_property:
  * @self: a #DfsmMachine
+ * @output_sequence: an output sequence to append effects of setting the property to
  * @interface_name: the name of the D-Bus interface that @property_name is defined on
  * @method_name: the name of the D-Bus property to set
  * @value: new value for the property
- * @error: a #GError
  *
  * Set the given @property_name to @value on the DFSM machine. The property will be set synchronously.
  *
- * Any signal emissions and additional property changes which occur as a result of the property being set will be made while this function is running.
+ * Any signal emissions which occur as a result of the property being set will be appended to @output_sequence. Any additional property changes will
+ * be made while the function's running (but signalled in @output_sequence, if anywhere).
  *
  * Return value: %TRUE if @property_name was changed (not just set) to @value, %FALSE otherwise
  */
 gboolean
-dfsm_machine_set_property (DfsmMachine *self, const gchar *interface_name, const gchar *property_name, GVariant *value, GError **error)
+dfsm_machine_set_property (DfsmMachine *self, DfsmOutputSequence *output_sequence, const gchar *interface_name, const gchar *property_name,
+                           GVariant *value)
 {
 	DfsmMachinePrivate *priv;
 	GPtrArray/*<DfsmAstObjectTransition>*/ *possible_transitions;
 	gboolean executed_transition = FALSE;
 	GVariant *return_value = NULL;
-	GError *child_error = NULL;
 
 	g_return_val_if_fail (DFSM_IS_MACHINE (self), FALSE);
+	g_return_val_if_fail (DFSM_IS_OUTPUT_SEQUENCE (output_sequence), FALSE);
 	g_return_val_if_fail (interface_name != NULL && *interface_name != '\0', FALSE);
 	g_return_val_if_fail (property_name != NULL && *property_name != '\0', FALSE);
 	g_return_val_if_fail (value != NULL, FALSE);
-	g_return_val_if_fail (error != NULL && *error == NULL, FALSE);
 
 	priv = self->priv;
-
-	/* Can't set a property if the simulation isn't running. */
-	if (priv->simulation_status != DFSM_SIMULATION_STATUS_STARTED) {
-		g_set_error (error, DFSM_SIMULATION_ERROR, DFSM_SIMULATION_ERROR_INVALID_STATUS,
-		             _("Can't set a D-Bus property if the simulation isn't running."));
-		goto done;
-	}
 
 	/* Look up the property name in our set of transitions which are triggered by property setters. */
 	possible_transitions = g_hash_table_lookup (priv->transitions.property_set_triggered, property_name);
@@ -848,7 +614,7 @@ dfsm_machine_set_property (DfsmMachine *self, const gchar *interface_name, const
 	dfsm_environment_set_variable_value (priv->environment, DFSM_VARIABLE_SCOPE_LOCAL, "value", value);
 
 	/* Find and potentially execute a transition from the array. */
-	return_value = find_and_execute_random_transition (self, possible_transitions, &executed_transition, &child_error);
+	executed_transition = find_and_execute_random_transition (self, output_sequence, possible_transitions);
 
 	/* Restore the environment. */
 	dfsm_environment_unset_variable_value (priv->environment, DFSM_VARIABLE_SCOPE_LOCAL, "value");
@@ -859,9 +625,9 @@ dfsm_machine_set_property (DfsmMachine *self, const gchar *interface_name, const
 	}
 
 done:
-	/* If we failed to execute a transition but didn't return an error, run a default transition which just sets the corresponding variable in
-	 * the object. We don't do this if a transition was found and run successfully (or in error). */
-	if (executed_transition == FALSE && child_error == NULL) {
+	/* If we failed to execute a transition, run a default transition which just sets the corresponding variable in the object. We don't do this if
+	 * a transition was found and run successfully. */
+	if (executed_transition == FALSE) {
 		GVariant *old_value;
 
 		g_debug ("Couldn't find any DFSM transitions eligible to be executed as a result of setting property ‘%s’. Running default transition.",
@@ -881,15 +647,10 @@ done:
 		dfsm_environment_set_variable_value (priv->environment, DFSM_VARIABLE_SCOPE_OBJECT, property_name, value);
 
 		return TRUE;
-	} else if (executed_transition == TRUE && child_error == NULL) {
-		/* Success! */
-		return TRUE;
-	} else {
-		/* Error or precondition failure */
-		g_propagate_error (error, child_error);
 	}
 
-	return FALSE;
+	/* Success! */
+	return TRUE;
 }
 
 /**
