@@ -162,6 +162,7 @@
 %type <ast_data_structure> FuzzyDataStructure
 %type <ast_data_structure> AnnotatedDataStructure
 %type <ast_data_structure> DataStructure
+%type <str> String
 %type <ptr_array> ArrayList ArrayListInner
 %type <ptr_array> DictionaryList DictionaryListInner
 %type <ptr_array> StructureList StructureListInner
@@ -439,7 +440,7 @@ DataStructure: BYTE					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BYTE, 
              | INT64					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_INT64, &$1); }
              | UINT64					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_UINT64, &$1); }
              | DOUBLE					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_DOUBLE, &$1); }
-             | STRING					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_STRING, $1); g_free ($1); }
+             | String					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_STRING, $1); g_free ($1); }
              | '<' Expression '>'			{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_VARIANT, $2); g_object_unref ($2); }
              | '<' error '>'				{ $$ = NULL; YYABORT; }
              | ARRAY_L_BRACKET ArrayList ARRAY_R_BRACKET	{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_ARRAY, $2); g_ptr_array_unref ($2); }
@@ -449,6 +450,11 @@ DataStructure: BYTE					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BYTE, 
              | L_BRACE DictionaryList R_BRACE		{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_DICT, $2); g_ptr_array_unref ($2); }
              | L_BRACE error R_BRACE			{ $$ = NULL; YYABORT; }
              | Variable					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_VARIABLE, $1); g_object_unref ($1); }
+;
+
+/* Returns a new string. A bit inefficient in the case of lots of consecutive string literals, but we don't expect that to happen much. */
+String: STRING									{ $$ = $1 /* steal */; }
+      | String STRING								{ $$ = g_strconcat ($1, $2, NULL); g_free ($1); g_free ($2); }
 ;
 
 /* Returns a new GPtrArray of DfsmAstExpressions */
