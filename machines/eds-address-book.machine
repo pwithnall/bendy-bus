@@ -1,4 +1,4 @@
-object at /org/gnome/evolution/dataserver/AddressBookFactory, org.gnome.evolution.dataserver.AddressBook1 implements org.gnome.evolution.dataserver.AddressBookFactory {
+object at /org/gnome/evolution/dataserver/AddressBookFactory, org.gnome.evolution.dataserver.AddressBook3 implements org.gnome.evolution.dataserver.AddressBookFactory {
 	states {
 		Main
 	}
@@ -15,14 +15,14 @@ object at /org/gnome/evolution/dataserver/AddressBookFactory, org.gnome.evolutio
 		precondition { object->_got_book == false }
 
 		/* Why doesn't this have type @o? */
-		reply ("/org/gnome/evolution/dataserver/AddressBook/2170/0");
+		reply ("/org/gnome/evolution/dataserver/AddressBook");
 
 		/* Only return the AddressBook object once so that Evo and Bendy Bus don't get their states out of sync. */
 		object->_got_book = true;
 	}
 }
 
-object at /org/gnome/evolution/dataserver/AddressBook/2170/0 implements org.gnome.evolution.dataserver.AddressBook {
+object at /org/gnome/evolution/dataserver/AddressBook implements org.gnome.evolution.dataserver.AddressBook {
 	data {
 		_opid_counter = 0u;
 	}
@@ -107,12 +107,12 @@ object at /org/gnome/evolution/dataserver/AddressBook/2170/0 implements org.gnom
 	/* View. */
 	transition inside Authenticated on method get_view {
 		reply (object->_opid_counter);
-		emit get_view_done (object->_opid_counter, "", "", "/org/gnome/evolution/dataserver/AddressBookView/2170/0");
+		emit get_view_done (object->_opid_counter, "", "", "/org/gnome/evolution/dataserver/AddressBookView");
 		object->_opid_counter = object->_opid_counter + 1u;
 	}
 }
 
-object at /org/gnome/evolution/dataserver/AddressBookView/2170/0 implements org.gnome.evolution.dataserver.AddressBookView {
+object at /org/gnome/evolution/dataserver/AddressBookView implements org.gnome.evolution.dataserver.AddressBookView {
 	states {
 		Stopped;
 		Started;

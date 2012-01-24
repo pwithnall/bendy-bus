@@ -32,16 +32,16 @@
       <arg type="s" name="query" direction="in"/>
       <arg type="u" name="opid" direction="out"/>
     </method>
-    <method name="add_contact">
-      <arg type="s" name="vcard" direction="in"/>
+    <method name="add_contacts">
+      <arg type="as" name="vcards" direction="in"/>
       <arg type="u" name="opid" direction="out"/>
     </method>
     <method name="remove_contacts">
       <arg type="as" name="list" direction="in"/>
       <arg type="u" name="opid" direction="out"/>
     </method>
-    <method name="modify_contact">
-      <arg type="s" name="vcard" direction="in"/>
+    <method name="modify_contacts">
+      <arg type="as" name="vcard" direction="in"/>
       <arg type="u" name="opid" direction="out"/>
     </method>
     <method name="get_backend_property">
@@ -115,18 +115,18 @@
       <arg type="s" name="dbus_error_message"/>
       <arg type="as" name="uids"/>
     </signal>
-    <signal name="add_contact_done">
+    <signal name="add_contacts_done">
       <arg type="u" name="opid"/>
       <arg type="s" name="dbus_error_name"/>
       <arg type="s" name="dbus_error_message"/>
-      <arg type="s" name="uid"/>
+      <arg type="as" name="uids"/>
     </signal>
     <signal name="remove_contacts_done">
       <arg type="u" name="opid"/>
       <arg type="s" name="dbus_error_name"/>
       <arg type="s" name="dbus_error_message"/>
     </signal>
-    <signal name="modify_contact_done">
+    <signal name="modify_contacts_done">
       <arg type="u" name="opid"/>
       <arg type="s" name="dbus_error_name"/>
       <arg type="s" name="dbus_error_message"/>
@@ -153,6 +153,9 @@
   <interface name="org.gnome.evolution.dataserver.AddressBookView">
     <method name="start"/>
     <method name="stop"/>
+    <method name="set_flags">
+      <arg type="u" name="flags" direction="in"/>
+    </method>
     <method name="dispose"/>
     <method name="set_fields_of_interest">
       <arg type="as" name="fields_of_interest" direction="in"/>
