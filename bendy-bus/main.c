@@ -613,8 +613,11 @@ dbus_daemon_notify_bus_address_cb (GObject *gobject, GParamSpec *pspec, MainData
 		 * trial and error rather than research or standards. */
 		forward_envp_pair (test_program_envp, "DISPLAY");
 		forward_envp_pair (test_program_envp, "XDG_DATA_HOME");
-		forward_envp_pair (test_program_envp, "XDG_CACHE_HOME");
 		forward_envp_pair (test_program_envp, "XDG_CONFIG_HOME");
+		forward_envp_pair (test_program_envp, "XDG_DATA_DIRS");
+		forward_envp_pair (test_program_envp, "XDG_CONFIG_DIRS");
+		forward_envp_pair (test_program_envp, "XDG_CACHE_HOME");
+		forward_envp_pair (test_program_envp, "XDG_RUNTIME_DIR");
 		forward_envp_pair (test_program_envp, "HOME");
 		forward_envp_pair (test_program_envp, "USER");
 		forward_envp_pair (test_program_envp, "HOSTNAME");
