@@ -1176,6 +1176,62 @@ _struct_head_evaluate (DfsmAstExpression *parameters_expression, const GVariantT
 	return output_value;
 }
 
+static GVariantType *
+_string_join_calculate_type (const GVariantType *parameters_type, GError **error)
+{
+	const GVariantType *parameters_supertype = (const GVariantType*) "(sas)";
+
+	if (g_variant_type_is_subtype_of (parameters_type, parameters_supertype) == FALSE) {
+		/* Error */
+		func_set_calculate_type_error (error, "stringJoin", parameters_supertype, parameters_type);
+		return NULL;
+	}
+
+	/* Always return a string. */
+	return g_variant_type_copy (G_VARIANT_TYPE_STRING);
+}
+
+static GVariant *
+_string_join_evaluate (DfsmAstExpression *parameters_expression, const GVariantType *return_type, DfsmEnvironment *environment)
+{
+	GVariant *parameters, *separator, *stringlets, *stringlet;
+	GVariantIter iter;
+	GString *output_string;
+	const gchar *separator_string;
+	gboolean first = TRUE;
+
+	/* Decode the parameters. */
+	parameters = dfsm_ast_expression_evaluate (parameters_expression, environment);
+	separator = g_variant_get_child_value (parameters, 0);
+	stringlets = g_variant_get_child_value (parameters, 1);
+	g_variant_unref (parameters);
+
+	separator_string = g_variant_get_string (separator, NULL);
+
+	/* Join the stringlets together. */
+	output_string = g_string_new ("");
+	g_variant_iter_init (&iter, stringlets);
+
+	while ((stringlet = g_variant_iter_next_value (&iter)) != NULL) {
+		/* Add the stringlet to the output string. */
+		if (first == FALSE) {
+			/* Separator. */
+			g_string_append (output_string, separator_string);
+		}
+
+		g_string_append (output_string, g_variant_get_string (stringlet, NULL));
+		first = FALSE;
+
+		g_variant_unref (stringlet);
+	}
+
+	g_variant_unref (stringlets);
+	g_variant_unref (separator);
+
+	/* Return the output string. */
+	return g_variant_ref_sink (g_variant_new_string (g_string_free (output_string, FALSE)));
+}
+
 typedef struct {
 	const gchar *name;
 	GVariantType *(*calculate_type_func) (const GVariantType *parameters_type, GError **error);
@@ -1195,6 +1251,7 @@ static const DfsmFunctionInfo _function_info[] = {
 	{ "dictUnset",		_dict_unset_calculate_type,	_dict_unset_evaluate },
 	{ "dictGet",		_dict_get_calculate_type,	_dict_get_evaluate },
 	{ "structHead",		_struct_head_calculate_type,	_struct_head_evaluate },
+	{ "stringJoin",		_string_join_calculate_type,	_string_join_evaluate },
 };
 
 /*
