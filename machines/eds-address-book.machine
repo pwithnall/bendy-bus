@@ -132,78 +132,186 @@ object at /org/gnome/evolution/dataserver/AddressBookView implements org.gnome.e
 
 	transition inside Started on random {
 		emit objects_added ([
-			"BEGIN:VCARD" "\n"
-			"VERSION:3.0" "\n"
-			"TEL;X-EVOLUTION-UI-SLOT=2;TYPE=CELL:0123456789" "\n"
-			"TEL;X-EVOLUTION-UI-SLOT=1;TYPE=HOME,VOICE:0123456789" "\n"
-			"NICKNAME:Fooful Baz" "\n"
-			"FN:Henry J. Foobaz" "\n"
-			"N:Foobaz;Henry;J.;;" "\n"
-			"UID:pas-id-asdfghjkl" "\n"
-			"REV:2011-08-19T07:06:32Z" "\n"
-			"ADR;TYPE=HOME:;;Castle House;Castlington;Castleshire;CA57LE;England" "\n"
-			"URL:http://example.com/" "\n"
-			"X-EVOLUTION-BLOG-URL:http://blog.example.com/" "\n"
-			"CALURI:" "\n"
-			"ROLE:" "\n"
-			"ORG:;;" "\n"
-			"X-EVOLUTION-MANAGER:" "\n"
-			"TITLE:" "\n"
-			"X-EVOLUTION-ASSISTANT:" "\n"
-			"BDAY:2000-01-01" "\n"
-			"X-EVOLUTION-SPOUSE:Mrs. Henry J. Foobaz" "\n"
-			"NOTE:A sharp." "\n"
-			"FBURL:http://freebusy.example.com/" "\n"
-			"X-EVOLUTION-VIDEO-URL:http://voip.example.com/" "\n"
-			"X-MOZILLA-HTML:TRUE" "\n"
-			"LABEL;TYPE=HOME:Castle House\nCastlington\, Castleshire\nCA57LE\nEngland" "\n"
-			"CATEGORIES:Family" "\n"
-			"X-EVOLUTION-FILE-AS:Foobaz\, Brian" "\n"
-			"EMAIL;X-EVOLUTION-UI-SLOT=1;TYPE=OTHER:baz@example.com" "\n"
-			"EMAIL;X-EVOLUTION-UI-SLOT=2;TYPE=OTHER:bar@example.com" "\n"
-			"EMAIL;X-EVOLUTION-UI-SLOT=3;TYPE=HOME:baz@gmail.com" "\n"
-			"X-JABBER;X-EVOLUTION-UI-SLOT=2;TYPE=HOME:baz@gmail.com" "\n"
-			"X-MSN;X-EVOLUTION-UI-SLOT=1;TYPE=HOME:baz@hotmail.com" "\n"
-			"END:VCARD"
-		]?);
+			stringJoin ("\n", [
+				"BEGIN:VCARD",
+				"VERSION:3.0",
+				"ENCODING:QUOTED-PRINTABLE",
+				"ENCODING:BASE64",
+				"ENCODING:X-RAW",
+				"CHARSET:UTF-8",
+				"CHARSET:ASCII",
+				"MAILER:Evolution",
+				"TEL;X-EVOLUTION-UI-SLOT=2;TYPE=CELL:0123456789",
+				"TEL;X-EVOLUTION-UI-SLOT=1;TYPE=HOME,VOICE:0123456789",
+				"NICKNAME:Fooful Baz",
+				"FN:Henry J. Foobaz",
+				"N:Foobaz;Henry;J.;;",
+				"UID:pas-id-asdfghjkl",
+				"PRODID:Evolution",
+				"REV:2011-08-19T07:06:32Z",
+				"ADR;TYPE=HOME:;;Castle House;Castlington;Castleshire;CA57LE;England",
+				"URL:http://example.com/",
+				"X-EVOLUTION-BLOG-URL:http://blog.example.com/",
+				"CALURI:http://calendar.example.com/",
+				"ICSCALENDAR:http://calendar.example.com/calendar.ics",
+				"ROLE:Manager",
+				"ORG:Foo;Bar;Baz",
+				"X-EVOLUTION-MANAGER:",
+				"TITLE:Head Boss",
+				"X-EVOLUTION-ASSISTANT:Dilbert Underdog",
+				"BDAY:2000-01-01",
+				"X-EVOLUTION-SPOUSE:Mrs. Henry J. Foobaz",
+				"NOTE:A sharp.",
+				"FBURL:http://freebusy.example.com/",
+				"X-EVOLUTION-VIDEO-URL:http://voip.example.com/",
+				"X-MOZILLA-HTML:TRUE",
+				"LABEL;TYPE=HOME:Castle House\nCastlington\, Castleshire\nCA57LE\nEngland",
+				"CATEGORIES:Family,Friends",
+				"X-EVOLUTION-FILE-AS:Foobaz\, Brian",
+				"EMAIL;X-EVOLUTION-UI-SLOT=1;TYPE=OTHER:baz@example.com",
+				"EMAIL;X-EVOLUTION-UI-SLOT=2;TYPE=OTHER:bar@example.com",
+				"EMAIL;X-EVOLUTION-UI-SLOT=3;TYPE=HOME:baz@gmail.com",
+				"X-JABBER;X-EVOLUTION-UI-SLOT=2;TYPE=HOME:baz@gmail.com",
+				"X-MSN;X-EVOLUTION-UI-SLOT=1;TYPE=HOME:baz@hotmail.com",
+				"PHOTO;VALUE=URL;TYPE=GIF:http://www.example.com/dir_photos/my_photo.gif",
+				"PHOTO:data:image/jpeg;base64,MIICajCCAdOgAwIBAgICBEUwDQYJKoZIhvc",
+				"LOGO:http://www.example.com/pub/logos/abccorp.jpg",
+				"LOGO:data:image/jpeg;base64,MIICajCCAdOgAwIBAgICBEUwDQYJKoZIhvc",
+				"KEY:http://www.example.com/keys/jdoe.cer",
+				"KEY;MEDIATYPE=application/pgp-keys:ftp://example.com/keys/jdoe",
+				"KEY:data:application/pgp-keys;base64,MIICajCCAdOgAwIBAgICBE",
+				"GEO:geo:37.386013,-122.082932",
+				"GEO:data:text/plain;This is perhaps a location.",
+				"X-AIM:0123456789",
+				"X-EVOLUTION-ANNIVERSARY:2010-01-06",
+				"X-EVOLUTION-BIRTHDAY:2010-07-01",
+				"X-EVOLUTION-BLOG-URL:http://blog.example.com/",
+				"X-EVOLUTION-CALLBACK:0123456789",
+				"X-EVOLUTION-COMPANY:Sample Company",
+				"X-EVOLUTION-DEST-CONTACT-UID:pas-id-asdfghjkl",
+				"X-EVOLUTION-DEST-EMAIL-NUM:5",
+				"X-EVOLUTION-DEST-HTML-MAIL:FALSE",
+				"X-EVOLUTION-DEST-SOURCE-UID:pas-id-asdfghjkl",
+				"X-GADUGADU:gadugadu",
+				"X-GROUPWISE:groupwise@example.com",
+				"X-ICQ:0123456789",
+				"X-JABBER:jabber@example.com",
+				"X-EVOLUTION-LIST-SHOW-ADDRESSES:TRUE",
+				"X-EVOLUTION-LIST:TRUE",
+				"X-EVOLUTION-LIST-NAME:Sample List",
+				"X-EVOLUTION-MANAGER:James M. Anager",
+				"X-MSN:msn@example.com",
+				"X-EVOLUTION-RADIO:0123456789",
+				"X-SKYPE:skype@example.com",
+				"X-GOOGLE_TALK:example@gmail.com",
+				"X-SIP:sip@example.com",
+				"X-EVOLUTION-TELEX:0123456789",
+				"X-EVOLUTION-TTYTDD:0123456789",
+				"X-EVOLUTION-VIDEO-URL:http://video.example.com/",
+				"X-MOZILLA-HTML:TRUE",
+				"X-YAHOO:example@yahoo.com",
+				"X-EVOLUTION-BOOK-URI:pas-id-asdfghjkl",
+				"X-EVOLUTION-CONTACT-LIST-INFO:Contact List Info",
+				"X-EVOLUTION-PARENT-UID:pas-id-asdfghjkl",
+				"X-EVOLUTION-CONTACT-LIST-UID:pas-id-asdfghjkl",
+				"X-EVOLUTION-DEST-EMAIL:test@example.com",
+				"X-EVOLUTION-DEST-NAME:Test Name",
+				"END:VCARD",
+			]?),
+			"pas-id-asdfghjkl"?
+		]);
 	}
 
 	transition inside Started on random {
 		emit objects_modified ([
-			"BEGIN:VCARD" "\n"
-			"VERSION:3.0" "\n"
-			"TEL;X-EVOLUTION-UI-SLOT=2;TYPE=CELL:0123456789" "\n"
-			"TEL;X-EVOLUTION-UI-SLOT=1;TYPE=HOME,VOICE:0123456789" "\n"
-			"NICKNAME:Fooful Baz" "\n"
-			"FN:Henry J. Foobaz" "\n"
-			"N:Foobaz;Henry;J.;;" "\n"
-			"UID:pas-id-asdfghjkl" "\n"
-			"REV:2011-08-19T07:06:32Z" "\n"
-			"ADR;TYPE=HOME:;;Castle House;Castlington;Castleshire;CA57LE;England" "\n"
-			"URL:http://example.com/" "\n"
-			"X-EVOLUTION-BLOG-URL:http://blog.example.com/" "\n"
-			"CALURI:" "\n"
-			"ROLE:" "\n"
-			"ORG:;;" "\n"
-			"X-EVOLUTION-MANAGER:" "\n"
-			"TITLE:" "\n"
-			"X-EVOLUTION-ASSISTANT:" "\n"
-			"BDAY:2000-01-01" "\n"
-			"X-EVOLUTION-SPOUSE:Mrs. Henry J. Foobaz" "\n"
-			"NOTE:A sharp." "\n"
-			"FBURL:http://freebusy.example.com/" "\n"
-			"X-EVOLUTION-VIDEO-URL:http://voip.example.com/" "\n"
-			"X-MOZILLA-HTML:TRUE" "\n"
-			"LABEL;TYPE=HOME:Castle House\nCastlington\, Castleshire\nCA57LE\nEngland" "\n"
-			"CATEGORIES:Family" "\n"
-			"X-EVOLUTION-FILE-AS:Foobaz\, Brian" "\n"
-			"EMAIL;X-EVOLUTION-UI-SLOT=1;TYPE=OTHER:baz@example.com" "\n"
-			"EMAIL;X-EVOLUTION-UI-SLOT=2;TYPE=OTHER:bar@example.com" "\n"
-			"EMAIL;X-EVOLUTION-UI-SLOT=3;TYPE=HOME:baz@gmail.com" "\n"
-			"X-JABBER;X-EVOLUTION-UI-SLOT=2;TYPE=HOME:baz@gmail.com" "\n"
-			"X-MSN;X-EVOLUTION-UI-SLOT=1;TYPE=HOME:baz@hotmail.com" "\n"
-			"END:VCARD"
-		]?);
+			stringJoin ("\n", [
+				"BEGIN:VCARD",
+				"VERSION:3.0",
+				"ENCODING:QUOTED-PRINTABLE",
+				"ENCODING:BASE64",
+				"ENCODING:X-RAW",
+				"CHARSET:UTF-8",
+				"CHARSET:ASCII",
+				"MAILER:Evolution",
+				"TEL;X-EVOLUTION-UI-SLOT=2;TYPE=CELL:0123456789",
+				"TEL;X-EVOLUTION-UI-SLOT=1;TYPE=HOME,VOICE:0123456789",
+				"NICKNAME:Fooful Baz",
+				"FN:Henry J. Foobaz",
+				"N:Foobaz;Henry;J.;;",
+				"UID:pas-id-asdfghjkl",
+				"PRODID:Evolution",
+				"REV:2011-08-19T07:06:32Z",
+				"ADR;TYPE=HOME:;;Castle House;Castlington;Castleshire;CA57LE;England",
+				"URL:http://example.com/",
+				"X-EVOLUTION-BLOG-URL:http://blog.example.com/",
+				"CALURI:http://calendar.example.com/",
+				"ICSCALENDAR:http://calendar.example.com/calendar.ics",
+				"ROLE:Manager",
+				"ORG:Foo;Bar;Baz",
+				"X-EVOLUTION-MANAGER:",
+				"TITLE:Head Boss",
+				"X-EVOLUTION-ASSISTANT:Dilbert Underdog",
+				"BDAY:2000-01-01",
+				"X-EVOLUTION-SPOUSE:Mrs. Henry J. Foobaz",
+				"NOTE:A sharp.",
+				"FBURL:http://freebusy.example.com/",
+				"X-EVOLUTION-VIDEO-URL:http://voip.example.com/",
+				"X-MOZILLA-HTML:TRUE",
+				"LABEL;TYPE=HOME:Castle House\nCastlington\, Castleshire\nCA57LE\nEngland",
+				"CATEGORIES:Family,Friends",
+				"X-EVOLUTION-FILE-AS:Foobaz\, Brian",
+				"EMAIL;X-EVOLUTION-UI-SLOT=1;TYPE=OTHER:baz@example.com",
+				"EMAIL;X-EVOLUTION-UI-SLOT=2;TYPE=OTHER:bar@example.com",
+				"EMAIL;X-EVOLUTION-UI-SLOT=3;TYPE=HOME:baz@gmail.com",
+				"X-JABBER;X-EVOLUTION-UI-SLOT=2;TYPE=HOME:baz@gmail.com",
+				"X-MSN;X-EVOLUTION-UI-SLOT=1;TYPE=HOME:baz@hotmail.com",
+				"PHOTO;VALUE=URL;TYPE=GIF:http://www.example.com/dir_photos/my_photo.gif",
+				"PHOTO:data:image/jpeg;base64,MIICajCCAdOgAwIBAgICBEUwDQYJKoZIhvc",
+				"LOGO:http://www.example.com/pub/logos/abccorp.jpg",
+				"LOGO:data:image/jpeg;base64,MIICajCCAdOgAwIBAgICBEUwDQYJKoZIhvc",
+				"KEY:http://www.example.com/keys/jdoe.cer",
+				"KEY;MEDIATYPE=application/pgp-keys:ftp://example.com/keys/jdoe",
+				"KEY:data:application/pgp-keys;base64,MIICajCCAdOgAwIBAgICBE",
+				"GEO:geo:37.386013,-122.082932",
+				"GEO:data:text/plain;This is perhaps a location.",
+				"X-AIM:0123456789",
+				"X-EVOLUTION-ANNIVERSARY:2010-01-06",
+				"X-EVOLUTION-BIRTHDAY:2010-07-01",
+				"X-EVOLUTION-BLOG-URL:http://blog.example.com/",
+				"X-EVOLUTION-CALLBACK:0123456789",
+				"X-EVOLUTION-COMPANY:Sample Company",
+				"X-EVOLUTION-DEST-CONTACT-UID:pas-id-asdfghjkl",
+				"X-EVOLUTION-DEST-EMAIL-NUM:5",
+				"X-EVOLUTION-DEST-HTML-MAIL:FALSE",
+				"X-EVOLUTION-DEST-SOURCE-UID:pas-id-asdfghjkl",
+				"X-GADUGADU:gadugadu",
+				"X-GROUPWISE:groupwise@example.com",
+				"X-ICQ:0123456789",
+				"X-JABBER:jabber@example.com",
+				"X-EVOLUTION-LIST-SHOW-ADDRESSES:TRUE",
+				"X-EVOLUTION-LIST:TRUE",
+				"X-EVOLUTION-LIST-NAME:Sample List",
+				"X-EVOLUTION-MANAGER:James M. Anager",
+				"X-MSN:msn@example.com",
+				"X-EVOLUTION-RADIO:0123456789",
+				"X-SKYPE:skype@example.com",
+				"X-GOOGLE_TALK:example@gmail.com",
+				"X-SIP:sip@example.com",
+				"X-EVOLUTION-TELEX:0123456789",
+				"X-EVOLUTION-TTYTDD:0123456789",
+				"X-EVOLUTION-VIDEO-URL:http://video.example.com/",
+				"X-MOZILLA-HTML:TRUE",
+				"X-YAHOO:example@yahoo.com",
+				"X-EVOLUTION-BOOK-URI:pas-id-asdfghjkl",
+				"X-EVOLUTION-CONTACT-LIST-INFO:Contact List Info",
+				"X-EVOLUTION-PARENT-UID:pas-id-asdfghjkl",
+				"X-EVOLUTION-CONTACT-LIST-UID:pas-id-asdfghjkl",
+				"X-EVOLUTION-DEST-EMAIL:test@example.com",
+				"X-EVOLUTION-DEST-NAME:Test Name",
+				"END:VCARD",
+			]?),
+			"pas-id-asdfghjkl"?
+		]);
 	}
 
 	transition inside Started on random {
