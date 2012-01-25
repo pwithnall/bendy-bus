@@ -160,6 +160,8 @@ typedef struct {
 	GPtrArray/*<DfsmObject>*/ *simulated_objects;
 	guint num_test_runs_remaining;
 	guint test_run_inactivity_timeout_id;
+	gulong test_program_spawn_end_signal;
+	gulong test_program_process_died_signal;
 } MainData;
 
 static void
@@ -256,20 +258,13 @@ simulated_object_dbus_activity_count_notify_cb (GObject *obj, GParamSpec *pspec,
 }
 
 static void
-stop_simulation (MainData *data)
+stop_simulation_test_program_died_cb (DsimProgramWrapper *wrapper, gint status, MainData *data)
 {
 	guint i;
 
-	g_debug ("stop_simulation()");
+	g_debug ("stop_simulation_test_program_died_cb() with status %i.", status);
 
-	/* Stop timers. */
-	if (data->test_run_inactivity_timeout_id != 0) {
-		g_source_remove (data->test_run_inactivity_timeout_id);
-		data->test_run_inactivity_timeout_id = 0;
-	}
-
-	/* Simulation's finished, so kill the test program. */
-	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program));
+	g_signal_handler_disconnect (data->test_program, data->test_program_process_died_signal);
 
 	/* Drop our well-known names, but only if we haven't been signalled. If we have been signalled, the dbus-daemon has also been signalled,
 	 * and so is concurrently dying. Since g_bus_unown_name() has no error handling, we can't prevent it spewing warnings everywhere about
@@ -302,6 +297,30 @@ stop_simulation (MainData *data)
 		/* Connection's already closed. */
 		post_connection_closed (data);
 	}
+}
+
+static void
+stop_simulation (MainData *data)
+{
+	g_debug ("stop_simulation()");
+
+	/* Stop timers. */
+	if (data->test_run_inactivity_timeout_id != 0) {
+		g_source_remove (data->test_run_inactivity_timeout_id);
+		data->test_run_inactivity_timeout_id = 0;
+	}
+
+	/* Remove intra-simulation signal handlers and add our own. */
+	g_signal_handler_disconnect (data->test_program, data->test_program_spawn_end_signal);
+	g_signal_handler_disconnect (data->test_program, data->test_program_process_died_signal);
+
+	data->test_program_spawn_end_signal = 0;
+	data->test_program_process_died_signal = g_signal_connect (data->test_program, "process-died",
+	                                                           (GCallback) stop_simulation_test_program_died_cb, data);
+
+	/* Simulation's finished, so kill the test program. We wait until the stop_simulation_test_program_died_cb() callback to disconnect from the
+	 * bus and quit. */
+	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program));
 }
 
 static void
@@ -429,8 +448,8 @@ start_simulation (MainData *data)
 {
 	g_message (_("Starting simulation."));
 
-	g_signal_connect (data->test_program, "spawn-end", (GCallback) test_program_spawn_end_cb, data);
-	g_signal_connect (data->test_program, "process-died", (GCallback) test_program_died_cb, data);
+	data->test_program_spawn_end_signal = g_signal_connect (data->test_program, "spawn-end", (GCallback) test_program_spawn_end_cb, data);
+	data->test_program_process_died_signal = g_signal_connect (data->test_program, "process-died", (GCallback) test_program_died_cb, data);
 
 	/* Spawn the program under test. */
 	spawn_test_program (data);
