@@ -155,8 +155,7 @@ typedef struct {
 	DsimDBusDaemon *dbus_daemon;
 	gchar *dbus_address;
 	GDBusConnection *connection;
-	guint outstanding_bus_ownership_callbacks; /* number of calls to g_bus_own_name() which are outstanding */
-	GHashTable/*<string, uint>*/ *bus_name_ids; /* map from well-known bus name to its ownership ID */
+	guint outstanding_registration_callbacks; /* number of calls to g_bus_own_name() which are outstanding */
 	GPtrArray/*<DfsmObject>*/ *simulated_objects;
 	guint num_test_runs_remaining;
 	guint test_run_inactivity_timeout_id;
@@ -171,7 +170,6 @@ main_data_clear (MainData *data)
 	g_clear_object (&data->connection);
 	g_free (data->dbus_address);
 	g_ptr_array_unref (data->simulated_objects);
-	g_hash_table_unref (data->bus_name_ids);
 
 	if (data->test_run_inactivity_timeout_id != 0) {
 		g_source_remove (data->test_run_inactivity_timeout_id);
@@ -259,37 +257,9 @@ simulated_object_dbus_activity_count_notify_cb (GObject *obj, GParamSpec *pspec,
 }
 
 static void
-stop_simulation_test_program_died_cb (DsimProgramWrapper *wrapper, gint status, MainData *data)
+unregister_objects_and_close_connection (MainData *data)
 {
 	guint i;
-
-	g_debug ("stop_simulation_test_program_died_cb() with status %i.", status);
-
-	if (data->test_program_process_died_signal != 0) {
-		g_signal_handler_disconnect (data->test_program, data->test_program_process_died_signal);
-		data->test_program_process_died_signal = 0;
-	}
-
-	if (data->test_program_sigkill_timeout_id != 0) {
-		g_source_remove (data->test_program_sigkill_timeout_id);
-		data->test_program_sigkill_timeout_id = 0;
-	}
-
-	/* Drop our well-known names, but only if we haven't been signalled. If we have been signalled, the dbus-daemon has also been signalled,
-	 * and so is concurrently dying. Since g_bus_unown_name() has no error handling, we can't prevent it spewing warnings everywhere about
-	 * failing to interact with the dying dbus-daemon. */
-	if (data->exit_signal == EXIT_SIGNAL_INVALID) {
-		GHashTableIter iter;
-		guint bus_name_id;
-
-		g_hash_table_iter_init (&iter, data->bus_name_ids);
-
-		while (g_hash_table_iter_next (&iter, NULL, (gpointer*) &bus_name_id) == TRUE) {
-			g_bus_unown_name (bus_name_id);
-		}
-	}
-
-	g_hash_table_remove_all (data->bus_name_ids);
 
 	/* Unregister all our DfsmObjects. */
 	for (i = 0; i < data->simulated_objects->len; i++) {
@@ -306,6 +276,24 @@ stop_simulation_test_program_died_cb (DsimProgramWrapper *wrapper, gint status, 
 		/* Connection's already closed. */
 		post_connection_closed (data);
 	}
+}
+
+static void
+stop_simulation_test_program_died_cb (DsimProgramWrapper *wrapper, gint status, MainData *data)
+{
+	g_debug ("stop_simulation_test_program_died_cb() with status %i.", status);
+
+	if (data->test_program_process_died_signal != 0) {
+		g_signal_handler_disconnect (data->test_program, data->test_program_process_died_signal);
+		data->test_program_process_died_signal = 0;
+	}
+
+	if (data->test_program_sigkill_timeout_id != 0) {
+		g_source_remove (data->test_program_sigkill_timeout_id);
+		data->test_program_sigkill_timeout_id = 0;
+	}
+
+	unregister_objects_and_close_connection (data);
 }
 
 static gboolean
@@ -499,24 +487,36 @@ start_simulation (MainData *data)
 }
 
 static void
-name_acquired_cb (GDBusConnection *connection, const gchar *name, MainData *data)
+object_registered_cb (DfsmObject *obj, GAsyncResult *async_result, MainData *data)
 {
-	g_debug ("Acquired ownership of well-known bus name: %s", name);
+	GError *error = NULL;
+
+	g_debug ("Finished registering object %p.", obj);
+
+	/* Finish the async call. */
+	dfsm_object_register_on_bus_finish (obj, async_result, &error);
+	data->outstanding_registration_callbacks--;
+
+	if (error != NULL) {
+		/* Error! Unregister all the objects we've just registered, disconnect from the bus and run away. */
+		g_printerr (_("Error connecting simulated object to D-Bus: %s"), error->message);
+		g_printerr ("\n");
+
+		data->exit_status = STATUS_DBUS_ERROR;
+
+		g_error_free (error);
+
+		/* Unregister objects and run away from the bus. */
+		unregister_objects_and_close_connection (data);
+	}
 
 	/* Bail if this isn't the last callback. */
-	data->outstanding_bus_ownership_callbacks--;
-	if (data->outstanding_bus_ownership_callbacks > 0) {
+	if (data->outstanding_registration_callbacks > 0) {
 		return;
 	}
 
 	/* Spawn! */
 	start_simulation (data);
-}
-
-static void
-name_lost_cb (GDBusConnection *connection, const gchar *name, MainData *data)
-{
-	g_debug ("Lost ownership of well-known bus name: %s", name);
 }
 
 static void
@@ -556,79 +556,28 @@ connection_created_cb (GObject *source_object, GAsyncResult *result, MainData *d
 	/* Connect to closed notifications, so we know if the bus disappears. */
 	g_signal_connect (data->connection, "closed", (GCallback) connection_closed_cb, data);
 
+	/* Hold an outstanding callback while we loop over the objects, so that we don't spawn the program under test before we've finished
+	 * registering all the objects (e.g. if their callbacks are called very quickly). */
+	data->outstanding_registration_callbacks++;
+
 	/* Register our DfsmObjects on the bus. */
 	for (i = 0; i < data->simulated_objects->len; i++) {
 		DfsmObject *simulated_object;
 
 		simulated_object = g_ptr_array_index (data->simulated_objects, i);
 
+		/* Register the object. We keep a count of all the outstanding callbacks and only spawn the program under test once all are complete. */
+		data->outstanding_registration_callbacks++;
+
 		g_signal_connect (simulated_object, "notify::dbus-activity-count", (GCallback) simulated_object_dbus_activity_count_notify_cb, data);
-		dfsm_object_register_on_bus (simulated_object, data->connection, &error);
-
-		if (error != NULL) {
-			/* Error! Unregister all the objects we've just registered, disconnect from the bus and run away. */
-			g_printerr (_("Error connecting simulated object to D-Bus: %s"), error->message);
-			g_printerr ("\n");
-
-			data->exit_status = STATUS_DBUS_ERROR;
-
-			goto error;
-		}
+		dfsm_object_register_on_bus (simulated_object, data->connection, (GAsyncReadyCallback) object_registered_cb, data);
 	}
 
-	/* Register our bus connection under zero or more well-known names. Once this is done, spawn the program under test. */
-	for (i = 0; i < data->simulated_objects->len; i++) {
-		DfsmObject *simulated_object;
-		GPtrArray/*<string>*/ *bus_names;
-		guint j;
-
-		simulated_object = g_ptr_array_index (data->simulated_objects, i);
-		bus_names = dfsm_object_get_well_known_bus_names (simulated_object);
-
-		/* Hold an outstanding callback while we loop over the bus names, so that don't spawn the program under test before we've finished
-		 * requesting to own all our bus names (e.g. if their callbacks are called very quickly. */
-		data->outstanding_bus_ownership_callbacks++;
-
-		for (j = 0; j < bus_names->len; j++) {
-			const gchar *bus_name;
-			guint bus_name_id;
-
-			bus_name = g_ptr_array_index (bus_names, j);
-
-			/* Skip the name if another object's already requested to own it. */
-			if (g_hash_table_lookup_extended (data->bus_name_ids, bus_name, NULL, NULL) == TRUE) {
-				continue;
-			}
-
-			/* Own the name. We keep a count of all the outstanding callbacks and only spawn the program under test once all are
-			 * complete. */
-			data->outstanding_bus_ownership_callbacks++;
-			bus_name_id = g_bus_own_name_on_connection (data->connection, bus_name, G_BUS_NAME_OWNER_FLAGS_NONE,
-			                                            (GBusNameAcquiredCallback) name_acquired_cb, (GBusNameLostCallback) name_lost_cb,
-			                                            data, NULL);
-			g_hash_table_insert (data->bus_name_ids, g_strdup (bus_name), GUINT_TO_POINTER (bus_name_id));
-		}
-
-		/* Release our outstanding callback and spawn the test program if it hasn't been spawned already. */
-		data->outstanding_bus_ownership_callbacks--;
-		if (data->outstanding_bus_ownership_callbacks == 0) {
-			start_simulation (data);
-		}
+	/* Release our outstanding callback and spawn the test program if it hasn't been spawned already. */
+	data->outstanding_registration_callbacks--;
+	if (data->outstanding_registration_callbacks == 0) {
+		start_simulation (data);
 	}
-
-	return;
-
-error:
-	g_error_free (error);
-
-	/* Unregister objects */
-	while (i-- > 0) {
-		DfsmObject *simulated_object = g_ptr_array_index (data->simulated_objects, i);
-		dfsm_object_unregister_on_bus (simulated_object);
-	}
-
-	/* Run away from the bus */
-	g_dbus_connection_close (data->connection, NULL, (GAsyncReadyCallback) connection_close_cb, data);
 }
 
 static void
@@ -1108,8 +1057,7 @@ main (int argc, char *argv[])
 	data.test_program = NULL;
 	data.connection = NULL;
 	data.simulated_objects = g_ptr_array_ref (simulated_objects);
-	data.bus_name_ids = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
-	data.outstanding_bus_ownership_callbacks = 0;
+	data.outstanding_registration_callbacks = 0;
 	data.test_run_inactivity_timeout_id = 0;
 
 	if (run_infinitely == TRUE || (run_iters == 0 && run_time == 0)) {
