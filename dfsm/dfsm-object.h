@@ -67,7 +67,8 @@ GPtrArray/*<DfsmAstObject>*/ *dfsm_object_factory_asts_from_files (const gchar *
 GPtrArray/*<DfsmObject>*/ *dfsm_object_factory_from_files (const gchar *simulation_code, const gchar *introspection_xml,
                                                            GError **error) DFSM_CONSTRUCTOR;
 
-void dfsm_object_register_on_bus (DfsmObject *self, GDBusConnection *connection, GError **error);
+void dfsm_object_register_on_bus (DfsmObject *self, GDBusConnection *connection, GAsyncReadyCallback callback, gpointer user_data);
+void dfsm_object_register_on_bus_finish (DfsmObject *self, GAsyncResult *async_result, GError **error);
 void dfsm_object_unregister_on_bus (DfsmObject *self);
 void dfsm_object_reset (DfsmObject *self);
 

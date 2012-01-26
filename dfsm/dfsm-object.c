@@ -78,6 +78,8 @@ struct _DfsmObjectPrivate {
 	GPtrArray/*<string>*/ *bus_names;
 	GPtrArray/*<string>*/ *interfaces;
 	GArray/*<uint>*/ *registration_ids; /* IDs for all the D-Bus interface registrations we've made, in the same order as ->interfaces. */
+	GHashTable/*<string, uint>*/ *bus_name_ids; /* map from well-known bus name to its ownership ID */
+	guint outstanding_bus_ownership_callbacks; /* number of calls to g_bus_own_name() which are outstanding */
 	guint dbus_activity_count;
 };
 
@@ -221,8 +223,9 @@ dfsm_object_dispose (GObject *object)
 
 	g_clear_object (&priv->connection);
 
-	/* Shouldn't leak this. */
+	/* Shouldn't leak these. */
 	g_assert (priv->registration_ids == NULL);
+	g_assert (priv->bus_name_ids == NULL);
 
 	/* Make sure we're not leaking a callback. */
 	g_assert (priv->timeout_id == 0);
@@ -643,10 +646,67 @@ schedule_arbitrary_transition (DfsmObject *self)
 	self->priv->timeout_id = g_timeout_add (timeout_period, (GSourceFunc) arbitrary_transition_timeout_cb, self);
 }
 
+static void
+start_simulation (DfsmObject *self, GDBusConnection *connection, GSimpleAsyncResult *async_result)
+{
+	DfsmObjectPrivate *priv = self->priv;
+
+	/* Expose the connection. */
+	g_assert (priv->connection == NULL);
+	priv->connection = g_object_ref (connection);
+	g_object_notify (G_OBJECT (self), "connection");
+
+	/* Reset the activity counter. */
+	priv->dbus_activity_count = 0;
+	g_object_notify (G_OBJECT (self), "dbus-activity-count");
+
+	/* Start the DFSM. */
+	g_debug ("Starting the simulation.");
+
+	/* Add a random timeout to the next potential arbitrary transition. */
+	schedule_arbitrary_transition (self);
+
+	/* Change simulation status. */
+	priv->simulation_status = DFSM_SIMULATION_STATUS_STARTED;
+	g_object_notify (G_OBJECT (self), "simulation-status");
+
+	/* Return in the async result. */
+	g_simple_async_result_complete_in_idle (async_result);
+}
+
+static void
+name_acquired_cb (GDBusConnection *connection, const gchar *name, GSimpleAsyncResult *async_result)
+{
+	DfsmObject *self;
+	DfsmObjectPrivate *priv;
+
+	self = DFSM_OBJECT (g_async_result_get_source_object (G_ASYNC_RESULT (async_result)));
+	priv = self->priv;
+
+	g_debug ("Acquired ownership of well-known bus name: %s", name);
+
+	/* Bail if this isn't the last callback. */
+	priv->outstanding_bus_ownership_callbacks--;
+	if (priv->outstanding_bus_ownership_callbacks > 0) {
+		return;
+	}
+
+	/* Start the simulation! */
+	start_simulation (self, connection, async_result);
+}
+
+static void
+name_lost_cb (GDBusConnection *connection, const gchar *name, GAsyncResult *async_result)
+{
+	g_debug ("Lost ownership of well-known bus name: %s", name);
+}
+
 /**
  * dfsm_object_register_on_bus:
  * @self: a #DfsmObject
- * @error: (allow-none): a #GError, or %NULL
+ * @connection: a #GDBusConnection to register the object on
+ * @callback: a function to call once the asynchronous registration operation is complete
+ * @user_data: (allow-none): user data to pass to @callback, or %NULL
  *
  * Register this simulated D-Bus object on the D-Bus instance given by @connection, and then start the simulation. Once the simulation is started
  * successfully, the object will respond to method calls on the bus as directed by its DFSM (#DfsmObject:machine), and will also take arbitrary actions
@@ -654,26 +714,37 @@ schedule_arbitrary_transition (DfsmObject *self)
  *
  * If the object is successfully registered on the bus, #DfsmObject:connection will be set to @connection.
  *
- * If the object is already registered on the bus, this function will return immediately. The object can be unregistered from the bus by calling
- * dfsm_object_unregister_on_bus().
+ * If the object is already registered on the bus, this function will return (via @callback) immediately. The object can be unregistered from the bus
+ * by calling dfsm_object_unregister_on_bus().
+ *
+ * Call dfsm_object_register_on_bus_finish() from @callback to handle results of this asynchronous operation, such as errors.
  */
 void
-dfsm_object_register_on_bus (DfsmObject *self, GDBusConnection *connection, GError **error)
+dfsm_object_register_on_bus (DfsmObject *self, GDBusConnection *connection, GAsyncReadyCallback callback, gpointer user_data)
 {
 	DfsmObjectPrivate *priv;
 	guint i;
 	GPtrArray/*<GDBusInterfaceInfo>*/ *interfaces;
 	GArray *registration_ids;
+	GPtrArray/*<string>*/ *bus_names = NULL;
+	GHashTable/*<string,uint> */ *bus_name_ids = NULL;
+	GSimpleAsyncResult *async_result;
 	GError *child_error = NULL;
 
 	g_return_if_fail (DFSM_IS_OBJECT (self));
 	g_return_if_fail (G_IS_DBUS_CONNECTION (connection));
-	g_return_if_fail (error == NULL || *error == NULL);
+	g_return_if_fail (callback != NULL);
 
 	priv = self->priv;
 
+	async_result = g_simple_async_result_new (G_OBJECT (self), callback, user_data, dfsm_object_register_on_bus);
+
 	/* Bail if we're already registered. */
+	g_assert ((priv->registration_ids == NULL) == (priv->bus_name_ids == NULL));
+
 	if (priv->registration_ids != NULL) {
+		g_simple_async_result_complete_in_idle (async_result);
+		g_object_unref (async_result);
 		return;
 	}
 
@@ -715,29 +786,49 @@ dfsm_object_register_on_bus (DfsmObject *self, GDBusConnection *connection, GErr
 	/* Success! Save the array of registration IDs so that we can unregister later. */
 	priv->registration_ids = registration_ids;
 
-	/* Expose the connection. */
-	g_assert (priv->connection == NULL);
-	priv->connection = g_object_ref (connection);
-	g_object_notify (G_OBJECT (self), "connection");
+	/* Register the process for all the object's well-known names. */
+	bus_names = dfsm_object_get_well_known_bus_names (self);
 
-	/* Reset the activity counter. */
-	priv->dbus_activity_count = 0;
-	g_object_notify (G_OBJECT (self), "dbus-activity-count");
+	/* Hold an outstanding callback while we loop over the bus names, so that don't spawn the program under test before we've finished
+	 * requesting to own all our bus names (e.g. if their callbacks are called very quickly. */
+	priv->outstanding_bus_ownership_callbacks++;
+	bus_name_ids = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
 
-	/* Start the DFSM. */
-	g_debug ("Starting the simulation.");
+	for (i = 0; i < bus_names->len; i++) {
+		const gchar *bus_name;
+		guint bus_name_id;
 
-	/* Add a random timeout to the next potential arbitrary transition. */
-	schedule_arbitrary_transition (self);
+		bus_name = g_ptr_array_index (bus_names, i);
 
-	/* Change simulation status. */
-	priv->simulation_status = DFSM_SIMULATION_STATUS_STARTED;
-	g_object_notify (G_OBJECT (self), "simulation-status");
+		/* Skip the name if another object's already requested to own it. */
+		if (g_hash_table_lookup_extended (bus_name_ids, bus_name, NULL, NULL) == TRUE) {
+			continue;
+		}
+
+		/* Own the name. We keep a count of all the outstanding callbacks and only start the simulation once all are complete. */
+		priv->outstanding_bus_ownership_callbacks++;
+		bus_name_id = g_bus_own_name_on_connection (connection, bus_name, G_BUS_NAME_OWNER_FLAGS_NONE,
+		                                            (GBusNameAcquiredCallback) name_acquired_cb, (GBusNameLostCallback) name_lost_cb,
+		                                            g_object_ref (async_result), g_object_unref);
+		g_hash_table_insert (bus_name_ids, g_strdup (bus_name), GUINT_TO_POINTER (bus_name_id));
+	}
+
+	/* Release our outstanding callback and start the simulation if it hasn't been started already. */
+	priv->outstanding_bus_ownership_callbacks--;
+	if (priv->outstanding_bus_ownership_callbacks == 0) {
+		start_simulation (self, connection, async_result);
+	}
+
+	/* Success! Save the array of bus name IDs so we can unown them later. */
+	priv->bus_name_ids = bus_name_ids;
+
+	g_object_unref (async_result);
 
 	return;
 
 error:
 	g_assert (child_error != NULL);
+	g_assert (bus_names == NULL);
 
 	/* Unregister all the interfaces we successfully registered before encountering the error. */
 	while (i-- > 0) {
@@ -748,7 +839,29 @@ error:
 	g_array_free (registration_ids, TRUE);
 
 	/* Propagate the error and return. */
-	g_propagate_error (error, child_error);
+	g_simple_async_result_take_error (async_result, child_error);
+	g_simple_async_result_complete_in_idle (async_result);
+
+	g_object_unref (async_result);
+}
+
+/**
+ * dfsm_object_register_on_bus_finish:
+ * @self: a #DfsmObject
+ * @async_result: the asynchronous result passed to the callback
+ * @error: (allow-none): a #GError, or %NULL
+ *
+ * Finish an asynchronous registration operation started by dfsm_object_register_on_bus().
+ */
+void
+dfsm_object_register_on_bus_finish (DfsmObject *self, GAsyncResult *async_result, GError **error)
+{
+	g_return_if_fail (DFSM_IS_OBJECT (self));
+	g_return_if_fail (G_IS_ASYNC_RESULT (async_result));
+	g_return_if_fail (error == NULL || *error == NULL);
+	g_return_if_fail (g_simple_async_result_is_valid (async_result, G_OBJECT (self), dfsm_object_register_on_bus));
+
+	g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (async_result), error);
 }
 
 /**
@@ -768,13 +881,16 @@ void
 dfsm_object_unregister_on_bus (DfsmObject *self)
 {
 	DfsmObjectPrivate *priv;
-	guint i;
+	GHashTableIter iter;
+	guint bus_name_id, i;
 
 	g_return_if_fail (DFSM_IS_OBJECT (self));
 
 	priv = self->priv;
 
 	/* Bail if we're already unregistered. */
+	g_assert ((priv->registration_ids == NULL) == (priv->bus_name_ids == NULL));
+
 	if (priv->registration_ids == NULL) {
 		return;
 	}
@@ -790,6 +906,16 @@ dfsm_object_unregister_on_bus (DfsmObject *self)
 	/* Change simulation status. */
 	priv->simulation_status = DFSM_SIMULATION_STATUS_STOPPED;
 	g_object_notify (G_OBJECT (self), "simulation-status");
+
+	/* Unregister the well-known names. */
+	g_hash_table_iter_init (&iter, priv->bus_name_ids);
+
+	while (g_hash_table_iter_next (&iter, NULL, (gpointer*) &bus_name_id) == TRUE) {
+		g_bus_unown_name (bus_name_id);
+	}
+
+	g_hash_table_unref (priv->bus_name_ids);
+	priv->bus_name_ids = NULL;
 
 	/* Unregister all the interfaces from the bus. */
 	for (i = 0; i < priv->registration_ids->len; i++) {
