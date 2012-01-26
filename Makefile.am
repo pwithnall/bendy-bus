@@ -18,6 +18,23 @@ lib_LTLIBRARIES += dfsm/libdfsm.la
 
 dfsm_main_header = dfsm/dfsm.h
 dfsm_public_headers = \
+	dfsm/dfsm-ast.h \
+	dfsm/dfsm-ast-node.h \
+	dfsm/dfsm-ast-object.h \
+	dfsm/dfsm-ast-expression.h \
+	dfsm/dfsm-ast-expression-function-call.h \
+	dfsm/dfsm-ast-expression-data-structure.h \
+	dfsm/dfsm-ast-expression-unary.h \
+	dfsm/dfsm-ast-expression-binary.h \
+	dfsm/dfsm-ast-data-structure.h \
+	dfsm/dfsm-ast-transition.h \
+	dfsm/dfsm-ast-precondition.h \
+	dfsm/dfsm-ast-statement.h \
+	dfsm/dfsm-ast-statement-assignment.h \
+	dfsm/dfsm-ast-statement-throw.h \
+	dfsm/dfsm-ast-statement-emit.h \
+	dfsm/dfsm-ast-statement-reply.h \
+	dfsm/dfsm-ast-variable.h \
 	dfsm/dfsm-dbus-output-sequence.h \
 	dfsm/dfsm-environment.h \
 	dfsm/dfsm-machine.h \
@@ -29,39 +46,22 @@ dfsm_public_headers = \
 dfsm_sources = \
 	dfsm/dfsm-bison.y \
 	dfsm/dfsm-flex.l \
-	dfsm/dfsm-ast.h \
 	dfsm/dfsm-ast-node.c \
-	dfsm/dfsm-ast-node.h \
 	dfsm/dfsm-ast-object.c \
-	dfsm/dfsm-ast-object.h \
 	dfsm/dfsm-ast-expression.c \
-	dfsm/dfsm-ast-expression.h \
 	dfsm/dfsm-ast-expression-function-call.c \
-	dfsm/dfsm-ast-expression-function-call.h \
 	dfsm/dfsm-ast-expression-data-structure.c \
-	dfsm/dfsm-ast-expression-data-structure.h \
 	dfsm/dfsm-ast-expression-unary.c \
-	dfsm/dfsm-ast-expression-unary.h \
 	dfsm/dfsm-ast-expression-binary.c \
-	dfsm/dfsm-ast-expression-binary.h \
 	dfsm/dfsm-ast-data-structure.c \
-	dfsm/dfsm-ast-data-structure.h \
 	dfsm/dfsm-ast-transition.c \
-	dfsm/dfsm-ast-transition.h \
 	dfsm/dfsm-ast-precondition.c \
-	dfsm/dfsm-ast-precondition.h \
 	dfsm/dfsm-ast-statement.c \
-	dfsm/dfsm-ast-statement.h \
 	dfsm/dfsm-ast-statement-assignment.c \
-	dfsm/dfsm-ast-statement-assignment.h \
 	dfsm/dfsm-ast-statement-throw.c \
-	dfsm/dfsm-ast-statement-throw.h \
 	dfsm/dfsm-ast-statement-emit.c \
-	dfsm/dfsm-ast-statement-emit.h \
 	dfsm/dfsm-ast-statement-reply.c \
-	dfsm/dfsm-ast-statement-reply.h \
 	dfsm/dfsm-ast-variable.c \
-	dfsm/dfsm-ast-variable.h \
 	dfsm/dfsm-dbus-output-sequence.c \
 	dfsm/dfsm-parser.c \
 	dfsm/dfsm-parser-internal.h \
