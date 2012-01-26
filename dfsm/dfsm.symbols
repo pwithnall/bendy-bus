@@ -1,4 +1,5 @@
 dfsm_ast_data_structure_calculate_type
+dfsm_ast_data_structure_get_nickname
 dfsm_ast_data_structure_get_type
 dfsm_ast_data_structure_get_weight
 dfsm_ast_data_structure_is_variable

@@ -100,6 +100,7 @@ G_GNUC_INTERNAL DfsmAstDataStructure *dfsm_ast_data_structure_new (DfsmAstDataSt
 
 G_GNUC_INTERNAL void dfsm_ast_data_structure_set_weight (DfsmAstDataStructure *self, gdouble weight);
 G_GNUC_INTERNAL void dfsm_ast_data_structure_set_type_annotation (DfsmAstDataStructure *self, const gchar *type_annotation);
+G_GNUC_INTERNAL void dfsm_ast_data_structure_set_nickname (DfsmAstDataStructure *self, const gchar *nickname);
 
 #include "dfsm-ast-expression-binary.h"
 

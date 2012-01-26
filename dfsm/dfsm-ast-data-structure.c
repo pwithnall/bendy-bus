@@ -41,6 +41,7 @@ struct _DfsmAstDataStructurePrivate {
 	GVariantType *variant_type; /* gets set by _calculate_type(); NULL beforehand; always a definite type when set */
 	gdouble weight;
 	gchar *type_annotation; /* may not match the actual data in the structure until after dfsm_ast_data_structure_check() is called */
+	gchar *nickname; /* may be NULL; must not be the empty string */
 	union {
 		guchar byte_val;
 		gboolean boolean_val;
@@ -96,6 +97,7 @@ dfsm_ast_data_structure_finalize (GObject *object)
 	}
 
 	g_free (priv->type_annotation);
+	g_free (priv->nickname);
 
 	switch (priv->data_structure_type) {
 		case DFSM_AST_DATA_BYTE:
@@ -151,6 +153,7 @@ dfsm_ast_data_structure_sanity_check (DfsmAstNode *node)
 	guint i;
 
 	g_assert (priv->type_annotation == NULL || *(priv->type_annotation) != '\0');
+	g_assert (priv->nickname == NULL || *(priv->nickname) != '\0');
 
 	switch (priv->data_structure_type) {
 		case DFSM_AST_DATA_BYTE:
@@ -865,6 +868,24 @@ dfsm_ast_data_structure_set_type_annotation (DfsmAstDataStructure *self, const g
 
 	g_free (self->priv->type_annotation);
 	self->priv->type_annotation = g_strdup (type_annotation);
+}
+
+const gchar *
+dfsm_ast_data_structure_get_nickname (DfsmAstDataStructure *self)
+{
+	g_return_val_if_fail (DFSM_IS_AST_DATA_STRUCTURE (self), NULL);
+
+	return self->priv->nickname;
+}
+
+void
+dfsm_ast_data_structure_set_nickname (DfsmAstDataStructure *self, const gchar *nickname)
+{
+	g_return_if_fail (DFSM_IS_AST_DATA_STRUCTURE (self));
+	g_return_if_fail (nickname == NULL || *nickname != '\0');
+
+	g_free (self->priv->nickname);
+	self->priv->nickname = g_strdup (nickname);
 }
 
 /**

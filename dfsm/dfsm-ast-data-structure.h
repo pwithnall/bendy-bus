@@ -102,6 +102,7 @@ typedef struct {
 GType dfsm_ast_data_structure_get_type (void) G_GNUC_CONST;
 
 gdouble dfsm_ast_data_structure_get_weight (DfsmAstDataStructure *self) G_GNUC_PURE;
+const gchar *dfsm_ast_data_structure_get_nickname (DfsmAstDataStructure *self) G_GNUC_PURE;
 
 GVariantType *dfsm_ast_data_structure_calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
 
