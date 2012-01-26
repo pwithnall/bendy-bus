@@ -162,6 +162,7 @@ typedef struct {
 	guint test_run_inactivity_timeout_id;
 	gulong test_program_spawn_end_signal;
 	gulong test_program_process_died_signal;
+	guint test_program_sigkill_timeout_id;
 } MainData;
 
 static void
@@ -178,7 +179,7 @@ main_data_clear (MainData *data)
 	}
 
 	if (data->test_program != NULL) {
-		dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program));
+		dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program), FALSE);
 		g_clear_object (&data->test_program);
 	}
 
@@ -186,7 +187,7 @@ main_data_clear (MainData *data)
 	g_free (data->test_program_name);
 
 	if (data->dbus_daemon != NULL) {
-		dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->dbus_daemon));
+		dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->dbus_daemon), FALSE);
 		g_clear_object (&data->dbus_daemon);
 	}
 
@@ -197,7 +198,7 @@ static void
 post_connection_closed (MainData *data)
 {
 	/* Kill the dbus-daemon instance. */
-	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->dbus_daemon));
+	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->dbus_daemon), FALSE);
 
 	/* Quit everything */
 	g_main_loop_quit (data->main_loop);
@@ -209,7 +210,7 @@ connection_close_cb (GObject *source_object, GAsyncResult *result, MainData *dat
 	GError *error = NULL;
 
 	/* Finish closing the connection */
-	g_dbus_connection_close_finish (data->connection, result, &error);
+	g_dbus_connection_close_finish (G_DBUS_CONNECTION (source_object), result, &error);
 
 	if (error != NULL) {
 		g_printerr (_("Error closing D-Bus connection: %s"), error->message);
@@ -264,7 +265,15 @@ stop_simulation_test_program_died_cb (DsimProgramWrapper *wrapper, gint status, 
 
 	g_debug ("stop_simulation_test_program_died_cb() with status %i.", status);
 
-	g_signal_handler_disconnect (data->test_program, data->test_program_process_died_signal);
+	if (data->test_program_process_died_signal != 0) {
+		g_signal_handler_disconnect (data->test_program, data->test_program_process_died_signal);
+		data->test_program_process_died_signal = 0;
+	}
+
+	if (data->test_program_sigkill_timeout_id != 0) {
+		g_source_remove (data->test_program_sigkill_timeout_id);
+		data->test_program_sigkill_timeout_id = 0;
+	}
 
 	/* Drop our well-known names, but only if we haven't been signalled. If we have been signalled, the dbus-daemon has also been signalled,
 	 * and so is concurrently dying. Since g_bus_unown_name() has no error handling, we can't prevent it spewing warnings everywhere about
@@ -299,6 +308,17 @@ stop_simulation_test_program_died_cb (DsimProgramWrapper *wrapper, gint status, 
 	}
 }
 
+static gboolean
+kill_program_cb (MainData *data)
+{
+	g_message (_("Killing test program (with SIGKILL) due to it not responding to termination requests (SIGTERM)."));
+
+	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program), TRUE);
+
+	data->test_program_sigkill_timeout_id = 0;
+	return FALSE;
+}
+
 static void
 stop_simulation (MainData *data)
 {
@@ -311,16 +331,26 @@ stop_simulation (MainData *data)
 	}
 
 	/* Remove intra-simulation signal handlers and add our own. */
-	g_signal_handler_disconnect (data->test_program, data->test_program_spawn_end_signal);
-	g_signal_handler_disconnect (data->test_program, data->test_program_process_died_signal);
+	if (data->test_program_spawn_end_signal != 0) {
+		g_signal_handler_disconnect (data->test_program, data->test_program_spawn_end_signal);
+		data->test_program_spawn_end_signal = 0;
+	}
 
-	data->test_program_spawn_end_signal = 0;
+	if (data->test_program_process_died_signal != 0) {
+		g_signal_handler_disconnect (data->test_program, data->test_program_process_died_signal);
+		data->test_program_process_died_signal = 0;
+	}
+
 	data->test_program_process_died_signal = g_signal_connect (data->test_program, "process-died",
 	                                                           (GCallback) stop_simulation_test_program_died_cb, data);
 
 	/* Simulation's finished, so kill the test program. We wait until the stop_simulation_test_program_died_cb() callback to disconnect from the
 	 * bus and quit. */
-	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program));
+	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program), FALSE);
+
+	/* However, some programs are badly behaved, and sometimes don't quit after being sent SIGTERM. Set up a timer which will SIGKILL the test
+	 * program. */
+	data->test_program_sigkill_timeout_id = g_timeout_add_seconds (15, (GSourceFunc) kill_program_cb, data);
 }
 
 static void
@@ -363,7 +393,7 @@ restart_simulation (MainData *data)
 	g_message (_("Restarting simulation."));
 
 	/* Stop the test program and reset all our simulation objects. */
-	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program));
+	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program), FALSE);
 
 	for (i = 0; i < data->simulated_objects->len; i++) {
 		DfsmObject *simulated_object = g_ptr_array_index (data->simulated_objects, i);

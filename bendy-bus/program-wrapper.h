@@ -55,7 +55,7 @@ typedef struct {
 GType dsim_program_wrapper_get_type (void) G_GNUC_CONST;
 
 void dsim_program_wrapper_spawn (DsimProgramWrapper *self, GError **error);
-void dsim_program_wrapper_kill (DsimProgramWrapper *self);
+void dsim_program_wrapper_kill (DsimProgramWrapper *self, gboolean kill_harder);
 
 GFile *dsim_program_wrapper_get_working_directory (DsimProgramWrapper *self) G_GNUC_PURE;
 GPid dsim_program_wrapper_get_process_id (DsimProgramWrapper *self);

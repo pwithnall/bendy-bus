@@ -181,7 +181,7 @@ dsim_program_wrapper_dispose (GObject *object)
 	DsimProgramWrapperPrivate *priv = DSIM_PROGRAM_WRAPPER (object)->priv;
 
 	/* Ensure we kill the process first. */
-	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (object));
+	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (object), FALSE);
 
 	g_clear_object (&priv->working_directory);
 
@@ -511,6 +511,7 @@ dsim_program_wrapper_spawn (DsimProgramWrapper *self, GError **error)
 /**
  * dsim_program_wrapper_kill:
  * @data: a #DsimProgramWrapper
+ * @kill_harder: %TRUE to send %SIGKILL, %FALSE to send %SIGTERM
  *
  * Kills the process associated with this #DsimProgramWrapper which was previously started using dsim_program_wrapper_spawn().
  *
@@ -518,7 +519,7 @@ dsim_program_wrapper_spawn (DsimProgramWrapper *self, GError **error)
  * own accord, or because dsim_program_wrapper_kill() has previously been called successfully), this function will return immediately.
  */
 void
-dsim_program_wrapper_kill (DsimProgramWrapper *self)
+dsim_program_wrapper_kill (DsimProgramWrapper *self, gboolean kill_harder)
 {
 	DsimProgramWrapperPrivate *priv;
 
@@ -532,10 +533,14 @@ dsim_program_wrapper_kill (DsimProgramWrapper *self)
 		return;
 	}
 
-	/* Send a SIGTERM to the dbus-daemon process. */
-	g_debug ("Killing `%s`.", priv->program_name);
-
-	kill (self->priv->pid, SIGTERM);
+	/* Signal the child process. */
+	if (kill_harder == FALSE) {
+		g_debug ("Terminating `%s`.", priv->program_name);
+		kill (self->priv->pid, SIGTERM);
+	} else {
+		g_debug ("Killing `%s`.", priv->program_name);
+		kill (self->priv->pid, SIGKILL);
+	}
 }
 
 /**
