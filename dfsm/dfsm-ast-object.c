@@ -30,13 +30,14 @@
 #include "dfsm-parser-internal.h"
 
 DfsmAstObjectTransition *
-dfsm_ast_object_transition_new (DfsmMachineStateNumber from_state, DfsmMachineStateNumber to_state, DfsmAstTransition *transition)
+dfsm_ast_object_transition_new (DfsmMachineStateNumber from_state, DfsmMachineStateNumber to_state, DfsmAstTransition *transition, const gchar *nickname)
 {
 	DfsmAstObjectTransition *object_transition = g_slice_new (DfsmAstObjectTransition);
 
 	object_transition->from_state = from_state;
 	object_transition->to_state = to_state;
 	object_transition->transition = g_object_ref (transition);
+	object_transition->nickname = g_strdup (nickname);
 	object_transition->ref_count = 1;
 
 	return object_transition;
@@ -58,6 +59,7 @@ dfsm_ast_object_transition_unref (DfsmAstObjectTransition *object_transition)
 	g_assert (object_transition != NULL);
 
 	if (g_atomic_int_dec_and_test (&object_transition->ref_count) == TRUE) {
+		g_free (object_transition->nickname);
 		g_object_unref (object_transition->transition);
 
 		g_slice_free (DfsmAstObjectTransition, object_transition);
@@ -449,7 +451,8 @@ dfsm_ast_object_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *envi
 			}
 
 			/* Register the transition. */
-			object_transition = dfsm_ast_object_transition_new (from_state_number, to_state_number, transition_block->transition);
+			object_transition = dfsm_ast_object_transition_new (from_state_number, to_state_number, transition_block->transition,
+			                                                    state_pair->nickname);
 			g_ptr_array_add (priv->transitions, object_transition);
 		}
 	}

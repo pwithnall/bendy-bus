@@ -34,13 +34,14 @@ typedef struct {
 	DfsmAstObjectStateNumber from_state;
 	DfsmAstObjectStateNumber to_state;
 	DfsmAstTransition *transition;
+	gchar *nickname;
 
 	/*< private >*/
 	gint ref_count;
 } DfsmAstObjectTransition;
 
 DfsmAstObjectTransition *dfsm_ast_object_transition_new (DfsmAstObjectStateNumber from_state, DfsmAstObjectStateNumber to_state,
-                                                         DfsmAstTransition *transition) DFSM_CONSTRUCTOR;
+                                                         DfsmAstTransition *transition, const gchar *nickname) DFSM_CONSTRUCTOR;
 DfsmAstObjectTransition *dfsm_ast_object_transition_ref (DfsmAstObjectTransition *object_transition);
 void dfsm_ast_object_transition_unref (DfsmAstObjectTransition *object_transition);
 

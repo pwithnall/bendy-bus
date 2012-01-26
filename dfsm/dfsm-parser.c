@@ -97,7 +97,7 @@ dfsm_parser_transition_block_free (DfsmParserTransitionBlock *block)
 }
 
 DfsmParserStatePair *
-dfsm_parser_state_pair_new (const gchar *from_state_name, const gchar *to_state_name)
+dfsm_parser_state_pair_new (const gchar *from_state_name, const gchar *to_state_name, const gchar *nickname)
 {
 	DfsmParserStatePair *state_pair = g_slice_new (DfsmParserStatePair);
 
@@ -108,6 +108,7 @@ dfsm_parser_state_pair_new (const gchar *from_state_name, const gchar *to_state_
 
 	state_pair->from_state_name = g_strdup (from_state_name);
 	state_pair->to_state_name = g_strdup (to_state_name);
+	state_pair->nickname = g_strdup (nickname); /* may be NULL */
 
 	return state_pair;
 }
@@ -118,6 +119,7 @@ dfsm_parser_state_pair_free (DfsmParserStatePair *state_pair)
 	if (state_pair != NULL) {
 		g_free (state_pair->from_state_name);
 		g_free (state_pair->to_state_name);
+		g_free (state_pair->nickname);
 
 		g_slice_free (DfsmParserStatePair, state_pair);
 	}

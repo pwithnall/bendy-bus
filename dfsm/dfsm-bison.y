@@ -310,10 +310,14 @@ StatePairList: StatePair							{
 ;
 
 /* Returns a new DfsmParserStatePair. */
-StatePair: FROM StateName TO StateName						{ $$ = dfsm_parser_state_pair_new ($2, $4);
+StatePair: FROM StateName TO StateName						{ $$ = dfsm_parser_state_pair_new ($2, $4, NULL);
 										  g_free ($2); g_free ($4); }
-         | INSIDE StateName							{ $$ = dfsm_parser_state_pair_new (NULL, $2);
+         | INSIDE StateName							{ $$ = dfsm_parser_state_pair_new (NULL, $2, NULL);
 										  g_free ($2); }
+         | IDENTIFIER FROM StateName TO StateName				{ $$ = dfsm_parser_state_pair_new ($3, $5, $1);
+										  g_free ($1); g_free ($3); g_free ($5); }
+         | IDENTIFIER INSIDE StateName						{ $$ = dfsm_parser_state_pair_new (NULL, $3, $1);
+										  g_free ($1); g_free ($3); }
 ;
 
 /* Returns a new string containing the method name. */

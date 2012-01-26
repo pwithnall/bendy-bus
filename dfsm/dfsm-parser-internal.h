@@ -82,9 +82,11 @@ G_GNUC_INTERNAL void dfsm_parser_transition_block_free (DfsmParserTransitionBloc
 typedef struct {
 	gchar *from_state_name;
 	gchar *to_state_name;
+	gchar *nickname; /* may be NULL */
 } DfsmParserStatePair;
 
-G_GNUC_INTERNAL DfsmParserStatePair *dfsm_parser_state_pair_new (const gchar *from_state_name, const gchar *to_state_name) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmParserStatePair *dfsm_parser_state_pair_new (const gchar *from_state_name, const gchar *to_state_name,
+                                                                 const gchar *nickname) DFSM_CONSTRUCTOR;
 G_GNUC_INTERNAL void dfsm_parser_state_pair_free (DfsmParserStatePair *state_pair);
 
 /* AST node constructors */
