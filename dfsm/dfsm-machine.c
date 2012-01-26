@@ -183,9 +183,13 @@ static gboolean
 execute_transition (DfsmMachine *self, DfsmAstObjectTransition *object_transition, DfsmOutputSequence *output_sequence)
 {
 	DfsmMachinePrivate *priv = self->priv;
+	gchar *friendly_transition_name;
 
-	g_debug ("…Executing transition %p from ‘%s’ to ‘%s’.", object_transition->transition, get_state_name (self, object_transition->from_state),
+	friendly_transition_name = dfsm_ast_object_transition_build_friendly_name (object_transition);
+	g_debug ("…Executing transition %s from ‘%s’ to ‘%s’.", friendly_transition_name, get_state_name (self, object_transition->from_state),
 	         get_state_name (self, object_transition->to_state));
+	g_free (friendly_transition_name);
+
 	dfsm_ast_transition_execute (object_transition->transition, priv->environment, output_sequence);
 
 	/* Various possibilities for return values. */
@@ -245,14 +249,19 @@ find_and_execute_random_transition (DfsmMachine *self, DfsmOutputSequence *outpu
 
 		/* Check we're in the right starting state. */
 		if (object_transition->from_state != priv->machine_state) {
-			g_debug ("…Skipping transition %p from ‘%s’ to ‘%s’ due to being in the wrong state (‘%s’).", transition,
+			gchar *friendly_transition_name = dfsm_ast_object_transition_build_friendly_name (object_transition);
+			g_debug ("…Skipping transition %s from ‘%s’ to ‘%s’ due to being in the wrong state (‘%s’).", friendly_transition_name,
 			         get_state_name (self, object_transition->from_state), get_state_name (self, object_transition->to_state),
 			         get_state_name (self, priv->machine_state));
+			g_free (friendly_transition_name);
+
 			continue;
 		}
 
 		/* If this transition's preconditions are satisfied, continue down to execute it. Otherwise, loop round and try the next transition. */
 		if (dfsm_ast_transition_check_preconditions (transition, priv->environment, NULL, &will_throw_error) == FALSE) {
+			gchar *friendly_transition_name;
+
 			/* If the transition will throw a D-Bus error as a result of its precondition failures, store it. If we don't find any
 			 * transitions which have no precondition failures, we can come back to the first one _with_ precondition failures and
 			 * throw its D-Bus errors. */
@@ -260,21 +269,27 @@ find_and_execute_random_transition (DfsmMachine *self, DfsmOutputSequence *outpu
 				precondition_failure_transition = object_transition;
 			}
 
-			g_debug ("…Skipping transition %p from ‘%s’ to ‘%s’ due to precondition failures.", transition,
+			friendly_transition_name = dfsm_ast_object_transition_build_friendly_name (object_transition);
+			g_debug ("…Skipping transition %s from ‘%s’ to ‘%s’ due to precondition failures.", friendly_transition_name,
 			         get_state_name (self, object_transition->from_state), get_state_name (self, object_transition->to_state));
+			g_free (friendly_transition_name);
 
 			continue;
 		}
 
 		/* If this transition contains a ‘throw’ statement, check if we really want to execute it. */
 		if (dfsm_ast_transition_contains_throw_statement (transition) == TRUE && DFSM_BIASED_COIN_FLIP (0.8)) {
+			gchar *friendly_transition_name;
+
 			/* Skip the transition, but keep a record of it in case we find there are no other transitions whose preconditions pass and
 			 * which don't contain ‘throw’ statements. */
 			candidate_object_transition = object_transition;
 			precondition_failure_transition = NULL;
 
-			g_debug ("…Skipping transition %p from ‘%s’ to ‘%s’ due to it containing a throw statement.", transition,
+			friendly_transition_name = dfsm_ast_object_transition_build_friendly_name (object_transition);
+			g_debug ("…Skipping transition %s from ‘%s’ to ‘%s’ due to it containing a throw statement.", friendly_transition_name,
 			         get_state_name (self, object_transition->from_state), get_state_name (self, object_transition->to_state));
+			g_free (friendly_transition_name);
 
 			continue;
 		}

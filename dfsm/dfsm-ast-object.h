@@ -44,6 +44,7 @@ DfsmAstObjectTransition *dfsm_ast_object_transition_new (DfsmAstObjectStateNumbe
                                                          DfsmAstTransition *transition, const gchar *nickname) DFSM_CONSTRUCTOR;
 DfsmAstObjectTransition *dfsm_ast_object_transition_ref (DfsmAstObjectTransition *object_transition);
 void dfsm_ast_object_transition_unref (DfsmAstObjectTransition *object_transition);
+gchar *dfsm_ast_object_transition_build_friendly_name (DfsmAstObjectTransition *object_transition) DFSM_CONSTRUCTOR;
 
 #define DFSM_TYPE_AST_OBJECT		(dfsm_ast_object_get_type ())
 #define DFSM_AST_OBJECT(o)		(G_TYPE_CHECK_INSTANCE_CAST ((o), DFSM_TYPE_AST_OBJECT, DfsmAstObject))

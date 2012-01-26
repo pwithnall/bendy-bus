@@ -66,6 +66,16 @@ dfsm_ast_object_transition_unref (DfsmAstObjectTransition *object_transition)
 	}
 }
 
+gchar *
+dfsm_ast_object_transition_build_friendly_name (DfsmAstObjectTransition *object_transition)
+{
+	if (object_transition->nickname != NULL) {
+		return g_strdup_printf ("‘%s’ (%p)", object_transition->nickname, object_transition->transition);
+	}
+
+	return g_strdup_printf ("%p", object_transition->transition);
+}
+
 static void dfsm_ast_object_dispose (GObject *object);
 static void dfsm_ast_object_finalize (GObject *object);
 static void dfsm_ast_object_sanity_check (DfsmAstNode *node);
