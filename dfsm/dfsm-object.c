@@ -727,7 +727,7 @@ dfsm_object_register_on_bus (DfsmObject *self, GDBusConnection *connection, GAsy
 	GPtrArray/*<GDBusInterfaceInfo>*/ *interfaces;
 	GArray *registration_ids;
 	GPtrArray/*<string>*/ *bus_names = NULL;
-	GHashTable/*<string,uint> */ *bus_name_ids = NULL;
+	GHashTable/*<string, uint> */ *bus_name_ids = NULL;
 	GSimpleAsyncResult *async_result;
 	GError *child_error = NULL;
 
@@ -882,7 +882,8 @@ dfsm_object_unregister_on_bus (DfsmObject *self)
 {
 	DfsmObjectPrivate *priv;
 	GHashTableIter iter;
-	guint bus_name_id, i;
+	guint i;
+	gpointer bus_name_id_ptr;
 
 	g_return_if_fail (DFSM_IS_OBJECT (self));
 
@@ -910,8 +911,8 @@ dfsm_object_unregister_on_bus (DfsmObject *self)
 	/* Unregister the well-known names. */
 	g_hash_table_iter_init (&iter, priv->bus_name_ids);
 
-	while (g_hash_table_iter_next (&iter, NULL, (gpointer*) &bus_name_id) == TRUE) {
-		g_bus_unown_name (bus_name_id);
+	while (g_hash_table_iter_next (&iter, NULL, &bus_name_id_ptr) == TRUE) {
+		g_bus_unown_name (GPOINTER_TO_UINT (bus_name_id_ptr));
 	}
 
 	g_hash_table_unref (priv->bus_name_ids);
