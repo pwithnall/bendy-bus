@@ -34,13 +34,13 @@ object at /org/freedesktop/Telepathy/Account/cmname/proto/account implements org
 		Service = ""?;
 		Parameters = @a{sv} {};
 		AutomaticPresence = (2u?, "available"?, ""?);
-		ConnectAutomatically = true?;
+		ConnectAutomatically = true;
 		Connection = @o "/";
 		ConnectionStatus = 2u /* Disconnected */;
 		ConnectionStatusReason = 0u;
 		ConnectionError = "";
 		ConnectionErrorDetails = @a{sv} {};
-		CurrentPresence = (1u?, ""?, ""?);
+		CurrentPresence = (1u, "", "");
 		RequestedPresence = (1u?, ""?, ""?);
 		ChangingPresence = false;
 		NormalizedName = "account";
@@ -58,6 +58,18 @@ object at /org/freedesktop/Telepathy/Account/cmname/proto/account implements org
 		object->ChangingPresence = true;
 		object->ConnectionStatus = 1u;
 		object->ConnectionStatusReason = 1u;
+
+		emit AccountPropertyChanged ({
+			"RequestedPresence" : <object->RequestedPresence>,
+			"ChangingPresence" : <object->ChangingPresence>,
+			"ConnectionStatus" : <object->ConnectionStatus>,
+			"ConnectionStatusReason" : <object->ConnectionStatusReason>,
+		});
+	}
+
+	transition inside Connecting on property RequestedPresence {
+		object->RequestedPresence = value;
+		object->ChangingPresence = true;
 
 		emit AccountPropertyChanged ({
 			"RequestedPresence" : <object->RequestedPresence>,
@@ -166,7 +178,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 			"org.freedesktop.Telepathy.Connection.Interface.ContactInfo",
 		];
 		SelfHandle = 1u;
-		Status = 2u;
+		Status = 0u /* Disconnected */;
 		HasImmortalHandles = true;
 
 		/* Conn.I.Contacts */
@@ -216,9 +228,9 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 	}
 
 	states {
+		Connected;
 		Disconnected;
 		Connecting;
-		Connected;
 	}
 
 	transition inside Disconnected, inside Connecting, inside Connected on method GetInterfaces {
@@ -284,7 +296,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 
 	transition inside Connected on method GetContactAttributes {
 		reply (pairKeys (Handles, {
-			"org.freedesktop.Telepathy.Connection/contact-id" : <"foo@example.com"?>,
+			"org.freedesktop.Telepathy.Connection/contact-id" : <"1@example.com"?>,
 			"org.freedesktop.Telepathy.Connection.Interface.Aliasing/alias" : <""?>,
 			"org.freedesktop.Telepathy.Connection.Interface.Avatars/token" : <""?>,
 			"org.freedesktop.Telepathy.Connection.Interface.SimplePresence/presence" : <(3u?, "available"?, "Status message!"?)>,
@@ -473,7 +485,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe i
 
 	transition inside Open on random {
 		object->Members = arrayInsert (object->Members, 0u, object->_MemberCount);
-		object->MemberIdentifiers = dictSet (object->MemberIdentifiers, object->_MemberCount, "foo@example.com"?);
+		object->MemberIdentifiers = dictSet (object->MemberIdentifiers, object->_MemberCount, "1@example.com"?);
 
 		emit MembersChangedDetailed ([object->_MemberCount + 1u], @au [], @au [], @au [], @a{sv} {});
 
@@ -558,7 +570,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/group1 impl
 
 	transition inside Open on random {
 		object->Members = arrayInsert (object->Members, 0u, object->_MemberCount);
-		object->MemberIdentifiers = dictSet (object->MemberIdentifiers, object->_MemberCount, "foo@example.com"?);
+		object->MemberIdentifiers = dictSet (object->MemberIdentifiers, object->_MemberCount, "1@example.com"?);
 
 		emit MembersChangedDetailed ([object->_MemberCount + 1u], @au [], @au [], @au [], @a{sv} {});
 

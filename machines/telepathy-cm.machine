@@ -171,7 +171,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 
 	transition inside Connected on method GetContactAttributes {
 		reply (pairKeys (Handles, {
-			"org.freedesktop.Telepathy.Connection/contact-id" : <"foo@example.com"?>,
+			"org.freedesktop.Telepathy.Connection/contact-id" : <"1@example.com"?>,
 			"org.freedesktop.Telepathy.Connection.Interface.Aliasing/alias" : <""?>,
 			"org.freedesktop.Telepathy.Connection.Interface.Avatars/token" : <""?>,
 			"org.freedesktop.Telepathy.Connection.Interface.SimplePresence/presence" : <(3u?, "available"?, "Status message!"?)>,
@@ -352,7 +352,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe i
 
 	transition inside Open on random {
 		object->Members = arrayInsert (object->Members, 0u, object->_MemberCount);
-		object->MemberIdentifiers = dictSet (object->MemberIdentifiers, object->_MemberCount, "foo@example.com"?);
+		object->MemberIdentifiers = dictSet (object->MemberIdentifiers, object->_MemberCount, "1@example.com"?);
 
 		emit MembersChangedDetailed ([object->_MemberCount + 1u], @au [], @au [], @au [], @a{sv} {});
 
@@ -437,7 +437,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/group1 impl
 
 	transition inside Open on random {
 		object->Members = arrayInsert (object->Members, 0u, object->_MemberCount);
-		object->MemberIdentifiers = dictSet (object->MemberIdentifiers, object->_MemberCount, "foo@example.com"?);
+		object->MemberIdentifiers = dictSet (object->MemberIdentifiers, object->_MemberCount, "1@example.com"?);
 
 		emit MembersChangedDetailed ([object->_MemberCount + 1u], @au [], @au [], @au [], @a{sv} {});
 
