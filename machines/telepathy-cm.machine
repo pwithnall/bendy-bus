@@ -33,76 +33,22 @@ object at /org/freedesktop/Telepathy/Account/cmname/proto/account implements org
 		Nickname = "John Smith"?;
 		Service = ""?;
 		Parameters = @a{sv} {};
-		AutomaticPresence = (2u?, "available"?, ""?);
-		ConnectAutomatically = true?;
-		Connection = @o "/";
-		ConnectionStatus = 2u;
+		AutomaticPresence = (2u, "available", "");
+		ConnectAutomatically = true;
+		Connection = @o "/org/freedesktop/Telepathy/Connection/cmname/proto/account";
+		ConnectionStatus = 0u; /* Connected */
 		ConnectionStatusReason = 0u;
 		ConnectionError = "";
 		ConnectionErrorDetails = @a{sv} {};
-		CurrentPresence = (1u?, ""?, ""?);
-		RequestedPresence = (1u?, ""?, ""?);
-		ChangingPresence = false?;
+		CurrentPresence = (2u, "available", ""); /* available */
+		RequestedPresence = (2u, "available", "");
+		ChangingPresence = false;
 		NormalizedName = "account";
-		HasBeenOnline = false?;
+		HasBeenOnline = true;
 	}
 
 	states {
-		Disconnected;
-		Connecting;
 		Connected;
-	}
-
-	transition from Disconnected to Connecting on property RequestedPresence {
-		object->RequestedPresence = value;
-		object->ChangingPresence = true;
-		object->ConnectionStatus = 1u;
-		object->ConnectionStatusReason = 1u;
-
-		emit AccountPropertyChanged ({
-			"RequestedPresence" : <object->RequestedPresence>,
-			"ChangingPresence" : <object->ChangingPresence>,
-			"ConnectionStatus" : <object->ConnectionStatus>,
-			"ConnectionStatusReason" : <object->ConnectionStatusReason>,
-		});
-	}
-
-	transition from Connecting to Connected on random {
-		object->CurrentPresence = object->RequestedPresence;
-		object->ChangingPresence = false;
-		object->ConnectionStatus = 0u;
-		object->ConnectionStatusReason = 1u;
-		object->Connection = @o "/org/freedesktop/Telepathy/Connection/cmname/proto/account";
-		object->HasBeenOnline = true;
-
-		emit AccountPropertyChanged ({
-			"CurrentPresence" : <object->CurrentPresence>,
-			"ChangingPresence" : <object->ChangingPresence>,
-			"ConnectionStatus" : <object->ConnectionStatus>,
-			"ConnectionStatusReason" : <object->ConnectionStatusReason>,
-			"Connection" : <object->Connection>,
-			"HasBeenOnline" : <object->HasBeenOnline>,
-		});
-	}
-
-	transition from Connecting to Disconnected on random {
-		object->CurrentPresence = (1u, "", "");
-		object->ChangingPresence = false;
-		object->ConnectionStatus = 2u;
-		object->ConnectionStatusReason = 2u?;
-		object->Connection = @o "/";
-		object->ConnectionError = ""?;
-		object->ConnectionErrorDetails = @a{sv} {}?;
-
-		emit AccountPropertyChanged ({
-			"CurrentPresence" : <object->CurrentPresence>,
-			"ChangingPresence" : <object->ChangingPresence>,
-			"ConnectionStatus" : <object->ConnectionStatus>,
-			"ConnectionStatusReason" : <object->ConnectionStatusReason>,
-			"Connection" : <object->Connection>,
-			"ConnectionError" : <object->ConnectionError>,
-			"ConnectionErrorDetails" : <object->ConnectionErrorDetails>,
-		});
 	}
 }
 
@@ -142,17 +88,9 @@ object at /org/freedesktop/Telepathy/ConnectionManager/cmname, org.freedesktop.T
 		emit NewConnection (object->_ConnectionBusName, object->_ConnectionObjectPath, Protocol);
 		reply (object->_ConnectionBusName, object->_ConnectionObjectPath);
 	}
-
-	transition inside Main on method RequestConnection {
-		throw NetworkError; /* Error messages are fuzzed */
-	}
-
-	transition inside Main on method RequestConnection {
-		throw InvalidArgument;
-	}
 }
 
-object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freedesktop.Telepathy.Connection.cmname.proto.account implements org.freedesktop.Telepathy.Connection, org.freedesktop.Telepathy.Connection.Interface.Contacts, org.freedesktop.Telepathy.Connection.Interface.Requests, org.freedesktop.Telepathy.Connection.Interface.Aliasing, org.freedesktop.Telepathy.Connection.Interface.Avatars, org.freedesktop.Telepathy.Connection.Interface.SimplePresence, org.freedesktop.Telepathy.Connection.Interface.ContactCapabilities {
+object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freedesktop.Telepathy.Connection.cmname.proto.account implements org.freedesktop.Telepathy.Connection, org.freedesktop.Telepathy.Connection.Interface.Contacts, org.freedesktop.Telepathy.Connection.Interface.Requests, org.freedesktop.Telepathy.Connection.Interface.Aliasing, org.freedesktop.Telepathy.Connection.Interface.Avatars, org.freedesktop.Telepathy.Connection.Interface.SimplePresence, org.freedesktop.Telepathy.Connection.Interface.ContactCapabilities, org.freedesktop.Telepathy.Connection.Interface.ContactInfo {
 	data {
 		/* Properties */
 		Interfaces = @as [
@@ -163,9 +101,10 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 			"org.freedesktop.Telepathy.Connection.Interface.Avatars",
 			"org.freedesktop.Telepathy.Connection.Interface.SimplePresence",
 			"org.freedesktop.Telepathy.Connection.Interface.ContactCapabilities",
+			"org.freedesktop.Telepathy.Connection.Interface.ContactInfo",
 		];
 		SelfHandle = 1u;
-		Status = 1u; /* HACK */
+		Status = 0u;
 		HasImmortalHandles = true;
 
 		/* Conn.I.Contacts */
@@ -175,6 +114,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 			"org.freedesktop.Telepathy.Connection.Interface.Avatars",
 			"org.freedesktop.Telepathy.Connection.Interface.SimplePresence",
 			"org.freedesktop.Telepathy.Connection.Interface.ContactCapabilities",
+			"org.freedesktop.Telepathy.Connection.Interface.ContactInfo",
 		];
 
 		/* Conn.I.Requests. */
@@ -199,105 +139,39 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 		}?;
 		MaximumStatusMessageLength = 100u?;
 
-		_Protocol = "protocol";
-		_Handles = {
-			1u : "John",
-			2u : "James",
-			3u : "Brian",
-			4u : "Sam",
-		}?;
-		/*_ClientInterests : TODO*/
-		_DesiredStatus = 0u; /* HACK */
-		/*_Channels : TODO*/
+		/* Conn.I.ContactInfo */
+		ContactInfoFlags = 1u?; /* Can_Set */
+		SupportedFields = [
+			("tel", ["type=home"]?, 1u?, 1u?),
+			("tel", ["type=cell"]?, 1u?, 1u?),
+			("adr", @as []?, 1u?, 1u?),
+			("bday", @as []?, 1u?, 1u?),
+			("email", ["type=internet"]?, 1u?, 1u?),
+			("fn", @as []?, 1u?, 1u?),
+			("org", @as []?, 1u?, 1u?),
+			("url", ["type=home"]?, 1u?, 1u?),
+		]?;
 	}
 
 	states {
-		/*Disconnected;*/
-		Connecting;
-		Disconnected; /* HACK */
 		Connected;
 	}
 
-	transition inside Disconnected, inside Connecting, inside Connected on method GetInterfaces {
+	transition inside Connected on method GetInterfaces {
 		reply (object->Interfaces);
 	}
 
-	/* Potentially simulate an older CM */
-	transition inside Disconnected on method GetInterfaces {
-		throw Disconnected;
-	}
-
-	transition inside Disconnected on method GetProtocol {
-		reply (object->_Protocol);
-	}
-
-	/* Deprecated. Empathy keeps calling it, though, which may be a bug. TODO: Investigate. */
-	transition inside Disconnected on method GetSelfHandle {
-		reply (0u);
-	}
-	transition inside Connecting, inside Connected on method GetSelfHandle {
+	transition inside Connected on method GetSelfHandle {
 		reply (object->SelfHandle);
 	}
 
-	transition inside Disconnected, inside Connecting, inside Connected on method GetStatus {
+	transition inside Connected on method GetStatus {
 		reply (object->Status);
 	}
 
-	transition inside Disconnected on method HoldHandles {
-		throw Disconnected;
-	}
-
-	transition inside Disconnected on method InspectHandles {
-		throw Disconnected;
-	}
-
-	transition inside Disconnected on method ReleaseHandles {
-		throw Disconnected;
-	}
-
-	transition inside Disconnected on method RequestHandles {
-		throw Disconnected;
-	}
-
-	/* TODO: transition inside Disconnected on method AddClientInterest {
-		TODO: Worth implementing?
-	} */
-
-	transition inside Disconnected on method Connect {
-		object->_DesiredStatus = 0u;
-		/* Status change is effected as a random transition */
-		reply ();
-	}
-
-	/* TODO: transition inside Disconnected on method Disconnect {} */
-
-	transition from Disconnected to Connecting on random {
-		precondition { object->_DesiredStatus != 2u }
-
-		object->Status = 1u;
-		emit StatusChanged (object->Status, 0u?);
-	}
-
-	transition from Connecting to Connected on random {
-		precondition { object->_DesiredStatus == 0u }
-
-		object->Status = 0u;
-		emit StatusChanged (object->Status, 0u?);
-	}
-
-	transition inside Disconnected on random {
-		emit ConnectionError ("org.freedesktop.Telepathy.Error.ConnectionRefused"?, {
-			"debug-message" : <""?>,
-			"server-message" : <""?>,
-			"user-requested" : <true?>,
-			"expected-hostname" : <""?>,
-			"certificate-hostname" : <""?>,
-		}?);
-	}
-
-	transition inside Connecting, inside Connected on method GetContactAttributes {
-		reply (pairKeys (Handles, { /* TODO: Hacky */
-			"org.freedesktop.Telepathy.Connection/contact-id" : <""?>,
+	transition inside Connected on method GetContactAttributes {
+		reply (pairKeys (Handles, {
+			"org.freedesktop.Telepathy.Connection/contact-id" : <"foo@example.com"?>,
 			"org.freedesktop.Telepathy.Connection.Interface.Aliasing/alias" : <""?>,
 			"org.freedesktop.Telepathy.Connection.Interface.Avatars/token" : <""?>,
 			"org.freedesktop.Telepathy.Connection.Interface.SimplePresence/presence" : <(3u?, "available"?, "Status message!"?)>,
@@ -310,11 +184,19 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 					"org.freedesktop.Telepathy.somethingelse",
 				]?,
 			)]?>,
-			/* etc. */
+			"org.freedesktop.Telepathy.Connection.Interface.ContactInfo/info" : <[
+				("fn", @as []?, ["Wee Ninja"]?),
+				("org", @as []?, ["Collabora, Ltd.", "Management Division", "Human Resources; Company Policy Enforcement"]?),
+				("adr", ["type=work", "type=postal", "type=parcel"]?, ["", "", "11 Kings Parade", "Cambridge", "Cambridgeshire", "CB2 1SJ", "UK"]?),
+				("tel", ["type=voice", "type=work"]?, ["+44 1223 362967"]?),
+				("bday", @as []?, ["2000-01-01"]?),
+				("email", ["type=work"]?, ["foo@example.baz"]?),
+				("url", ["type=home"]?, ["http://example.com/"]?),
+			]?>,
 		}?));
 	}
 
-	transition inside Connecting, inside Connected on method EnsureChannel {
+	transition inside Connected on method EnsureChannel {
 		precondition throwing NotImplemented {
 			dictGet (Request, "org.freedesktop.Telepathy.Channel.ChannelType", <"">) == <"org.freedesktop.Telepathy.Channel.Type.ContactList"> &&
 			dictGet (Request, "org.freedesktop.Telepathy.Channel.TargetID", <"">) == <"subscribe">
@@ -331,7 +213,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 		reply (true, @o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe", @a{sv} []);
 	}
 
-	transition inside Connecting, inside Connected on random {
+	transition inside Connected on random {
 		object->Channels = arrayInsert (object->Channels, 0u, (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe", {
 			"org.freedesktop.Telepathy.Channel.ChannelType" : <"org.freedesktop.Telepathy.Channel.Type.ContactList">,
 			"org.freedesktop.Telepathy.Channel.TargetHandleType" : <3u>,
@@ -345,7 +227,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 		                 "org.freedesktop.Telepathy.Channel.Type.ContactList", 3u, 0u?, false?);
 	}
 
-	transition inside Connecting, inside Connected on random {
+	transition inside Connected on random {
 		object->Channels = arrayInsert (object->Channels, 0u, (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/group1", {
 			"org.freedesktop.Telepathy.Channel.ChannelType" : <"org.freedesktop.Telepathy.Channel.Type.ContactList">,
 			"org.freedesktop.Telepathy.Channel.TargetHandleType" : <4u>,
@@ -359,53 +241,41 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 		                 "org.freedesktop.Telepathy.Channel.Type.ContactList", 4u, 0u?, false?);
 	}
 
-	transition inside Connecting, inside Connected on random {
+	transition inside Connected on random {
 		precondition { arrayGet (object->Channels, 0u, (@o "/p", @a{sv} {})) != (@o "/p", @a{sv} {}) }
 
 		emit ChannelClosed (structHead (arrayGet (object->Channels, 0u, (@o "/p", @a{sv} {}))));
 		object->Channels = arrayRemove (object->Channels, 0u);
 	}
 
-	/*transition inside Connecting, inside Connected on method EnsureChannel {
-		throw Disconnected; TODO: other errors
-	}*/
-
-	transition inside Disconnected on method GetAliasFlags {
-		throw Disconnected;
-	}
-
-	transition inside Connecting, inside Connected on method GetAliasFlags {
+	transition inside Connected on method GetAliasFlags {
 		reply (0u?);
 	}
 
-	transition inside Disconnected, inside Connecting, inside Connected on random {
+	transition inside Connected on random {
 		emit AvatarUpdated (0u?, ""?);
 	}
 
-	transition inside Disconnected, inside Connecting, inside Connected on random {
+	transition inside Connected on random {
 		emit AvatarRetrieved (0u?, ""?, @ay [
 			255y, 216y /* JPEG SOI; see if that gets us anywhere */
 		]?, "image/jpeg"?);
 	}
 
-	transition inside Connecting, inside Connected on method RequestAvatars {
+	transition inside Connected on method RequestAvatars {
 		/* Do nothing specific. AvatarRetrieved will be emitted randomly at some point in the future. Possibly even for the contacts the client's requested. */
 		reply ();
 	}
 
-	transition inside Disconnected on method RequestAvatars {
-		throw Disconnected;
-	}
-
-	transition inside Connecting, inside Connected on method RequestAvatars {
+	transition inside Connected on method RequestAvatars {
 		throw InvalidHandle;
 	}
 
-	transition inside Disconnected, inside Connecting, inside Connected on random {
+	transition inside Connected on random {
 		emit PresencesChanged (pairKeys (@au [0u]?, (6u?, "busy"?, "I’m busy."?)));
 	}
 
-	transition inside Disconnected, inside Connecting, inside Connected on random {
+	transition inside Connected on random {
 		emit ContactCapabilitiesChanged (pairKeys (@au [0u]?, [(
 			{
 				"org.freedesktop.Telepathy.something" : <""?>,
@@ -415,6 +285,18 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 				"org.freedesktop.Telepathy.somethingelse",
 			]?,
 		)]?));
+	}
+
+	transition inside Connected on random {
+		emit ContactInfoChanged (0u?, [
+			("fn", @as []?, ["Wee Ninja"]?),
+			("org", @as []?, ["Collabora, Ltd.", "Management Division", "Human Resources; Company Policy Enforcement"]?),
+			("adr", ["type=work", "type=postal", "type=parcel"]?, ["", "", "11 Kings Parade", "Cambridge", "Cambridgeshire", "CB2 1SJ", "UK"]?),
+			("tel", ["type=voice", "type=work"]?, ["+44 1223 362967"]?),
+			("bday", @as []?, ["2000-01-01"]?),
+			("email", ["type=work"]?, ["foo@example.baz"]?),
+			("url", ["type=home"]?, ["http://example.com/"]?),
+		]?);
 	}
 }
 
@@ -426,7 +308,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe i
 			"org.freedesktop.Telepathy.Channel.Type.ContactList",
 			"org.freedesktop.Telepathy.Channel",
 			"org.freedesktop.Telepathy.Channel.Interface.Group",
-		]?;
+		];
 		TargetHandle = 0u?;
 		TargetID = "subscribe";
 		TargetHandleType = 3u;
@@ -435,16 +317,27 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe i
 		InitiatorID = ""?;
 
 		/* Channel.I.Group */
-		GroupFlags = 4096u; /* Members_Changed_Detailed */
+		GroupFlags = 6144u; /* Properties | Members_Changed_Detailed */
 		HandleOwners = @a{uu} {};
 		LocalPendingMembers = @a(uuus) [];
-		Members = @au [];
+		Members = @au [ 1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u, 9u, 10u ];
 		RemotePendingMembers = @au [];
 		SelfHandle = 0u;
-		MemberIdentifiers = @a{us} {};
+		MemberIdentifiers = @a{us} {
+			1u : "1@example.com",
+			2u : "2@example.com",
+			3u : "3@example.com",
+			4u : "4@example.com",
+			5u : "5@example.com",
+			6u : "6@example.com",
+			7u : "7@example.com",
+			8u : "8@example.com",
+			9u : "9@example.com",
+			10u : "10@example.com",
+		};
 
 		/* Temporaries */
-		_MemberCount = 0u;
+		_MemberCount = 10u;
 	}
 
 	states {
@@ -461,7 +354,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe i
 		object->Members = arrayInsert (object->Members, 0u, object->_MemberCount);
 		object->MemberIdentifiers = dictSet (object->MemberIdentifiers, object->_MemberCount, "foo@example.com"?);
 
-		emit MembersChangedDetailed ([object->_MemberCount], @au [], @au [], @au [], @a{sv} {});
+		emit MembersChangedDetailed ([object->_MemberCount + 1u], @au [], @au [], @au [], @a{sv} {});
 
 		object->_MemberCount = object->_MemberCount + 1u;
 	}
@@ -474,7 +367,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe i
 		object->Members = arrayRemove (object->Members, 0u);
 		object->MemberIdentifiers = dictUnset (object->MemberIdentifiers, object->_MemberCount);
 
-		emit MembersChangedDetailed (@au [], [object->_MemberCount], @au [], @au [], @a{sv} {});
+		emit MembersChangedDetailed (@au [], [object->_MemberCount + 1u], @au [], @au [], @a{sv} {});
 	}
 
 	transition inside Open on method GetHandle {
@@ -506,7 +399,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/group1 impl
 			"org.freedesktop.Telepathy.Channel.Type.ContactList",
 			"org.freedesktop.Telepathy.Channel",
 			"org.freedesktop.Telepathy.Channel.Interface.Group",
-		]?;
+		];
 		TargetHandle = 0u?;
 		TargetID = "group1";
 		TargetHandleType = 4u;
@@ -515,16 +408,21 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/group1 impl
 		InitiatorID = ""?;
 
 		/* Channel.I.Group */
-		GroupFlags = 4096u; /* Members_Changed_Detailed */
+		GroupFlags = 6144u; /* Properties | Members_Changed_Detailed */
 		HandleOwners = @a{uu} {};
 		LocalPendingMembers = @a(uuus) [];
-		Members = @au [];
+		Members = @au [ 1u, 2u, 3u, 4u ];
 		RemotePendingMembers = @au [];
 		SelfHandle = 0u;
-		MemberIdentifiers = @a{us} {};
+		MemberIdentifiers = @a{us} {
+			1u : "1@example.com",
+			2u : "2@example.com",
+			3u : "3@example.com",
+			4u : "4@example.com",
+		};
 
 		/* Temporaries */
-		_MemberCount = 0u;
+		_MemberCount = 4u;
 	}
 
 	states {
@@ -541,7 +439,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/group1 impl
 		object->Members = arrayInsert (object->Members, 0u, object->_MemberCount);
 		object->MemberIdentifiers = dictSet (object->MemberIdentifiers, object->_MemberCount, "foo@example.com"?);
 
-		emit MembersChangedDetailed ([object->_MemberCount], @au [], @au [], @au [], @a{sv} {});
+		emit MembersChangedDetailed ([object->_MemberCount + 1u], @au [], @au [], @au [], @a{sv} {});
 
 		object->_MemberCount = object->_MemberCount + 1u;
 	}
@@ -554,7 +452,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/group1 impl
 		object->Members = arrayRemove (object->Members, 0u);
 		object->MemberIdentifiers = dictUnset (object->MemberIdentifiers, object->_MemberCount);
 
-		emit MembersChangedDetailed (@au [], [object->_MemberCount], @au [], @au [], @a{sv} {});
+		emit MembersChangedDetailed (@au [], [object->_MemberCount + 1u], @au [], @au [], @a{sv} {});
 	}
 
 	transition inside Open on method GetHandle {

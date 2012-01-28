@@ -32,6 +32,28 @@ object at /org/gnome/evolution/dataserver/AddressBook implements org.gnome.evolu
 		Authenticated;
 	}
 
+	/* Unsuccessful async open call. */
+	transition inside Closed on method open {
+		throw ArbitraryError;
+	}
+
+	/* Successful async open call with authentication. */
+	transition from Closed to Opening on method open {
+		reply (object->_opid_counter);
+		emit auth_required (["credential1"?, "credential2"?]?);
+	}
+	transition from Opening to Authenticated, inside Authenticated on method authenticate_user {
+		emit open_done (object->_opid_counter, "", "");
+
+		object->_opid_counter = object->_opid_counter + 1u;
+		reply ();
+	}
+
+	/* Failed authentication. */
+	transition from Opening to Authenticated on method authenticate_user {
+		throw ArbitraryError;
+	}
+
 	/* Successful async open call without authentication. */
 	transition from Closed to Authenticated on method open {
 		reply (object->_opid_counter);
@@ -55,6 +77,16 @@ object at /org/gnome/evolution/dataserver/AddressBook implements org.gnome.evolu
 		/* Nothing to see here. */
 		reply ();
 	}
+
+	transition inside Closed, inside Opening, inside Authenticated on method close {
+		throw ArbitraryError;
+	}
+
+	/* Arbitrary online/opened/readonly errors. */
+	transition inside Closed, inside Opening, inside Authenticated on random { emit online (true?); }
+	transition inside Closed, inside Opening, inside Authenticated on random { emit opened (["", ""]); }
+	transition inside Closed, inside Opening, inside Authenticated on random { emit readonly (false?); }
+	transition inside Closed, inside Opening, inside Authenticated on random { emit backend_property_changed (["key"?, "value"?]?); }
 
 	/* Properties. */
 	transition inside Authenticated on method get_backend_property {
