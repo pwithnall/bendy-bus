@@ -1499,20 +1499,55 @@ fuzz_string (const gchar *default_value)
 			break;
 		}
 		case ADD_SEPARATORS: {
-			guint i;
+			guint old_i, i, j;
+			glong default_value_length_unicode;
+			gchar *temp;
 
 			/* Letter replacement with block separators. Much the same as with normal letter replacement, except we replace letters with
 			 * block separators only. The separators are only ever 1 byte long, so we can allocate a fuzzy string of the same length as
 			 * the original. */
-			fuzzy_string = g_strdup (default_value);
-			fuzzy_string_length = default_value_length;
+			default_value_length_unicode = g_utf8_strlen (default_value, -1);
+			fuzzy_string = g_malloc (default_value_length + 1);
+			temp = fuzzy_string;
 
-			i = g_random_int_range (0, fuzzy_string_length + 1);
+			old_i = 0;
+			i = g_random_int_range (0, default_value_length_unicode + 1);
 
-			while (i < fuzzy_string_length) {
-				fuzzy_string[i] = random_block_separators[g_random_int_range (0, G_N_ELEMENTS (random_block_separators))];
-				i += g_random_int_range (i + 1, fuzzy_string_length + 1);
+			while (i < default_value_length_unicode) {
+				guint sep;
+
+				/* Copy the chunk between the previously replaced character and the next character to replace
+				 * (at character offset i). */
+				for (j = old_i; j < i; j++) {
+					const gchar *next_char = g_utf8_find_next_char (default_value, NULL);
+
+					while (default_value < next_char) {
+						*(temp++) = *(default_value++);
+					}
+				}
+
+				/* Replace character i. */
+				sep = g_random_int_range (0, G_N_ELEMENTS (random_block_separators));
+				*(temp++) = random_block_separators[sep];
+				default_value = g_utf8_next_char (default_value);
+
+				/* Choose the next character to replace. */
+				old_i = i + 1;
+				i = g_random_int_range (old_i, default_value_length_unicode + 1);
 			}
+
+			/* Copy the final chunk. */
+			for (j = old_i; j < i; j++) {
+				const gchar *next_char = g_utf8_find_next_char (default_value, NULL);
+
+				while (default_value < next_char) {
+					*(temp++) = *(default_value++);
+				}
+			}
+
+			*temp = '\0';
+
+			fuzzy_string_length = temp - fuzzy_string;
 
 			break;
 		}
