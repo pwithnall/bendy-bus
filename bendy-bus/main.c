@@ -58,6 +58,7 @@ static gboolean run_infinitely = FALSE;
 static GPtrArray *test_program_environment = NULL;
 static gboolean pass_through_environment = FALSE;
 static gchar *dbus_daemon_config_file_path = NULL;
+static guint unfuzzed_transition_limit = 0;
 
 static gboolean
 option_env_parse_cb (const gchar *option_name, const gchar *value, gpointer data, GError **error)
@@ -114,6 +115,8 @@ static const GOptionEntry testing_entries[] = {
 	{ "run-time", 'r', 0, G_OPTION_ARG_INT, &run_time, N_("Maximum time (in seconds) the set of test runs should take"), N_("SECS") },
 	{ "run-iters", 'n', 0, G_OPTION_ARG_INT, &run_iters, N_("Maximum number of test runs which should be performed (default: 1)"), N_("COUNT") },
 	{ "run-infinitely", 'i', 0, G_OPTION_ARG_NONE, &run_infinitely, N_("Run test runs in an infinite loop"), NULL },
+	{ "unfuzzed-transition-limit", 'u', 0, G_OPTION_ARG_INT, &unfuzzed_transition_limit,
+	  N_("Number of unfuzzed transitions to execute before enabling fuzzing (default: 0)"), N_("COUNT") },
 	{ NULL }
 };
 
@@ -388,6 +391,8 @@ restart_simulation (MainData *data)
 		dfsm_object_reset (simulated_object);
 	}
 
+	dfsm_object_factory_set_unfuzzed_transition_limit (unfuzzed_transition_limit);
+
 	/* Re-spawn the program under test. */
 	spawn_test_program (data);
 }
@@ -468,6 +473,8 @@ start_simulation (MainData *data)
 
 	data->test_program_spawn_end_signal = g_signal_connect (data->test_program, "spawn-end", (GCallback) test_program_spawn_end_cb, data);
 	data->test_program_process_died_signal = g_signal_connect (data->test_program, "process-died", (GCallback) test_program_died_cb, data);
+
+	dfsm_object_factory_set_unfuzzed_transition_limit (unfuzzed_transition_limit);
 
 	/* Spawn the program under test. */
 	spawn_test_program (data);
