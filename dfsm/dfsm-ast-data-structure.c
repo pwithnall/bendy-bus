@@ -1540,6 +1540,7 @@ whitespace:
 
 	if (fuzzy_string == NULL) {
 		fuzzy_string = g_strdup (default_value);
+		fuzzy_string_length = default_value_length;
 	}
 
 	/* Sanity check. */
