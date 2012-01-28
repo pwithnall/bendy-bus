@@ -1061,11 +1061,13 @@ find_random_block_with_separator (const gchar *input, gsize input_length /* byte
 	*block_end = i;
 }
 
+static const gchar random_block_separators[] = { '/', '.', ':', ',', ';', '=', '\n' };
+
 static gsize
 find_random_block (const gchar *input, gsize input_length /* bytes */, const gchar **block_start_out, const gchar **block_end_out)
 {
-	gboolean has_slash = FALSE, has_dot = FALSE, has_colon = FALSE, has_comma = FALSE;
-	guint num_characters_found = 0, distribution;
+	gboolean has_separator[G_N_ELEMENTS (random_block_separators)] = { FALSE, };
+	guint j, num_separators_found = 0 /* number of _distinct_ separators found */, distribution;
 	const gchar *i, *block_start, *block_end;
 
 	g_assert (input != NULL);
@@ -1081,23 +1083,16 @@ find_random_block (const gchar *input, gsize input_length /* bytes */, const gch
 	/* We use a uniform distribution over all separators _which exist_. We consider these four characters to be common separators for blocks of
 	 * text, which is true in the D-Bus world. Dots are used in interface names and slashes are used in object paths. Commas and colons are not
 	 * specifically used in D-Bus, but are commonly used elsewhere in software. */
-	for (i = input; num_characters_found < 4 && ((gsize) (i - input)) < input_length; i++) {
-		if (*i == '/' && has_slash == FALSE) {
-			has_slash = TRUE;
-			num_characters_found++;
-		} else if (*i == '.' && has_dot == FALSE) {
-			has_dot = TRUE;
-			num_characters_found++;
-		} else if (*i == ':' && has_colon == FALSE) {
-			has_colon = TRUE;
-			num_characters_found++;
-		} else if (*i == ',' && has_comma == FALSE) {
-			has_comma = TRUE;
-			num_characters_found++;
+	for (i = input; num_separators_found < G_N_ELEMENTS (random_block_separators) && ((gsize) (i - input)) < input_length; i++) {
+		for (j = 0; j < G_N_ELEMENTS (random_block_separators); j++) {
+			if (*i == random_block_separators[j] && has_separator[j] == FALSE) {
+				has_separator[j] = TRUE;
+				num_separators_found++;
+			}
 		}
 	}
 
-	if (num_characters_found == 0) {
+	if (num_separators_found == 0) {
 		guint32 start_offset;
 		glong input_length_unicode = g_utf8_strlen (input, input_length);
 
@@ -1111,41 +1106,25 @@ find_random_block (const gchar *input, gsize input_length /* bytes */, const gch
 		goto done;
 	}
 
-	/* Since we know that there's at least one instance of at least one of the four separator characters in the input, randomly choose a separator
-	 * character and find a block delimited by it. */
+	/* Since we know that there's at least one instance of at least one of the separator characters in the input, randomly choose a separator
+	 * character and find a block delimited by it. We do this by examining which separators were found, skipping over separators which weren't
+	 * found, and choosing the first separator whose probability interval the distribution random variable falls into. */
 	distribution = g_random_int ();
 
-	if (distribution < G_MAXUINT32 / num_characters_found) {
-		// Could be any of the characters.
-		if (has_slash == TRUE) {
-			find_random_block_with_separator (input, input_length, '/', &block_start, &block_end);
-		} else if (has_dot == TRUE) {
-			find_random_block_with_separator (input, input_length, '.', &block_start, &block_end);
-		} else if (has_colon == TRUE) {
-			find_random_block_with_separator (input, input_length, ':', &block_start, &block_end);
-		} else {
-			find_random_block_with_separator (input, input_length, ',', &block_start, &block_end);
+	for (j = 0; j < G_N_ELEMENTS (has_separator); j++) {
+		if (has_separator[j] == TRUE) {
+			if (distribution < G_MAXUINT32 / num_separators_found) {
+				/* RV falls into this separator's probability interval. We're done. */
+				find_random_block_with_separator (input, input_length, random_block_separators[j], &block_start, &block_end);
+				goto done;
+			}
+
+			/* Decrement the RV to make the comparison next time round easier. */
+			distribution -= G_MAXUINT32 / num_separators_found;
 		}
-	} else if (distribution < 2 * (G_MAXUINT32 / num_characters_found)) {
-		// Can't be the first character.
-		if (has_dot == TRUE) {
-			find_random_block_with_separator (input, input_length, '.', &block_start, &block_end);
-		} else if (has_colon == TRUE) {
-			find_random_block_with_separator (input, input_length, ':', &block_start, &block_end);
-		} else {
-			find_random_block_with_separator (input, input_length, ',', &block_start, &block_end);
-		}
-	} else if (distribution < 3 * (G_MAXUINT32 / num_characters_found)) {
-		// Can't be the second character.
-		if (has_colon == TRUE) {
-			find_random_block_with_separator (input, input_length, ':', &block_start, &block_end);
-		} else {
-			find_random_block_with_separator (input, input_length, ',', &block_start, &block_end);
-		}
-	} else {
-		// Must be a comma.
-		find_random_block_with_separator (input, input_length, ',', &block_start, &block_end);
 	}
+
+	g_assert_not_reached ();
 
 done:
 	g_assert (block_start <= block_end);
