@@ -17,6 +17,7 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <float.h>
 #include <glib.h>
 
 #ifndef DFSM_PROBABILITIES_H
@@ -74,7 +75,8 @@ G_BEGIN_DECLS
 		_DFSM_DISTRIBUTION_LIST_UINT32(N, __VA_ARGS__,) \
 	}; \
 \
-	G_STATIC_ASSERT (_DFSM_DISTRIBUTION_SUM(N, __VA_ARGS__,) == 1.0); \
+	gdouble diff = (_DFSM_DISTRIBUTION_SUM(N, __VA_ARGS__,)) - 1.0; \
+	G_STATIC_ASSERT (diff < DBL_EPSILON && -diff > DBL_EPSILON); \
 \
 	switch ((enum TempEnum) dfsm_random_nonuniform_distribution (intervals, N)) { \
 		default: \
