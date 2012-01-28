@@ -605,7 +605,7 @@ dfsm_object_dbus_set_property (GDBusConnection *connection, const gchar *sender,
 		/* Schedule a notification. */
 		builder = g_variant_builder_new (G_VARIANT_TYPE_ARRAY);
 		g_variant_builder_add (builder, "{sv}", property_name, value);
-		parameters = g_variant_new ("(sa{sv}as)", interface_name, builder, NULL);
+		parameters = g_variant_ref_sink (g_variant_new ("(sa{sv}as)", interface_name, builder, NULL));
 
 		dfsm_output_sequence_add_emit (output_sequence, "org.freedesktop.DBus.Properties", "PropertiesChanged", parameters);
 
