@@ -66,10 +66,10 @@ GType dfsm_machine_get_type (void) G_GNUC_CONST;
 void dfsm_machine_reset_state (DfsmMachine *self);
 
 void dfsm_machine_call_method (DfsmMachine *self, DfsmOutputSequence *output_sequence, const gchar *interface_name, const gchar *method_name,
-                               GVariant *parameters);
+                               GVariant *parameters, gboolean enable_fuzzing);
 gboolean dfsm_machine_set_property (DfsmMachine *self, DfsmOutputSequence *output_sequence, const gchar *interface_name, const gchar *property_name,
-                                    GVariant *value);
-void dfsm_machine_make_arbitrary_transition (DfsmMachine *self, DfsmOutputSequence *output_sequence);
+                                    GVariant *value, gboolean enable_fuzzing);
+void dfsm_machine_make_arbitrary_transition (DfsmMachine *self, DfsmOutputSequence *output_sequence, gboolean enable_fuzzing);
 
 DfsmEnvironment *dfsm_machine_get_environment (DfsmMachine *self) G_GNUC_PURE;
 

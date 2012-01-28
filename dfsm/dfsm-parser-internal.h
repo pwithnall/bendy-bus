@@ -102,6 +102,8 @@ G_GNUC_INTERNAL void dfsm_ast_data_structure_set_weight (DfsmAstDataStructure *s
 G_GNUC_INTERNAL void dfsm_ast_data_structure_set_type_annotation (DfsmAstDataStructure *self, const gchar *type_annotation);
 G_GNUC_INTERNAL void dfsm_ast_data_structure_set_nickname (DfsmAstDataStructure *self, const gchar *nickname);
 
+G_GNUC_INTERNAL void dfsm_ast_data_structure_set_fuzzing_enabled (gboolean enable);
+
 #include "dfsm-ast-expression-binary.h"
 
 G_GNUC_INTERNAL DfsmAstExpression *dfsm_ast_expression_binary_new (DfsmAstExpressionBinaryType expression_type, DfsmAstExpression *left_node,

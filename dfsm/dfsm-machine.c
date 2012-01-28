@@ -180,7 +180,7 @@ get_state_name (DfsmMachine *self, DfsmMachineStateNumber state_number)
 
 /* Return value: whether the machine changed state */
 static gboolean
-execute_transition (DfsmMachine *self, DfsmAstObjectTransition *object_transition, DfsmOutputSequence *output_sequence)
+execute_transition (DfsmMachine *self, DfsmAstObjectTransition *object_transition, DfsmOutputSequence *output_sequence, gboolean enable_fuzzing)
 {
 	DfsmMachinePrivate *priv = self->priv;
 	gchar *friendly_transition_name;
@@ -190,6 +190,7 @@ execute_transition (DfsmMachine *self, DfsmAstObjectTransition *object_transitio
 	         get_state_name (self, object_transition->to_state));
 	g_free (friendly_transition_name);
 
+	dfsm_ast_data_structure_set_fuzzing_enabled (enable_fuzzing);
 	dfsm_ast_transition_execute (object_transition->transition, priv->environment, output_sequence);
 
 	/* Various possibilities for return values. */
@@ -211,7 +212,8 @@ execute_transition (DfsmMachine *self, DfsmAstObjectTransition *object_transitio
 }
 
 static gboolean
-find_and_execute_random_transition (DfsmMachine *self, DfsmOutputSequence *output_sequence, GPtrArray/*<DfsmAstObjectTransition>*/ *possible_transitions)
+find_and_execute_random_transition (DfsmMachine *self, DfsmOutputSequence *output_sequence, GPtrArray/*<DfsmAstObjectTransition>*/ *possible_transitions,
+                                    gboolean enable_fuzzing)
 {
 	DfsmMachinePrivate *priv = self->priv;
 	guint i, rand_offset;
@@ -278,7 +280,8 @@ find_and_execute_random_transition (DfsmMachine *self, DfsmOutputSequence *outpu
 		}
 
 		/* If this transition contains a ‘throw’ statement, check if we really want to execute it. */
-		if (dfsm_ast_transition_contains_throw_statement (transition) == TRUE && DFSM_BIASED_COIN_FLIP (0.8)) {
+		if (dfsm_ast_transition_contains_throw_statement (transition) == TRUE &&
+		    (enable_fuzzing == FALSE || DFSM_BIASED_COIN_FLIP (0.8))) {
 			gchar *friendly_transition_name;
 
 			/* Skip the transition, but keep a record of it in case we find there are no other transitions whose preconditions pass and
@@ -298,7 +301,7 @@ find_and_execute_random_transition (DfsmMachine *self, DfsmOutputSequence *outpu
 		precondition_failure_transition = NULL;
 		candidate_object_transition = NULL;
 
-		execute_transition (self, object_transition, output_sequence);
+		execute_transition (self, object_transition, output_sequence, enable_fuzzing);
 		outputted = TRUE;
 
 		break;
@@ -313,7 +316,7 @@ find_and_execute_random_transition (DfsmMachine *self, DfsmOutputSequence *outpu
 	/* If we found a candidate transition but then skipped it due to it containing ‘throw’ statements, and didn't subsequently find a better
 	 * transition, execute the previous candidate transition now. */
 	if (candidate_object_transition != NULL) {
-		execute_transition (self, candidate_object_transition, output_sequence);
+		execute_transition (self, candidate_object_transition, output_sequence, enable_fuzzing);
 		outputted = TRUE;
 	}
 
@@ -328,6 +331,7 @@ done:
  * dfsm_machine_make_arbitrary_transition:
  * @self: a #DfsmMachine
  * @output_sequence: an output sequence to append effects of the transition to
+ * @enable_fuzzing: %TRUE to enable fuzzing and error-throwing transitions, %FALSE to disable them
  *
  * Make an arbitrary (i.e. triggered randomly) transition in the machine's state, if one is available to be taken at the moment (e.g. its preconditions
  * are met). This should typically be called on a timer.
@@ -336,7 +340,7 @@ done:
  * those effects out onto the bus using dfsm_output_sequence_output().
  */
 void
-dfsm_machine_make_arbitrary_transition (DfsmMachine *self, DfsmOutputSequence *output_sequence)
+dfsm_machine_make_arbitrary_transition (DfsmMachine *self, DfsmOutputSequence *output_sequence, gboolean enable_fuzzing)
 {
 	DfsmMachinePrivate *priv;
 	GPtrArray/*<DfsmAstTransition>*/ *possible_transitions;
@@ -351,7 +355,7 @@ dfsm_machine_make_arbitrary_transition (DfsmMachine *self, DfsmOutputSequence *o
 	possible_transitions = priv->transitions.arbitrarily_triggered;
 
 	/* Find and potentially execute a transition. */
-	executed_transition = find_and_execute_random_transition (self, output_sequence, possible_transitions);
+	executed_transition = find_and_execute_random_transition (self, output_sequence, possible_transitions, enable_fuzzing);
 
 	if (executed_transition == FALSE) {
 		/* If we failed to execute a transition, log it and ignore it. */
@@ -479,6 +483,7 @@ dfsm_machine_reset_state (DfsmMachine *self)
  * @interface_name: the name of the D-Bus interface that @method_name is defined on
  * @method_name: the name of the D-Bus method to call
  * @parameters: parameters for the D-Bus method
+ * @enable_fuzzing: %TRUE to enable fuzzing and error-throwing transitions, %FALSE to disable them
  *
  * Call the given @method_name on the DFSM machine with the given @parameters as input. The method will be called synchronously, and its effects added
  * to the given @output_sequence, including its return value (if any). If the method throws a D-Bus error, that will be set in @output_sequence.
@@ -487,7 +492,7 @@ dfsm_machine_reset_state (DfsmMachine *self)
  */
 void
 dfsm_machine_call_method (DfsmMachine *self, DfsmOutputSequence *output_sequence, const gchar *interface_name, const gchar *method_name,
-                          GVariant *parameters)
+                          GVariant *parameters, gboolean enable_fuzzing)
 {
 	DfsmMachinePrivate *priv;
 	GPtrArray/*<DfsmAstObjectTransition>*/ *possible_transitions;
@@ -561,7 +566,7 @@ dfsm_machine_call_method (DfsmMachine *self, DfsmOutputSequence *output_sequence
 	}
 
 	/* Find and potentially execute a transition from the array. */
-	executed_transition = find_and_execute_random_transition (self, output_sequence, possible_transitions);
+	executed_transition = find_and_execute_random_transition (self, output_sequence, possible_transitions, enable_fuzzing);
 
 	/* Restore the environment. */
 	if (method_info->in_args != NULL) {
@@ -591,6 +596,7 @@ done:
  * @interface_name: the name of the D-Bus interface that @property_name is defined on
  * @method_name: the name of the D-Bus property to set
  * @value: new value for the property
+ * @enable_fuzzing: %TRUE to enable fuzzing and error-throwing transitions, %FALSE to disable them
  *
  * Set the given @property_name to @value on the DFSM machine. The property will be set synchronously.
  *
@@ -601,7 +607,7 @@ done:
  */
 gboolean
 dfsm_machine_set_property (DfsmMachine *self, DfsmOutputSequence *output_sequence, const gchar *interface_name, const gchar *property_name,
-                           GVariant *value)
+                           GVariant *value, gboolean enable_fuzzing)
 {
 	DfsmMachinePrivate *priv;
 	GPtrArray/*<DfsmAstObjectTransition>*/ *possible_transitions;
@@ -629,7 +635,7 @@ dfsm_machine_set_property (DfsmMachine *self, DfsmOutputSequence *output_sequenc
 	dfsm_environment_set_variable_value (priv->environment, DFSM_VARIABLE_SCOPE_LOCAL, "value", value);
 
 	/* Find and potentially execute a transition from the array. */
-	executed_transition = find_and_execute_random_transition (self, output_sequence, possible_transitions);
+	executed_transition = find_and_execute_random_transition (self, output_sequence, possible_transitions, enable_fuzzing);
 
 	/* Restore the environment. */
 	dfsm_environment_unset_variable_value (priv->environment, DFSM_VARIABLE_SCOPE_LOCAL, "value");

@@ -83,6 +83,10 @@ struct _DfsmObjectPrivate {
 	guint dbus_activity_count;
 };
 
+/* HACK: Apply to all DfsmObjects. Not thread-safe. */
+static guint unfuzzed_transition_count = 0;
+static guint unfuzzed_transition_limit = 0;
+
 enum {
 	PROP_CONNECTION = 1,
 	PROP_MACHINE,
@@ -487,6 +491,20 @@ dfsm_object_factory_from_files (const gchar *simulation_code, const gchar *intro
 	return object_array;
 }
 
+/**
+ * dfsm_object_factory_set_unfuzzed_transition_limit:
+ * @transition_limit: number of unfuzzed transitions to execute before enabling fuzzing and error-throwing transitions
+ *
+ * Set the number of unfuzzed transitions to execute before enabling fuzzing and error-throwing transitions, across all #DfsmObject<!-- -->s as an
+ * aggregate. May be zero.
+ */
+void
+dfsm_object_factory_set_unfuzzed_transition_limit (guint transition_limit)
+{
+	unfuzzed_transition_count = 0;
+	unfuzzed_transition_limit = transition_limit;
+}
+
 static void
 dfsm_object_dbus_method_call (GDBusConnection *connection, const gchar *sender, const gchar *object_path, const gchar *interface_name,
                               const gchar *method_name, GVariant *parameters, GDBusMethodInvocation *invocation, gpointer user_data)
@@ -508,7 +526,12 @@ dfsm_object_dbus_method_call (GDBusConnection *connection, const gchar *sender, 
 
 	/* Pass the method call through to the DFSM. */
 	output_sequence = DFSM_OUTPUT_SEQUENCE (dfsm_dbus_output_sequence_new (connection, object_path, invocation));
-	dfsm_machine_call_method (priv->machine, output_sequence, interface_name, method_name, parameters);
+	dfsm_machine_call_method (priv->machine, output_sequence, interface_name, method_name, parameters,
+	                          (unfuzzed_transition_count >= unfuzzed_transition_limit) ? TRUE : FALSE);
+
+	if (unfuzzed_transition_count < unfuzzed_transition_limit) {
+		unfuzzed_transition_count++;
+	}
 
 	/* Output the effect sequence resulting from the method call. */
 	dfsm_output_sequence_output (output_sequence, &child_error);
@@ -574,7 +597,8 @@ dfsm_object_dbus_set_property (GDBusConnection *connection, const gchar *sender,
 	/* Set the property on the machine. */
 	output_sequence = DFSM_OUTPUT_SEQUENCE (dfsm_dbus_output_sequence_new (connection, object_path, NULL));
 
-	if (dfsm_machine_set_property (priv->machine, output_sequence, interface_name, property_name, value) == TRUE) {
+	if (dfsm_machine_set_property (priv->machine, output_sequence, interface_name, property_name, value,
+	                               (unfuzzed_transition_count >= unfuzzed_transition_limit) ? TRUE : FALSE) == TRUE) {
 		GVariantBuilder *builder;
 		GVariant *parameters;
 
@@ -586,6 +610,10 @@ dfsm_object_dbus_set_property (GDBusConnection *connection, const gchar *sender,
 		dfsm_output_sequence_add_emit (output_sequence, "org.freedesktop.DBus.Properties", "PropertiesChanged", parameters);
 
 		g_variant_unref (parameters);
+	}
+
+	if (unfuzzed_transition_count < unfuzzed_transition_limit) {
+		unfuzzed_transition_count++;
 	}
 
 	/* Output effects of the transition. */
@@ -614,7 +642,12 @@ arbitrary_transition_timeout_cb (DfsmObject *self)
 
 	/* Make an arbitrary transition. */
 	output_sequence = DFSM_OUTPUT_SEQUENCE (dfsm_dbus_output_sequence_new (priv->connection, priv->object_path, NULL));
-	dfsm_machine_make_arbitrary_transition (self->priv->machine, output_sequence);
+	dfsm_machine_make_arbitrary_transition (self->priv->machine, output_sequence,
+	                                        (unfuzzed_transition_count >= unfuzzed_transition_limit) ? TRUE : FALSE);
+
+	if (unfuzzed_transition_count < unfuzzed_transition_limit) {
+		unfuzzed_transition_count++;
+	}
 
 	/* Output the transition's effects. */
 	dfsm_output_sequence_output (output_sequence, &child_error);
@@ -660,8 +693,10 @@ start_simulation (DfsmObject *self, GDBusConnection *connection, GSimpleAsyncRes
 	priv->dbus_activity_count = 0;
 	g_object_notify (G_OBJECT (self), "dbus-activity-count");
 
+	unfuzzed_transition_count = 0;
+
 	/* Start the DFSM. */
-	g_debug ("Starting the simulation.");
+	g_debug ("Starting the simulation. %u unfuzzed transitions to go.", unfuzzed_transition_limit);
 
 	/* Add a random timeout to the next potential arbitrary transition. */
 	schedule_arbitrary_transition (self);
@@ -958,6 +993,8 @@ dfsm_object_reset (DfsmObject *self)
 
 	self->priv->dbus_activity_count = 0;
 	g_object_notify (G_OBJECT (self), "dbus-activity-count");
+
+	unfuzzed_transition_count = 0;
 }
 
 /**

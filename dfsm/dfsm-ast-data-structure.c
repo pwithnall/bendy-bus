@@ -914,10 +914,26 @@ dfsm_ast_data_structure_calculate_type (DfsmAstDataStructure *self, DfsmEnvironm
 	return retval;
 }
 
+/* NOTE: Not thread safe. */
+static gboolean enable_fuzzing = TRUE;
+
+/**
+ * dfsm_ast_data_structure_set_fuzzing_enabled:
+ * @enable: %TRUE to enable fuzzing, %FALSE to disable it
+ *
+ * Set whether fuzzing should be performed on any AST data structures. If this is set to %TRUE, fuzzing will be performed on all data structures with
+ * a positive weight. If this is set to %FALSE, fuzzing will be performed on no data structures, and they will all just take their default value.
+ */
+void
+dfsm_ast_data_structure_set_fuzzing_enabled (gboolean enable)
+{
+	enable_fuzzing = enable;
+}
+
 static gboolean
 should_be_fuzzed (DfsmAstDataStructure *self)
 {
-	return (self->priv->weight > 0.0) ? TRUE : FALSE;
+	return (enable_fuzzing == TRUE && self->priv->weight > 0.0) ? TRUE : FALSE;
 }
 
 static gint64
