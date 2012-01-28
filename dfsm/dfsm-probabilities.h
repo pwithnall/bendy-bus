@@ -42,6 +42,7 @@ G_BEGIN_DECLS
 #define _DFSM_DISTRIBUTION_SEQ4(OP, TERM, first_name, first_p, ...) OP(first_name, _DFSM_DISTRIBUTION_SEQ3(OP, TERM, __VA_ARGS__))
 #define _DFSM_DISTRIBUTION_SEQ5(OP, TERM, first_name, first_p, ...) OP(first_name, _DFSM_DISTRIBUTION_SEQ4(OP, TERM, __VA_ARGS__))
 #define _DFSM_DISTRIBUTION_SEQ6(OP, TERM, first_name, first_p, ...) OP(first_name, _DFSM_DISTRIBUTION_SEQ5(OP, TERM, __VA_ARGS__))
+#define _DFSM_DISTRIBUTION_SEQ7(OP, TERM, first_name, first_p, ...) OP(first_name, _DFSM_DISTRIBUTION_SEQ6(OP, TERM, __VA_ARGS__))
 
 #define _DFSM_DISTRIBUTION_NOOP(A) A
 

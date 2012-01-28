@@ -1276,13 +1276,14 @@ fuzz_string (const gchar *default_value)
 
 	g_assert (default_value_length > 0);
 
-	DFSM_NONUNIFORM_DISTRIBUTION (6,
+	DFSM_NONUNIFORM_DISTRIBUTION (7,
 		CASE_CHANGE, 0.1, /* change the case of some letters */
-		REPLACE_LETTERS, 0.3, /* replace some letters with random replacements */
+		REPLACE_LETTERS, 0.2, /* replace some letters with random replacements */
 		DELETE_BLOCK, 0.1, /* delete a random block of text */
 		OVERWRITE_BLOCK, 0.2, /* overwrite a random block of text with a random replacement */
 		CLONE_BLOCK, 0.1, /* clone a random block of text to somewhere else in the string */
-		SWAP_BLOCKS, 0.2 /* swap two random blocks of text */
+		SWAP_BLOCKS, 0.2, /* swap two random blocks of text */
+		ADD_SEPARATORS, 0.1 /* replace letters with block separators at random locations */
 		/* Additionally, and independently, we randomly add whitespace to the start and end of the string with probability 0.2. */
 	)
 		case CASE_CHANGE: {
@@ -1478,6 +1479,24 @@ fuzz_string (const gchar *default_value)
 			strncpy (i, block2_end, default_value + default_value_length - block2_end);
 
 			fuzzy_string[fuzzy_string_length] = '\0';
+
+			break;
+		}
+		case ADD_SEPARATORS: {
+			guint i;
+
+			/* Letter replacement with block separators. Much the same as with normal letter replacement, except we replace letters with
+			 * block separators only. The separators are only ever 1 byte long, so we can allocate a fuzzy string of the same length as
+			 * the original. */
+			fuzzy_string = g_strdup (default_value);
+			fuzzy_string_length = default_value_length;
+
+			i = g_random_int_range (0, fuzzy_string_length + 1);
+
+			while (i < fuzzy_string_length) {
+				fuzzy_string[i] = random_block_separators[g_random_int_range (0, G_N_ELEMENTS (random_block_separators))];
+				i += g_random_int_range (i + 1, fuzzy_string_length + 1);
+			}
 
 			break;
 		}
