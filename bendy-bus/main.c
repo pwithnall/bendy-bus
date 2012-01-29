@@ -155,6 +155,7 @@ typedef struct {
 	DsimTestProgram *test_program;
 	gchar *test_program_name;
 	GPtrArray/*<string>*/ *test_program_argv;
+	GFile *working_directory_file;
 	DsimDBusDaemon *dbus_daemon;
 	gchar *dbus_address;
 	GDBusConnection *connection;
@@ -170,6 +171,7 @@ typedef struct {
 static void
 main_data_clear (MainData *data)
 {
+	g_clear_object (&data->working_directory_file);
 	g_clear_object (&data->connection);
 	g_free (data->dbus_address);
 	g_ptr_array_unref (data->simulated_objects);
@@ -657,8 +659,7 @@ dbus_daemon_notify_bus_address_cb (GObject *gobject, GParamSpec *pspec, MainData
 		}
 	}
 
-	data->test_program = dsim_test_program_new (g_file_new_for_path ("/tmp/test"), data->test_program_name, data->test_program_argv,
-	                                            test_program_envp);
+	data->test_program = dsim_test_program_new (data->working_directory_file, data->test_program_name, data->test_program_argv, test_program_envp);
 
 	g_ptr_array_unref (test_program_envp);
 
@@ -767,15 +768,17 @@ build_config_file (GFile *working_directory_file, gsize *length_out)
 }
 
 static void
-prepare_dbus_daemon_working_directory (GFile **working_directory_out, GFile **config_file_out, GError **error)
+prepare_dbus_daemon_working_directory (GFile **test_program_working_directory_out, GFile **dbus_daemon_working_directory_out,
+                                       GFile **config_file_out, GError **error)
 {
 	gchar *tmp_dir_path, *config_file;
 	gsize config_file_length;
-	GFile *tmp_dir_file = NULL, *tmp_dir_file_daemon = NULL, *tmp_dir_file_daemon_config = NULL;
+	GFile *tmp_dir_file = NULL, *tmp_dir_file_test_program = NULL, *tmp_dir_file_daemon = NULL, *tmp_dir_file_daemon_config = NULL;
 	GError *child_error = NULL;
 
 	/* Output. */
-	*working_directory_out = NULL;
+	*test_program_working_directory_out = NULL;
+	*dbus_daemon_working_directory_out = NULL;
 	*config_file_out = NULL;
 
 	/* Check if the user's provided a config file. */
@@ -796,8 +799,11 @@ prepare_dbus_daemon_working_directory (GFile **working_directory_out, GFile **co
 		/* If the file exists, take its parent directory as the working directory and return. */
 		tmp_dir_file_daemon = g_file_get_parent (tmp_dir_file_daemon_config);
 
-		*working_directory_out = tmp_dir_file_daemon;
+		*test_program_working_directory_out = g_object_ref (tmp_dir_file_daemon);
+		*dbus_daemon_working_directory_out = g_object_ref (tmp_dir_file_daemon);
 		*config_file_out = tmp_dir_file_daemon_config;
+
+		g_object_unref (tmp_dir_file_daemon);
 
 		return;
 	}
@@ -814,7 +820,16 @@ prepare_dbus_daemon_working_directory (GFile **working_directory_out, GFile **co
 	tmp_dir_file = g_file_new_for_path (tmp_dir_path);
 	g_free (tmp_dir_path);
 
-	/* Make a subdirectory for the dbus-daemon .*/
+	/* Make a subdirectory for the test program. */
+	tmp_dir_file_test_program = g_file_get_child (tmp_dir_file, "test-program");
+
+	g_file_make_directory (tmp_dir_file_test_program, NULL, &child_error);
+
+	if (child_error != NULL) {
+		goto error;
+	}
+
+	/* Make a subdirectory for the dbus-daemon. */
 	tmp_dir_file_daemon = g_file_get_child (tmp_dir_file, "dbus-daemon");
 
 	g_file_make_directory (tmp_dir_file_daemon, NULL, &child_error);
@@ -836,7 +851,8 @@ prepare_dbus_daemon_working_directory (GFile **working_directory_out, GFile **co
 	}
 
 	/* Success! */
-	*working_directory_out = tmp_dir_file_daemon;
+	*test_program_working_directory_out = tmp_dir_file_test_program;
+	*dbus_daemon_working_directory_out = tmp_dir_file_daemon;
 	*config_file_out = tmp_dir_file_daemon_config;
 
 	return;
@@ -853,6 +869,11 @@ error:
 	if (tmp_dir_file_daemon != NULL) {
 		g_file_delete (tmp_dir_file_daemon, NULL, NULL);
 		g_object_unref (tmp_dir_file_daemon);
+	}
+
+	if (tmp_dir_file_test_program != NULL) {
+		g_file_delete (tmp_dir_file_test_program, NULL, NULL);
+		g_object_unref (tmp_dir_file_test_program);
 	}
 
 	if (tmp_dir_file != NULL) {
@@ -1086,7 +1107,7 @@ main (int argc, char *argv[])
 	g_unix_signal_add (SIGTERM, (GSourceFunc) sigterm_handler_cb, &data);
 
 	/* Create a working directory. */
-	prepare_dbus_daemon_working_directory (&working_directory_file, &dbus_daemon_config_file, &error);
+	prepare_dbus_daemon_working_directory (&(data.working_directory_file), &working_directory_file, &dbus_daemon_config_file, &error);
 
 	if (error != NULL) {
 		g_printerr (_("Error creating dbus-daemon working directory: %s"), error->message);
