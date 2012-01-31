@@ -61,6 +61,7 @@ GFile *dsim_program_wrapper_get_working_directory (DsimProgramWrapper *self) G_G
 GPid dsim_program_wrapper_get_process_id (DsimProgramWrapper *self);
 const gchar *dsim_program_wrapper_get_logging_domain_name (DsimProgramWrapper *self) G_GNUC_PURE;
 const gchar *dsim_program_wrapper_get_program_name (DsimProgramWrapper *self) G_GNUC_PURE;
+gboolean dsim_program_wrapper_is_running (DsimProgramWrapper *self) G_GNUC_PURE;
 
 G_END_DECLS
 

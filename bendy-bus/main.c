@@ -334,6 +334,19 @@ stop_simulation (MainData *data)
 		data->test_program_process_died_signal = 0;
 	}
 
+	/* Have we already started stopping the program? */
+	if (data->test_program_sigkill_timeout_id != 0) {
+		g_debug ("Already started stopping the simulation.");
+		return;
+	}
+
+	/* Has the program already died? (e.g. If we crashed.) */
+	if (dsim_program_wrapper_is_running (DSIM_PROGRAM_WRAPPER (data->test_program)) == FALSE) {
+		g_debug ("Program was already dead.");
+		unregister_objects_and_close_connection (data);
+		return;
+	}
+
 	data->test_program_process_died_signal = g_signal_connect (data->test_program, "process-died",
 	                                                           (GCallback) stop_simulation_test_program_died_cb, data);
 
@@ -1087,6 +1100,9 @@ main (int argc, char *argv[])
 	data.simulated_objects = g_ptr_array_ref (simulated_objects);
 	data.outstanding_registration_callbacks = 0;
 	data.test_run_inactivity_timeout_id = 0;
+	data.test_program_spawn_end_signal = 0;
+	data.test_program_process_died_signal = 0;
+	data.test_program_sigkill_timeout_id = 0;
 
 	if (run_infinitely == TRUE || (run_iters == 0 && run_time == 0)) {
 		data.num_test_runs_remaining = -1;

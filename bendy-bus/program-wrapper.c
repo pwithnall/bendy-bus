@@ -53,6 +53,7 @@ enum {
 	PROP_PROGRAM_NAME,
 	PROP_PROCESS_ID,
 	PROP_LOGGING_DOMAIN_NAME,
+	PROP_IS_RUNNING,
 };
 
 enum {
@@ -122,6 +123,18 @@ dsim_program_wrapper_class_init (DsimProgramWrapperClass *klass)
 	                                                      "Name of the logging domain name to use for all stdout/stderr output from the process.",
 	                                                      NULL,
 	                                                      G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+	/**
+	 * DsimProgramWrapper:is-running:
+	 *
+	 * Whether the program is currently running.
+	 */
+	g_object_class_install_property (gobject_class, PROP_IS_RUNNING,
+	                                 g_param_spec_boolean ("is-running",
+	                                                       "Running?",
+	                                                       "Whether the program is currently running.",
+	                                                       FALSE,
+	                                                       G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 
 	/**
 	 * DsimProgramWrapper::spawn-begin:
@@ -219,6 +232,9 @@ dsim_program_wrapper_get_property (GObject *object, guint property_id, GValue *v
 		case PROP_LOGGING_DOMAIN_NAME:
 			g_value_set_string (value, priv->logging_domain_name);
 			break;
+		case PROP_IS_RUNNING:
+			g_value_set_boolean (value, priv->process_is_running);
+			break;
 		default:
 			/* We don't have any other property... */
 			G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -245,6 +261,8 @@ dsim_program_wrapper_set_property (GObject *object, guint property_id, const GVa
 			priv->logging_domain_name = g_value_dup_string (value);
 			break;
 		case PROP_PROCESS_ID:
+			/* Read-only */
+		case PROP_IS_RUNNING:
 			/* Read-only */
 		default:
 			/* We don't have any other property... */
@@ -275,6 +293,7 @@ child_watch_cb (GPid pid, gint status, DsimProgramWrapper *self)
 	g_spawn_close_pid (priv->pid);
 
 	priv->process_is_running = FALSE;
+	g_object_notify (G_OBJECT (self), "is-running");
 }
 
 static gboolean
@@ -462,6 +481,7 @@ dsim_program_wrapper_spawn (DsimProgramWrapper *self, GError **error)
 	g_debug ("Successfully spawned process %i, with stdout as %i and stderr as %i.", child_pid, child_stdout, child_stderr);
 
 	priv->process_is_running = TRUE;
+	g_object_notify (G_OBJECT (self), "is-running");
 
 	/* Listen for things on the daemon's stderr and stdout. We hackily pass extra information in the user_data for the callbacks; we set the LSB
 	 * of the pointer to be 1 iff the channel is stderr and 0 iff it's stdout. The rest of the bits contain the self pointer. */
@@ -608,4 +628,20 @@ dsim_program_wrapper_get_program_name (DsimProgramWrapper *self)
 	g_return_val_if_fail (DSIM_IS_PROGRAM_WRAPPER (self), NULL);
 
 	return self->priv->program_name;
+}
+
+/**
+ * dsim_program_wrapper_is_running:
+ * @self: a #DsimProgramWrapper
+ *
+ * Gets whether the program is currently running.
+ *
+ * Return value: %TRUE if the program is currently running (or if it has exited, but we haven't yet handled the exit signal); %FALSE otherwise
+ */
+gboolean
+dsim_program_wrapper_is_running (DsimProgramWrapper *self)
+{
+	g_return_val_if_fail (DSIM_IS_PROGRAM_WRAPPER (self), FALSE);
+
+	return self->priv->process_is_running;
 }
