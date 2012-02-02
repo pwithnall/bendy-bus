@@ -304,10 +304,18 @@ stop_simulation_test_program_died_cb (DsimProgramWrapper *wrapper, gint status, 
 static gboolean
 kill_program_cb (MainData *data)
 {
+	/* Has the program already died? (e.g. If we crashed while sitting in the timeout.) */
+	if (dsim_program_wrapper_is_running (DSIM_PROGRAM_WRAPPER (data->test_program)) == FALSE) {
+		g_debug ("Program was already dead.");
+		stop_simulation_test_program_died_cb (DSIM_PROGRAM_WRAPPER (data->test_program), 0, data);
+		goto done;
+	}
+
 	g_message (_("Killing test program (with SIGKILL) due to it not responding to termination requests (SIGTERM)."));
 
 	dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program), TRUE);
 
+done:
 	data->test_program_sigkill_timeout_id = 0;
 	return FALSE;
 }
@@ -343,7 +351,7 @@ stop_simulation (MainData *data)
 	/* Has the program already died? (e.g. If we crashed.) */
 	if (dsim_program_wrapper_is_running (DSIM_PROGRAM_WRAPPER (data->test_program)) == FALSE) {
 		g_debug ("Program was already dead.");
-		unregister_objects_and_close_connection (data);
+		stop_simulation_test_program_died_cb (DSIM_PROGRAM_WRAPPER (data->test_program), 0, data);
 		return;
 	}
 

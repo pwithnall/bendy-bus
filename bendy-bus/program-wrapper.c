@@ -278,6 +278,9 @@ child_watch_cb (GPid pid, gint status, DsimProgramWrapper *self)
 
 	g_debug ("`%s` died.", priv->program_name);
 
+	priv->process_is_running = FALSE;
+	g_object_notify (G_OBJECT (self), "is-running");
+
 	/* Signal emission. */
 	g_signal_emit (self, program_wrapper_signals[SIGNAL_PROCESS_DIED], 0, status);
 
@@ -291,9 +294,6 @@ child_watch_cb (GPid pid, gint status, DsimProgramWrapper *self)
 
 	/* NOTE: We retain the PID for use by dsim_program_wrapper_get_process_id(). */
 	g_spawn_close_pid (priv->pid);
-
-	priv->process_is_running = FALSE;
-	g_object_notify (G_OBJECT (self), "is-running");
 }
 
 static gboolean
