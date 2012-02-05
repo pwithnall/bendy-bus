@@ -17,6 +17,8 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <math.h>
+
 #include "dfsm-probabilities.h"
 
 /**
@@ -53,4 +55,58 @@ dfsm_random_nonuniform_distribution (guint32 intervals[], gsize intervals_len)
 	g_assert (i < intervals_len);
 
 	return i;
+}
+
+/* NOTE: These aren't thread safe. */
+static gdouble normal_z1_mu = 0.0;
+static gdouble normal_z1_sigma = 0.0;
+static gdouble normal_z1 = 0.0;
+
+/**
+ * dfsm_random_normal_distribution:
+ * @mu: mean of the distribution to sample from
+ * @sigma: standard deviation of the distribution to sample from
+ *
+ * Randomly choose a value from the normal distribution parametrised by standard deviation @sigma and mean @mu. If @sigma is
+ * <code class="literal">1.0</code> and @mu is <code class="literal">0.0</code>, this is the standard normal distribution.
+ *
+ * This is implemented using the polar Box–Muller transform, and as such generates two values from the same distribution simultaneously, and will
+ * cache one until the next time dfsm_random_normal_distribution() is called. Consequently, it is faster to re-use the same @sigma and @mu between
+ * consecutive calls to dfsm_random_normal_distribution() than to change their values.
+ *
+ * This function is not thread safe.
+ *
+ * Return value: a random value from the normal distribution parametrised by @sigma and @mu
+ */
+gdouble
+dfsm_random_normal_distribution (gdouble mu, gdouble sigma)
+{
+	gdouble u, v, s, r;
+
+	/* If we have a result left over from the previous calculation, return that. This isn't thread safe. */
+	if (normal_z1_sigma == sigma && normal_z1_mu == mu) {
+		/* Invalidate the cached value. */
+		normal_z1_sigma = 0.0;
+		normal_z1_mu = 0.0;
+
+		return normal_z1;
+	}
+
+	/* Use the Box–Muller transform to generate two standard normal variables.
+	 * See: http://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform#Polar_form */
+	do {
+		u = g_random_double_range (-1.0, 1.0);
+		v = g_random_double_range (-1.0, 1.0);
+
+		s = u * u + v * v;
+	} while (s == 0.0 || s == -0.0 || s >= 1.0);
+
+	r = sqrt ((-2.0 * log (s)) / s);
+
+	/* Calculate and cache the second value (z1). */
+	normal_z1 = (u * r) * sigma + mu;
+	normal_z1_mu = mu;
+	normal_z1_sigma = sigma;
+
+	return (v * r) * sigma + mu;
 }

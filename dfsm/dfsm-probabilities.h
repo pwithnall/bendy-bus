@@ -93,6 +93,7 @@ G_BEGIN_DECLS
 }
 
 G_GNUC_INTERNAL guint dfsm_random_nonuniform_distribution (guint32 intervals[], gsize intervals_len);
+G_GNUC_INTERNAL gdouble dfsm_random_normal_distribution (gdouble mu, gdouble sigma);
 
 G_END_DECLS
 

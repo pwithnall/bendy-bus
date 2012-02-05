@@ -19,6 +19,7 @@
 
 #include "config.h"
 
+#include <math.h>
 #include <glib.h>
 #include <glib/gi18n-lib.h>
 
@@ -28,6 +29,7 @@
 #include "dfsm-machine.h"
 #include "dfsm-parser.h"
 #include "dfsm-parser-internal.h"
+#include "dfsm-probabilities.h"
 
 GType
 dfsm_simulation_status_get_type (void)
@@ -47,9 +49,10 @@ dfsm_simulation_status_get_type (void)
 	return etype;
 }
 
-/* Arbitrarily-chosen min. and max. values for the arbitrary transition timeout callbacks. */
-#define MIN_TIMEOUT 50 /* ms */
-#define MAX_TIMEOUT 200 /* ms */
+/* Arbitrarily-chosen normal distribution parameters for the arbitrary transition timeout callbacks.
+ * These values give most timeouts between 70ms and 130ms, and almost all timeouts between 10ms and 190ms. */
+#define TRANSITION_TIMEOUT_MU 100 /* ms */
+#define TRANSITION_TIMEOUT_SIGMA 30 /* ms */
 
 static void dfsm_object_dispose (GObject *object);
 static void dfsm_object_finalize (GObject *object);
@@ -674,7 +677,7 @@ schedule_arbitrary_transition (DfsmObject *self)
 	g_assert (self->priv->timeout_id == 0);
 
 	/* Add a random timeout to the next potential arbitrary transition. */
-	timeout_period = g_random_int_range (MIN_TIMEOUT, MAX_TIMEOUT);
+	timeout_period = floor (dfsm_random_normal_distribution (TRANSITION_TIMEOUT_MU, TRANSITION_TIMEOUT_SIGMA));
 	g_debug ("Scheduling the next arbitrary transition in %u ms.", timeout_period);
 	self->priv->timeout_id = g_timeout_add (timeout_period, (GSourceFunc) arbitrary_transition_timeout_cb, self);
 }

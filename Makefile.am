@@ -110,6 +110,7 @@ dfsm_libdfsm_la_CFLAGS = \
 	$(NULL)
 
 dfsm_libdfsm_la_LIBADD = \
+	$(LIBM) \
 	$(GLIB_LIBS) \
 	$(GIO_LIBS) \
 	$(AM_LIBADD) \
