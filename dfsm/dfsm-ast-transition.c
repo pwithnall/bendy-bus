@@ -480,6 +480,22 @@ dfsm_ast_transition_new (const DfsmParserTransitionDetails *details, GPtrArray/*
 }
 
 /**
+ * dfsm_ast_transition_get_preconditions:
+ * @self: a #DfsmAstTransition
+ *
+ * Returns an array of the transition's #DfsmAstPrecondition<!-- -->s. The array may be empty, but will never be %NULL.
+ *
+ * Return value: (transfer none) (element-type DfsmAstPrecondition): array of preconditions
+ */
+GPtrArray/*<DfsmAstPrecondition>*/ *
+dfsm_ast_transition_get_preconditions (DfsmAstTransition *self)
+{
+	g_return_val_if_fail (DFSM_IS_AST_TRANSITION (self), NULL);
+
+	return self->priv->preconditions;
+}
+
+/**
  * dfsm_ast_transition_check_preconditions:
  * @self: a #DfsmAstTransition
  * @environment: the environment to execute the transition in

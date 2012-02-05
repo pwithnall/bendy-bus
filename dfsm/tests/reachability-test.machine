@@ -1,0 +1,55 @@
+object at /uk/ac/cam/cl/DBusSimulator/ReachabilityTest implements uk.ac.cam.cl.DBusSimulator.SimpleTest {
+	data {
+		ArbitraryProperty = "";
+	}
+
+	states {
+		State0; /* initial state */
+		State1;
+		State2;
+		State3;
+		State4;
+		State5;
+		State6;
+		State7; /* completely unreachable */
+		State8;
+	}
+
+	/* Trivial reachable transitions. */
+	transition from State0 to State1 on random { emit SingleStateSignal (""); }
+	transition from State0 to State2 on method SingleStateEcho { reply (""); }
+	transition from State0 to State3 on property ArbitraryProperty { emit SingleStateSignal (""); }
+
+	/* Recursive transition. */
+	transition inside State1 on random { emit SingleStateSignal (""); }
+
+	/* Possibly-reachable transition to reachable state. */
+	transition from State3 to State5 on random {
+		precondition { false }
+		emit SingleStateSignal ("");
+	}
+
+	/* Bypass transition so that State5 is actually reachable. */
+	transition from State2 to State4 on random { emit SingleStateSignal (""); }
+
+	/* Non-trivial loop. */
+	transition from State4 to State5 on random { emit SingleStateSignal (""); }
+	transition from State5 to State4 on random { emit SingleStateSignal (""); }
+
+	/* Possibly-reachable transition to possibly-reachable state. */
+	transition from State5 to State6 on random {
+		precondition { false }
+		emit SingleStateSignal ("");
+	}
+
+	/* Recursive transition on unreachable state. */
+	transition inside State8 on random { emit SingleStateSignal (""); }
+
+	/* Irrelevant transitions which provide alternate paths to states, but which shouldn't affect reachability. */
+	transition from State3 to State5 on random { emit SingleStateSignal (""); }
+	transition from State2 to State4 on random { emit SingleStateSignal (""); }
+	transition from State5 to State6 on random {
+		precondition { false }
+		emit SingleStateSignal ("");
+	}
+}

@@ -19,6 +19,7 @@
 
 #include "config.h"
 
+#include <stdio.h>
 #include <string.h>
 #include <glib.h>
 #include <glib/gi18n-lib.h>
@@ -672,6 +673,262 @@ done:
 
 	/* Success! */
 	return TRUE;
+}
+
+static DfsmMachineStateNumber
+pop_most_reachable_state_from_queue (GQueue/*<DfsmMachineStateNumber>*/ *unvisited_states,
+                                     GArray/*<DfsmMachineStateNumber, DfsmStateReachability>*/ *reachability, DfsmStateReachability *state_reachability)
+{
+	DfsmStateReachability highest_reachability = DFSM_STATE_UNREACHABLE;
+	DfsmMachineStateNumber highest_state;
+	GList *highest_i = NULL;
+	GList *i;
+
+	for (i = unvisited_states->head; i != NULL; i = i->next) {
+		if (highest_i == NULL || g_array_index (reachability, DfsmStateReachability, GPOINTER_TO_UINT (i->data)) > highest_reachability) {
+			highest_state = GPOINTER_TO_UINT (i->data);
+			highest_reachability = g_array_index (reachability, DfsmStateReachability, highest_state);
+			highest_i = i;
+
+			/* We can't get higher than REACHABLE. */
+			if (highest_reachability == DFSM_STATE_REACHABLE) {
+				goto done;
+			}
+		}
+	}
+
+done:
+	g_assert (state_reachability != NULL);
+	*state_reachability = highest_reachability;
+
+	g_assert (highest_i != NULL);
+	g_queue_delete_link (unvisited_states, highest_i);
+
+	return highest_state;
+}
+
+#define TRANSITION_MATRIX_ASSIGN(M, S, F, T) \
+	g_assert ((F) < (S)); \
+	g_assert ((T) < (S)); \
+	TRANSITION_MATRIX_INDEX(M, S, F, T)
+#define TRANSITION_MATRIX_INDEX(M, S, F, T) M[(S) * (F) + (T)]
+
+static void
+set_transition_matrix_entries (DfsmStateReachability *matrix, guint num_states, GPtrArray/*<DfsmAstObjectTransition>*/ *object_transition_array)
+{
+	guint i;
+
+	for (i = 0; i < object_transition_array->len; i++) {
+		DfsmAstObjectTransition *object_transition;
+		DfsmStateReachability reachability;
+
+		object_transition = (DfsmAstObjectTransition*) g_ptr_array_index (object_transition_array, i);
+
+		/* Determine the reachability. */
+		reachability = (dfsm_ast_transition_get_preconditions (object_transition->transition)->len == 0) ?
+		               DFSM_STATE_REACHABLE : DFSM_STATE_POSSIBLY_REACHABLE;
+
+		/* Combine the reachability with what's in the matrix. */
+		TRANSITION_MATRIX_ASSIGN (matrix, num_states, object_transition->from_state, object_transition->to_state) =
+			MAX (TRANSITION_MATRIX_INDEX (matrix, num_states, object_transition->from_state, object_transition->to_state), reachability);
+	}
+}
+
+static DfsmStateReachability *
+build_transition_matrix (DfsmMachine *self)
+{
+	DfsmMachinePrivate *priv = self->priv;
+	DfsmStateReachability *matrix;
+	GHashTableIter iter;
+	GPtrArray/*<DfsmAstObjectTransition>*/ *object_transition_array;
+	guint num_states;
+
+	/* Create the matrix and initialise all entries to DFSM_STATE_UNREACHABLE. */
+	num_states = priv->state_names->len;
+	matrix = g_malloc0 (sizeof (DfsmStateReachability) * num_states * num_states);
+
+	/* Method-triggered transitions. */
+	g_hash_table_iter_init (&iter, priv->transitions.method_call_triggered);
+
+	while (g_hash_table_iter_next (&iter, NULL, (gpointer*) &object_transition_array) == TRUE) {
+		set_transition_matrix_entries (matrix, num_states, object_transition_array);
+	}
+
+	/* Property-triggered transitions. */
+	g_hash_table_iter_init (&iter, priv->transitions.property_set_triggered);
+
+	while (g_hash_table_iter_next (&iter, NULL, (gpointer*) &object_transition_array) == TRUE) {
+		set_transition_matrix_entries (matrix, num_states, object_transition_array);
+	}
+
+	/* Arbitrarily-triggered transitions. */
+	set_transition_matrix_entries (matrix, num_states, priv->transitions.arbitrarily_triggered);
+
+	return matrix;
+}
+
+static void
+print_transition_matrix (DfsmMachine *self, DfsmStateReachability *matrix, guint num_states)
+{
+	DfsmMachineStateNumber i, j;
+
+	puts ("State numbers:");
+	for (i = 0; i < num_states; i++) {
+		printf (" %02u → %s\n", i, get_state_name (self, i));
+	}
+
+	puts ("");
+
+	fputs ("F\\T", stdout);
+
+	/* Header. */
+	for (i = 0; i < num_states; i++) {
+		printf (" %02u", i);
+	}
+
+	puts ("");
+
+	/* Body. */
+	for (i = 0; i < num_states; i++) {
+		printf ("%02u ", i);
+
+		for (j = 0; j < num_states; j++) {
+			printf (" %02u", TRANSITION_MATRIX_INDEX (matrix, num_states, i, j));
+		}
+
+		puts ("");
+	}
+}
+
+/**
+ * dfsm_machine_calculate_state_reachability:
+ * @self: a #DfsmMachine
+ *
+ * Calculate the reachability of all of the states in the #DfsmMachine's finite automaton from the starting state. This assumes that all D-Bus methods
+ * will be called at some point, and all D-Bus properties will be set at some point (i.e. method- and property-triggered transitions are just as likely
+ * to be taken as arbitrary transitions).
+ *
+ * Due to the possibility of arithmetic being used in precondition conditions, it is undecidable whether a transition which is predicated on a
+ * precondition will be available to be executed at any point. States which are only reachable via preconditioned transitions are given a reachability
+ * of %DFSM_STATE_POSSIBLY_REACHABLE accordingly.
+ *
+ * Return value: (transfer full) (element-type DfsmStateReachability): array of state reachabilities (#DfsmStateReachability values)
+ * indexed by #DfsmMachineStateNumber
+ */
+GArray/*<DfsmStateReachability>*/ *
+dfsm_machine_calculate_state_reachability (DfsmMachine *self)
+{
+	DfsmMachinePrivate *priv;
+	GQueue/*<DfsmMachineStateNumber>*/ unvisited_states = G_QUEUE_INIT;
+	GArray/*<DfsmMachineStateNumber, DfsmStateReachability>*/ *reachability;
+	DfsmStateReachability *matrix;
+	DfsmMachineStateNumber i;
+	guint num_states;
+
+	g_return_val_if_fail (DFSM_IS_MACHINE (self), NULL);
+
+	priv = self->priv;
+
+	/* Prepare the result array, initially marking all states as unreachable. Also prepare the queue of unvisited states. */
+	num_states = priv->state_names->len;
+	reachability = g_array_sized_new (FALSE, FALSE, sizeof (DfsmStateReachability), num_states);
+
+	for (i = 0; i < num_states; i++) {
+		DfsmStateReachability r = DFSM_STATE_UNREACHABLE;
+		g_array_append_val (reachability, r); /* for state i */
+		g_queue_push_head (&unvisited_states, GUINT_TO_POINTER (i));
+	}
+
+	/* Mark the starting state as reachable. */
+	g_array_index (reachability, DfsmStateReachability, DFSM_MACHINE_STARTING_STATE) = DFSM_STATE_REACHABLE;
+
+	/* Coalesce all the parallel transitions between pairs of states to produce a one-step reachability matrix. We use this for neighbour lookups,
+	 * rather than consulting priv->transitions.* all the time. */
+	matrix = build_transition_matrix (self);
+
+	/* Print out the matrix. */
+	print_transition_matrix (self, matrix, num_states);
+
+	/* Loop while there are unvisited states. */
+	while (g_queue_is_empty (&unvisited_states) == FALSE) {
+		DfsmMachineStateNumber state;
+		DfsmStateReachability state_reachability;
+
+		state = pop_most_reachable_state_from_queue (&unvisited_states, reachability, &state_reachability);
+
+		if (state_reachability == DFSM_STATE_UNREACHABLE) {
+			/* Rest of the states are unreachable. */
+			break;
+		}
+
+		/* Examine the state's neighbours and see if we can relax any of the transitions to them and thus mark them as more reachable. */
+		for (i = 0; i < num_states; i++) {
+			DfsmStateReachability neighbour_reachability;
+
+			neighbour_reachability = MIN (state_reachability, TRANSITION_MATRIX_INDEX (matrix, num_states, state, i));
+
+			/* Relax the transition. */
+			if (neighbour_reachability > g_array_index (reachability, DfsmStateReachability, i)) {
+				g_array_index (reachability, DfsmStateReachability, i) = neighbour_reachability;
+			}
+		}
+	}
+
+	g_free (matrix);
+	g_queue_clear (&unvisited_states);
+
+	return reachability;
+}
+
+/**
+ * dfsm_machine_look_up_state:
+ * @self: a #DfsmMachine
+ * @state_name: the human-readable name of a state to look up
+ *
+ * Looks up the #DfsmMachineStateNumber corresponding to the given @state_name. @state_name must be a valid state name, but doesn't have to exist
+ * in the #DfsmMachine. If it doesn't exist, %DFSM_MACHINE_INVALID_STATE will be returned.
+ *
+ * Return value: the state number corresponding to @state_name, or %DFSM_MACHINE_INVALID_STATE
+ */
+DfsmMachineStateNumber
+dfsm_machine_look_up_state (DfsmMachine *self, const gchar *state_name)
+{
+	DfsmMachineStateNumber i;
+
+	g_return_val_if_fail (DFSM_IS_MACHINE (self), DFSM_MACHINE_INVALID_STATE);
+	g_return_val_if_fail (state_name != NULL && dfsm_is_state_name (state_name) == TRUE, DFSM_MACHINE_INVALID_STATE);
+
+	for (i = 0; i < self->priv->state_names->len; i++) {
+		if (strcmp (state_name, g_ptr_array_index (self->priv->state_names, i)) == 0) {
+			return i;
+		}
+	}
+
+	return DFSM_MACHINE_INVALID_STATE;
+}
+
+/**
+ * dfsm_machine_get_state_name:
+ * @self: a #DfsmMachine
+ * @state_number: state number to look up
+ *
+ * Looks up the human-readable name of the state indexed by @state_number. @state_number must be a valid state number (i.e. it must not be
+ * %DFSM_MACHINE_INVALID_STATE), but it does not have to be a state which is defined on this #DfsmMachine. Such undefined states will return %NULL.
+ *
+ * Return value: human-readable name for @state_number, or %NULL
+ */
+const gchar *
+dfsm_machine_get_state_name (DfsmMachine *self, DfsmMachineStateNumber state_number)
+{
+	g_return_val_if_fail (DFSM_IS_MACHINE (self), NULL);
+	g_return_val_if_fail (state_number != DFSM_MACHINE_INVALID_STATE, NULL);
+
+	/* Array bounds checking. */
+	if (state_number >= self->priv->state_names->len) {
+		return NULL;
+	}
+
+	return g_ptr_array_index (self->priv->state_names, state_number);
 }
 
 /**

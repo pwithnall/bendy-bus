@@ -43,6 +43,13 @@ typedef guint DfsmMachineStateNumber;
  */
 #define DFSM_MACHINE_STARTING_STATE 0
 
+/**
+ * DFSM_MACHINE_INVALID_STATE:
+ *
+ * The #DfsmMachineStateNumber of an invalid state.
+ */
+#define DFSM_MACHINE_INVALID_STATE G_MAXUINT
+
 #define DFSM_TYPE_MACHINE		(dfsm_machine_get_type ())
 #define DFSM_MACHINE(o)			(G_TYPE_CHECK_INSTANCE_CAST ((o), DFSM_TYPE_MACHINE, DfsmMachine))
 #define DFSM_MACHINE_CLASS(k)		(G_TYPE_CHECK_CLASS_CAST((k), DFSM_TYPE_MACHINE, DfsmMachineClass))
@@ -70,6 +77,25 @@ void dfsm_machine_call_method (DfsmMachine *self, DfsmOutputSequence *output_seq
 gboolean dfsm_machine_set_property (DfsmMachine *self, DfsmOutputSequence *output_sequence, const gchar *interface_name, const gchar *property_name,
                                     GVariant *value, gboolean enable_fuzzing);
 void dfsm_machine_make_arbitrary_transition (DfsmMachine *self, DfsmOutputSequence *output_sequence, gboolean enable_fuzzing);
+
+/**
+ * DfsmStateReachability:
+ * @DFSM_STATE_UNREACHABLE: the state is never reachable
+ * @DFSM_STATE_POSSIBLY_REACHABLE: set if state is possibly reachable, dependent on the outcome of a precondition
+ * @DFSM_STATE_REACHABLE: set if state is always reachable
+ *
+ * Ordered values indicating the calculated reachability of a given state, starting from the #DfsmMachine's initial state and using all its transitions.
+ */
+typedef enum {
+	DFSM_STATE_UNREACHABLE = 0,
+	DFSM_STATE_POSSIBLY_REACHABLE = 1,
+	DFSM_STATE_REACHABLE = 2,
+} DfsmStateReachability;
+
+GArray/*<DfsmStateReachability>*/ *dfsm_machine_calculate_state_reachability (DfsmMachine *self) DFSM_CONSTRUCTOR;
+
+DfsmMachineStateNumber dfsm_machine_look_up_state (DfsmMachine *self, const gchar *state_name) G_GNUC_PURE;
+const gchar *dfsm_machine_get_state_name (DfsmMachine *self, DfsmMachineStateNumber state_number) G_GNUC_PURE;
 
 DfsmEnvironment *dfsm_machine_get_environment (DfsmMachine *self) G_GNUC_PURE;
 
