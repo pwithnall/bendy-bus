@@ -28,7 +28,7 @@
 
 G_BEGIN_DECLS
 
-typedef guint DfsmAstObjectStateNumber; /* same as DfsmAstObjectStateNumber */
+typedef guint DfsmAstObjectStateNumber; /* same as DfsmMachineStateNumber */
 
 typedef struct {
 	DfsmAstObjectStateNumber from_state;
