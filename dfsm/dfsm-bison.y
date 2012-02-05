@@ -522,7 +522,7 @@ dfsm_bison_parse (GDBusNodeInfo *dbus_node_info, const gchar *source_buf, GError
 	data.dbus_node_info = dbus_node_info;
 
 	data.source_buf = source_buf;
-	data.source_len = g_utf8_strlen (source_buf, -1);
+	data.source_len = strlen (source_buf);
 	data.source_pos = 0;
 
 	yylex_init (&(data.yyscanner));
