@@ -66,13 +66,6 @@
 DBUS_OBJECT_PATH_ELEMENT		[A-Za-z0-9_]+
 DBUS_OBJECT_PATH			\/({DBUS_OBJECT_PATH_ELEMENT}(\/{DBUS_OBJECT_PATH_ELEMENT})*)?
 
-/* Additional restrictions not encoded here:
- *  • Must be UTF-8.
- *  • Must not exceed 255 characters in length.
- */
-DBUS_UNIQUE_BUS_NAME_ELEMENT		[A-Za-z0-9_-]+
-DBUS_UNIQUE_BUS_NAME			:{DBUS_UNIQUE_BUS_NAME_ELEMENT}\.{DBUS_UNIQUE_BUS_NAME_ELEMENT}(\.{DBUS_UNIQUE_BUS_NAME_ELEMENT})*
-
 /* Includes D-Bus interface names and well-known bus names.
  *
  * Additional restrictions not encoded here:
