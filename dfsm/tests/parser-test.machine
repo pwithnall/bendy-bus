@@ -1,0 +1,90 @@
+object at /uk/ac/cam/cl/DBusSimulator/ParserTest implements uk.ac.cam.cl.DBusSimulator.SimpleTest {
+	data {
+		ArbitraryProperty = "foo";
+		EmptyString = "";
+		SingleCharacter = "a";
+		SingleUnicodeCharacter = "ö";
+		NonEmptyString = "hello world";
+		UnicodeString = "hállö wèrlđ";
+		TypeSignature = @av [];
+	}
+
+	states {
+		Main;
+		NotMain;
+	}
+
+	/* Random triggering, inside transitions, signal emissions. */
+	transition inside Main on random {
+		emit CounterSignal (1u);
+	}
+
+	/* Method triggering, from…to transitions, replies. */
+	transition from Main to Main on method TwoStateEcho {
+		reply ("baz");
+	}
+
+	/* Throwing errors. */
+	transition from Main to Main on method TwoStateEcho {
+		throw RandomError;
+	}
+
+	/* Property triggering. */
+	transition inside Main on property ArbitraryProperty {
+		emit CounterSignal (1u);
+	}
+
+	/* Preconditions, -> operator, == operator, != operator. */
+	transition inside Main on random {
+		precondition { object->ArbitraryProperty == "foo" }
+		precondition throwing RandomError { object->ArbitraryProperty != "foo" }
+
+		emit SingleStateSignal ("");
+	}
+
+	/* Arithmetic operators. */
+	transition inside Main on random {
+		emit CounterSignal (1u * 1u / 1u + 1u - 1u % 1u);
+	}
+
+	/* Operator precedence. */
+	transition inside Main on random {
+		emit CounterSignal (⟨1u * 1u⟩ / ⟨1u + 1u⟩ - 1u % 1u);
+	}
+
+	/* Boolean operators. */
+	transition inside Main on random {
+		precondition { !false == true && false || true }
+
+		emit SingleStateSignal ("");
+	}
+
+	/* Numeric comparisons. */
+	transition inside Main on random {
+		precondition { 0.5d <~ 0.0d || 0.5d <= 0.0d || 0.5d >= 0.0d || 0.5d ~> 0.0d }
+
+		emit SingleStateSignal ("");
+	}
+
+	/* Arrays, variants, dicts, structs. */
+	transition inside Main on random {
+		object->TypeSignature = [<1u>];
+		object->TypeSignature = [<{ "foo" : "bar" }>];
+		object->TypeSignature = [<( "foo", "bar" )>];
+	}
+
+	/* Fuzzing. */
+	transition inside Main on random {
+		object->TypeSignature = @av []?;
+	}
+
+	/* Transition state lists. */
+	transition inside Main, inside NotMain on random {
+		emit SingleStateSignal ("");
+	}
+
+	/* Multiple assignment. */
+	transition inside Main on random {
+		(object->UnicodeString, object->NonEmptyString) = ("…", "Test string");
+	}
+}

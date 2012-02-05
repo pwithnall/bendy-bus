@@ -40,14 +40,14 @@ load_test_file (const gchar *filename)
 }
 
 static void
-test_ast_single_object (void)
+test_machine_description (const gchar *machine_description_filename, const gchar *introspection_xml_filename)
 {
 	gchar *machine_description, *introspection_xml;
 	GPtrArray/*<DfsmObject>*/ *object_array;
 	GError *error = NULL;
 
-	machine_description = load_test_file ("simple-test.machine");
-	introspection_xml = load_test_file ("simple-test.xml");
+	machine_description = load_test_file (machine_description_filename);
+	introspection_xml = load_test_file (introspection_xml_filename);
 
 	object_array = dfsm_object_factory_from_files (machine_description, introspection_xml, &error);
 
@@ -62,6 +62,18 @@ test_ast_single_object (void)
 	g_free (machine_description);
 }
 
+static void
+test_ast_single_object (void)
+{
+	test_machine_description ("simple-test.machine", "simple-test.xml");
+}
+
+static void
+test_ast_parser (void)
+{
+	test_machine_description ("parser-test.machine", "simple-test.xml");
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -72,6 +84,7 @@ main (int argc, char *argv[])
 	g_test_init (&argc, &argv, NULL);
 
 	g_test_add_func ("/ast/single-object", test_ast_single_object);
+	g_test_add_func ("/ast/parser", test_ast_parser);
 
 	return g_test_run ();
 }
