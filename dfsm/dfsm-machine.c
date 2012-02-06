@@ -770,6 +770,7 @@ build_transition_matrix (DfsmMachine *self)
 static void
 print_transition_matrix (DfsmMachine *self, DfsmStateReachability *matrix, guint num_states)
 {
+#if 0
 	DfsmMachineStateNumber i, j;
 
 	puts ("State numbers:");
@@ -798,6 +799,7 @@ print_transition_matrix (DfsmMachine *self, DfsmStateReachability *matrix, guint
 
 		puts ("");
 	}
+#endif
 }
 
 /**
