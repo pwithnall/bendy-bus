@@ -28,7 +28,6 @@ object at /org/gnome/evolution/dataserver/AddressBook implements org.gnome.evolu
 
 	states {
 		Closed;
-		Opening;
 		Authenticated;
 	}
 
@@ -43,7 +42,7 @@ object at /org/gnome/evolution/dataserver/AddressBook implements org.gnome.evolu
 	}
 
 	/* Already open. */
-	transition inside Opening, inside Authenticated on method open {
+	transition inside Authenticated on method open {
 		emit open_done (object->_opid_counter, "", "");
 		reply (object->_opid_counter);
 
@@ -51,7 +50,7 @@ object at /org/gnome/evolution/dataserver/AddressBook implements org.gnome.evolu
 	}
 
 	/* Closing. */
-	transition inside Closed, from Opening to Closed, from Authenticated to Closed on method close {
+	transition inside Closed, from Authenticated to Closed on method close {
 		/* Nothing to see here. */
 		reply ();
 	}

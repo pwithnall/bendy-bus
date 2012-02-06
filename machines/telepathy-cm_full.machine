@@ -229,69 +229,18 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 
 	states {
 		Connected;
-		Disconnected;
-		Connecting;
 	}
 
-	transition inside Disconnected, inside Connecting, inside Connected on method GetInterfaces {
+	transition inside Connected on method GetInterfaces {
 		reply (object->Interfaces);
 	}
 
-	/* Potentially simulate an older CM */
-	transition inside Disconnected on method GetInterfaces {
-		throw Disconnected;
-	}
-
-	transition inside Disconnected on method GetProtocol {
-		reply ("protocol");
-	}
-
-	transition inside Disconnected on method GetSelfHandle {
-		reply (0u);
-	}
-	transition inside Connecting, inside Connected on method GetSelfHandle {
+	transition inside Connected on method GetSelfHandle {
 		reply (object->SelfHandle);
 	}
 
-	transition inside Disconnected, inside Connecting, inside Connected on method GetStatus {
+	transition inside Connected on method GetStatus {
 		reply (object->Status);
-	}
-
-	transition inside Disconnected on method HoldHandles {
-		throw Disconnected;
-	}
-
-	transition inside Disconnected on method InspectHandles {
-		throw Disconnected;
-	}
-
-	transition inside Disconnected on method ReleaseHandles {
-		throw Disconnected;
-	}
-
-	transition inside Disconnected on method RequestHandles {
-		throw Disconnected;
-	}
-
-	transition from Disconnected to Connecting on method Connect {
-		object->Status = 1u;
-		emit StatusChanged (object->Status, 0u?);
-		reply ();
-	}
-
-	transition from Connecting to Connected on random {
-		object->Status = 0u;
-		emit StatusChanged (object->Status, 0u?);
-	}
-
-	transition inside Disconnected on random {
-		emit ConnectionError ("org.freedesktop.Telepathy.Error.ConnectionRefused"?, {
-			"debug-message" : <""?>,
-			"server-message" : <""?>,
-			"user-requested" : <true?>,
-			"expected-hostname" : <""?>,
-			"certificate-hostname" : <""?>,
-		}?);
 	}
 
 	transition inside Connected on method GetContactAttributes {
@@ -321,7 +270,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 		}?));
 	}
 
-	transition inside Connecting, inside Connected on method EnsureChannel {
+	transition inside Connected on method EnsureChannel {
 		precondition throwing NotImplemented {
 			dictGet (Request, "org.freedesktop.Telepathy.Channel.ChannelType", <"">) == <"org.freedesktop.Telepathy.Channel.Type.ContactList"> &&
 			dictGet (Request, "org.freedesktop.Telepathy.Channel.TargetID", <"">) == <"subscribe">
@@ -338,7 +287,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 		reply (true, @o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe", @a{sv} []);
 	}
 
-	transition inside Connecting, inside Connected on random {
+	transition inside Connected on random {
 		object->Channels = arrayInsert (object->Channels, 0u, (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe", {
 			"org.freedesktop.Telepathy.Channel.ChannelType" : <"org.freedesktop.Telepathy.Channel.Type.ContactList">,
 			"org.freedesktop.Telepathy.Channel.TargetHandleType" : <3u>,
@@ -352,7 +301,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 		                 "org.freedesktop.Telepathy.Channel.Type.ContactList", 3u, 0u?, false?);
 	}
 
-	transition inside Connecting, inside Connected on random {
+	transition inside Connected on random {
 		object->Channels = arrayInsert (object->Channels, 0u, (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/group1", {
 			"org.freedesktop.Telepathy.Channel.ChannelType" : <"org.freedesktop.Telepathy.Channel.Type.ContactList">,
 			"org.freedesktop.Telepathy.Channel.TargetHandleType" : <4u>,
@@ -366,49 +315,41 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 		                 "org.freedesktop.Telepathy.Channel.Type.ContactList", 4u, 0u?, false?);
 	}
 
-	transition inside Connecting, inside Connected on random {
+	transition inside Connected on random {
 		precondition { arrayGet (object->Channels, 0u, (@o "/p", @a{sv} {})) != (@o "/p", @a{sv} {}) }
 
 		emit ChannelClosed (structHead (arrayGet (object->Channels, 0u, (@o "/p", @a{sv} {}))));
 		object->Channels = arrayRemove (object->Channels, 0u);
 	}
 
-	transition inside Disconnected on method GetAliasFlags {
-		throw Disconnected;
-	}
-
-	transition inside Connecting, inside Connected on method GetAliasFlags {
+	transition inside Connected on method GetAliasFlags {
 		reply (0u?);
 	}
 
-	transition inside Disconnected, inside Connecting, inside Connected on random {
+	transition inside Connected on random {
 		emit AvatarUpdated (0u?, ""?);
 	}
 
-	transition inside Disconnected, inside Connecting, inside Connected on random {
+	transition inside Connected on random {
 		emit AvatarRetrieved (0u?, ""?, @ay [
 			255y, 216y /* JPEG SOI; see if that gets us anywhere */
 		]?, "image/jpeg"?);
 	}
 
-	transition inside Connecting, inside Connected on method RequestAvatars {
+	transition inside Connected on method RequestAvatars {
 		/* Do nothing specific. AvatarRetrieved will be emitted randomly at some point in the future. Possibly even for the contacts the client's requested. */
 		reply ();
 	}
 
-	transition inside Disconnected on method RequestAvatars {
-		throw Disconnected;
-	}
-
-	transition inside Connecting, inside Connected on method RequestAvatars {
+	transition inside Connected on method RequestAvatars {
 		throw InvalidHandle;
 	}
 
-	transition inside Disconnected, inside Connecting, inside Connected on random {
+	transition inside Connected on random {
 		emit PresencesChanged (pairKeys (@au [0u]?, (6u?, "busy"?, "I’m busy."?)));
 	}
 
-	transition inside Disconnected, inside Connecting, inside Connected on random {
+	transition inside Connected on random {
 		emit ContactCapabilitiesChanged (pairKeys (@au [0u]?, [(
 			{
 				"org.freedesktop.Telepathy.something" : <""?>,
