@@ -31,6 +31,7 @@ enum StatusCodes {
 	STATUS_INVALID_OPTIONS = 1,
 	STATUS_UNREADABLE_FILE = 2,
 	STATUS_INVALID_CODE = 3,
+	STATUS_UNREACHABLE_STATES = 4,
 };
 
 static void
@@ -51,6 +52,8 @@ main (int argc, char *argv[])
 	const gchar *simulation_filename, *introspection_filename;
 	gchar *simulation_code, *introspection_xml;
 	GPtrArray/*<DfsmObject>*/ *simulated_objects;
+	guint i;
+	gboolean found_unreachable_states = FALSE;
 
 	/* Set up localisation. */
 	setlocale (LC_ALL, "");
@@ -134,7 +137,46 @@ main (int argc, char *argv[])
 		exit (STATUS_INVALID_CODE);
 	}
 
+	/* Check the reachability of all of the states in each object. */
+	for (i = 0; i < simulated_objects->len; i++) {
+		DfsmObject *simulated_object;
+		DfsmMachine *machine;
+		GArray/*<DfsmStateReachability>*/ *reachability;
+		DfsmMachineStateNumber state;
+
+		simulated_object = DFSM_OBJECT (g_ptr_array_index (simulated_objects, i));
+		machine = dfsm_object_get_machine (simulated_object);
+		reachability = dfsm_machine_calculate_state_reachability (machine);
+
+		for (state = 0; state < reachability->len; state++) {
+			switch (g_array_index (reachability, DfsmStateReachability, state)) {
+				case DFSM_STATE_UNREACHABLE:
+					g_printerr (_("State ‘%s’ of object ‘%s’ is unreachable."),
+					            dfsm_machine_get_state_name (machine, state),
+					            dfsm_object_get_object_path (simulated_object));
+					g_printerr ("\n");
+
+					/* Note the error, but continue so that we detect any other unreachable states. */
+					found_unreachable_states = TRUE;
+					break;
+				case DFSM_STATE_POSSIBLY_REACHABLE:
+				case DFSM_STATE_REACHABLE:
+					/* Nothing to do. */
+					break;
+				default:
+					g_assert_not_reached ();
+			}
+		}
+
+		g_array_unref (reachability);
+	}
+
 	g_ptr_array_unref (simulated_objects);
+
+	/* Did we find at least one unreachable state? Yes? Shame. */
+	if (found_unreachable_states == TRUE) {
+		return STATUS_UNREACHABLE_STATES;
+	}
 
 	return STATUS_SUCCESS;
 }
