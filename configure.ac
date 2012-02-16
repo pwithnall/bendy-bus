@@ -15,6 +15,7 @@ AC_PROG_CPP
 AM_PROG_LEX
 AC_PROG_YACC
 LT_INIT
+PKG_PROG_PKG_CONFIG
 
 AC_PATH_PROG([GLIB_GENMARSHAL],[glib-genmarshal])
 
@@ -45,6 +46,7 @@ PKG_CHECK_MODULES([GIO],[gio-2.0 >= $GIO_REQS gio-unix-2.0 >= $GIO_REQS])
 # Output!
 AC_CONFIG_FILES([
 Makefile
+dfsm/dfsm.pc
 po/Makefile.in
 ])
 AC_OUTPUT

@@ -156,6 +156,13 @@ dfsm/dfsm-marshal.c: $(top_srcdir)/dfsm/dfsm-marshal.list dfsm/dfsm-marshal.h
 EXTRA_DIST += $(top_srcdir)/dfsm/dfsm-marshal.list
 CLEANFILES += $(dfsm_marshal_sources)
 
+# pkgconfig data
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = dfsm/dfsm.pc
+
+EXTRA_DIST += dfsm/dfsm.pc.in
+CLEANFILES += $(pkgconfig_DATA)
+
 # libdfsm tests
 test_cppflags = \
 	-I$(top_srcdir) \
