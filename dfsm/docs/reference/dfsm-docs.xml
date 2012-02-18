@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.3//EN" "http://www.oasis-open.org/docbook/xml/4.3/docbookx.dtd" [
+	<!ENTITY % local.common.attrib "xmlns:xi  CDATA  #FIXED 'http://www.w3.org/2003/XInclude'">
+]>
+<book id="index" xmlns:xi="http://www.w3.org/2003/XInclude">
+	<bookinfo>
+		<title>DFSM Reference Manual</title>
+		<releaseinfo>for libdfsm.</releaseinfo>
+	</bookinfo>
+
+	<part>
+		<title>DFSM Overview</title>
+		<!--<xi:include href="dfsm-overview.xml"/>-->
+		<chapter>
+			<title>Object Hierarchy</title>
+			<xi:include href="xml/tree_index.sgml"/>
+			<xi:include href="xml/object_index.sgml"/>
+		</chapter>
+	</part>
+
+	<part>
+		<title>Core API</title>
+		<chapter>
+			<title>High Level API</title>
+			<xi:include href="xml/dfsm-dbus-output-sequence.xml"/>
+			<xi:include href="xml/dfsm-environment.xml"/>
+			<xi:include href="xml/dfsm-machine.xml"/>
+			<xi:include href="xml/dfsm-object.xml"/>
+			<xi:include href="xml/dfsm-output-sequence.xml"/>
+			<xi:include href="xml/dfsm-parser.xml"/>
+			<xi:include href="xml/dfsm-probabilities.xml"/>
+			<xi:include href="xml/dfsm-utils.xml"/>
+		</chapter>
+
+		<chapter>
+			<title>AST API</title>
+			<xi:include href="xml/dfsm-ast-data-structure.xml"/>
+			<xi:include href="xml/dfsm-ast-expression.xml"/>
+			<xi:include href="xml/dfsm-ast-expression-binary.xml"/>
+			<xi:include href="xml/dfsm-ast-expression-data-structure.xml"/>
+			<xi:include href="xml/dfsm-ast-expression-function-call.xml"/>
+			<xi:include href="xml/dfsm-ast-expression-unary.xml"/>
+			<xi:include href="xml/dfsm-ast-node.xml"/>
+			<xi:include href="xml/dfsm-ast-object.xml"/>
+			<xi:include href="xml/dfsm-ast-precondition.xml"/>
+			<xi:include href="xml/dfsm-ast-statement.xml"/>
+			<xi:include href="xml/dfsm-ast-statement-assignment.xml"/>
+			<xi:include href="xml/dfsm-ast-statement-emit.xml"/>
+			<xi:include href="xml/dfsm-ast-statement-reply.xml"/>
+			<xi:include href="xml/dfsm-ast-statement-throw.xml"/>
+			<xi:include href="xml/dfsm-ast-transition.xml"/>
+			<xi:include href="xml/dfsm-ast-variable.xml"/>
+		</chapter>
+	</part>
+
+	<part>
+		<title>Appendices</title>
+		<index id="api-index-full">
+			<title>API Index</title>
+			<xi:include href="xml/api-index-full.xml"><xi:fallback/></xi:include>
+		</index>
+		<index id="api-index-deprecated">
+			<title>Index of deprecated symbols</title>
+			<xi:include href="xml/api-index-deprecated.xml"><xi:fallback/></xi:include>
+		</index>
+		<xi:include href="xml/annotation-glossary.xml"><xi:fallback /></xi:include>
+	</part>
+</book>

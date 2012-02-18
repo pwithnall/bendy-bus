@@ -1,4 +1,4 @@
-SUBDIRS = po
+SUBDIRS = po . dfsm/docs/reference
 
 # Setup
 bin_PROGRAMS =
@@ -11,6 +11,7 @@ DISTCLEANFILES =
 MAINTAINERCLEANFILES =
 GITIGNOREFILES =
 BUILT_SOURCES =
+DISTCHECK_CONFIGURE_FLAGS =
 
 # libdfsm
 
@@ -199,6 +200,11 @@ GITIGNOREFILES += \
 	dfsm/tests/.dirstamp \
 	dfsm/tests/.libs/ \
 	$(NULL)
+
+# libdfsm documentation
+DISTCHECK_CONFIGURE_FLAGS += --enable-gtk-doc
+EXTRA_DIST += gtk-doc.make
+MAINTAINERCLEANFILES += gtk-doc.make
 
 # bendy-bus
 bin_PROGRAMS += bendy-bus/bendy-bus

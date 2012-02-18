@@ -13,6 +13,7 @@ PKG_NAME="bendy-bus"
 
 libtoolize --force --copy || exit 1
 intltoolize --force --copy --automake || exit 1
+gtkdocize --copy || exit 1
 aclocal -I m4 || exit 1
 autoconf || exit 1
 autoheader || exit 1

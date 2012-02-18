@@ -19,6 +19,14 @@ PKG_PROG_PKG_CONFIG
 
 AC_PATH_PROG([GLIB_GENMARSHAL],[glib-genmarshal])
 
+# Documentation
+# Note that the GTK_DOC_CHECK() macro must be invoked at the start of the line, as gtkdocize greps for it.
+m4_ifdef([GTK_DOC_CHECK],[
+GTK_DOC_CHECK([1.14],[--flavour no-tmpl])
+],[
+AM_CONDITIONAL([ENABLE_GTK_DOC], false)
+])
+
 # Internationalisation
 GETTEXT_PACKAGE=bendy-bus
 AC_SUBST(GETTEXT_PACKAGE)
@@ -47,6 +55,7 @@ PKG_CHECK_MODULES([GIO],[gio-2.0 >= $GIO_REQS gio-unix-2.0 >= $GIO_REQS])
 AC_CONFIG_FILES([
 Makefile
 dfsm/dfsm.pc
+dfsm/docs/reference/Makefile
 po/Makefile.in
 ])
 AC_OUTPUT
