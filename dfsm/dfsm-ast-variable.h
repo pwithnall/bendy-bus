@@ -37,12 +37,23 @@ G_BEGIN_DECLS
 
 typedef struct _DfsmAstVariablePrivate	DfsmAstVariablePrivate;
 
+/**
+ * DfsmAstVariable:
+ *
+ * All the fields in the #DfsmAstVariable structure are private and should never be accessed directly.
+ */
 typedef struct {
 	DfsmAstNode parent;
 	DfsmAstVariablePrivate *priv;
 } DfsmAstVariable;
 
+/**
+ * DfsmAstVariableClass:
+ *
+ * All the fields in the #DfsmAstVariableClass structure are private and should never be accessed directly.
+ */
 typedef struct {
+	/*< private >*/
 	DfsmAstNodeClass parent;
 } DfsmAstVariableClass;
 

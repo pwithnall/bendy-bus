@@ -36,12 +36,23 @@ G_BEGIN_DECLS
 
 typedef struct _DfsmAstStatementThrowPrivate	DfsmAstStatementThrowPrivate;
 
+/**
+ * DfsmAstStatementThrow:
+ *
+ * All the fields in the #DfsmAstStatementThrow structure are private and should never be accessed directly.
+ */
 typedef struct {
 	DfsmAstStatement parent;
 	DfsmAstStatementThrowPrivate *priv;
 } DfsmAstStatementThrow;
 
+/**
+ * DfsmAstStatementThrowClass:
+ *
+ * All the fields in the #DfsmAstStatementThrowClass structure are private and should never be accessed directly.
+ */
 typedef struct {
+	/*< private >*/
 	DfsmAstStatementClass parent;
 } DfsmAstStatementThrowClass;
 

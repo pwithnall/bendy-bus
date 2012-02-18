@@ -28,6 +28,13 @@
 
 G_BEGIN_DECLS
 
+/**
+ * DfsmVariableScope:
+ * @DFSM_VARIABLE_SCOPE_LOCAL: local to a transition block
+ * @DFSM_VARIABLE_SCOPE_OBJECT: object-wide within an object block
+ *
+ * Possible scopes for variables in a machine description.
+ */
 typedef enum {
 	DFSM_VARIABLE_SCOPE_LOCAL,
 	DFSM_VARIABLE_SCOPE_OBJECT,
@@ -42,12 +49,23 @@ typedef enum {
 
 typedef struct _DfsmEnvironmentPrivate	DfsmEnvironmentPrivate;
 
+/**
+ * DfsmEnvironment:
+ *
+ * All the fields in the #DfsmEnvironment structure are private and should never be accessed directly.
+ */
 typedef struct {
 	GObject parent;
 	DfsmEnvironmentPrivate *priv;
 } DfsmEnvironment;
 
+/**
+ * DfsmEnvironmentClass:
+ *
+ * All the fields in the #DfsmEnvironmentClass structure are private and should never be accessed directly.
+ */
 typedef struct {
+	/*< private >*/
 	GObjectClass parent;
 } DfsmEnvironmentClass;
 

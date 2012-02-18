@@ -29,6 +29,13 @@
 
 G_BEGIN_DECLS
 
+/**
+ * DfsmAstDictionaryEntry:
+ * @key: expression giving the dictionary entry's key
+ * @value: expression giving the dictionary entry's value
+ *
+ * A single dictionary entry, mapping the given @key to the given @value.
+ */
 typedef struct {
 	DfsmAstExpression *key;
 	DfsmAstExpression *value;
@@ -90,12 +97,23 @@ typedef enum {
 
 typedef struct _DfsmAstDataStructurePrivate	DfsmAstDataStructurePrivate;
 
+/**
+ * DfsmAstDataStructure:
+ *
+ * All the fields in the #DfsmAstDataStructure structure are private and should never be accessed directly.
+ */
 typedef struct {
 	DfsmAstNode parent;
 	DfsmAstDataStructurePrivate *priv;
 } DfsmAstDataStructure;
 
+/**
+ * DfsmAstDataStructureClass:
+ *
+ * All the fields in the #DfsmAstDataStructureClass structure are private and should never be accessed directly.
+ */
 typedef struct {
+	/*< private >*/
 	DfsmAstNodeClass parent;
 } DfsmAstDataStructureClass;
 

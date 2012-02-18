@@ -37,12 +37,23 @@ G_BEGIN_DECLS
 
 typedef struct _DfsmAstStatementReplyPrivate	DfsmAstStatementReplyPrivate;
 
+/**
+ * DfsmAstStatementReply:
+ *
+ * All the fields in the #DfsmAstStatementReply structure are private and should never be accessed directly.
+ */
 typedef struct {
 	DfsmAstStatement parent;
 	DfsmAstStatementReplyPrivate *priv;
 } DfsmAstStatementReply;
 
+/**
+ * DfsmAstStatementReplyClass:
+ *
+ * All the fields in the #DfsmAstStatementReplyClass structure are private and should never be accessed directly.
+ */
 typedef struct {
+	/*< private >*/
 	DfsmAstStatementClass parent;
 } DfsmAstStatementReplyClass;
 

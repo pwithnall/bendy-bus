@@ -503,7 +503,7 @@ _dfsm_machine_new (DfsmEnvironment *environment, GPtrArray/*<string>*/ *state_na
 }
 
 /**
- * dfsm_machine_reset_simulation:
+ * dfsm_machine_reset_state:
  * @self: a #DfsmMachine
  *
  * Reset the simulation's state. This can be called whether the simulation is currently running or stopped. In both cases, it resets the DFSM to its

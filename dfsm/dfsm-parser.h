@@ -28,13 +28,27 @@
 
 G_BEGIN_DECLS
 
+/**
+ * DfsmParseError:
+ * @DFSM_PARSE_ERROR_SYNTAX: syntax error in the input file
+ * @DFSM_PARSE_ERROR_OOM: out of memory while parsing
+ * @DFSM_PARSE_ERROR_AST_INVALID: post-parsing checks on the AST failed
+ *
+ * Error codes for the #DFSM_PARSE_ERROR domain returned by the parser.
+ */
 typedef enum {
 	DFSM_PARSE_ERROR_SYNTAX,
 	DFSM_PARSE_ERROR_OOM,
 	DFSM_PARSE_ERROR_AST_INVALID,
 } DfsmParseError;
 
+/**
+ * DFSM_PARSE_ERROR:
+ *
+ * Error domain returned by the parser.
+ */
 #define DFSM_PARSE_ERROR dfsm_parse_error_quark ()
+
 GQuark dfsm_parse_error_quark (void) G_GNUC_PURE;
 
 G_END_DECLS

@@ -60,14 +60,27 @@ typedef guint DfsmMachineStateNumber;
 
 typedef struct _DfsmMachinePrivate	DfsmMachinePrivate;
 
+/**
+ * DfsmMachine:
+ *
+ * All the fields in the #DfsmMachine structure are private and should never be accessed directly.
+ */
 typedef struct {
 	GObject parent;
 	DfsmMachinePrivate *priv;
 } DfsmMachine;
 
+/**
+ * DfsmMachineClass:
+ * @check_transition: default handler for the #DfsmMachine::check-transition signal
+ *
+ * Class structure for #DfsmMachine.
+ */
 typedef struct {
+	/*< private >*/
 	GObjectClass parent;
 
+	/*< public >*/
 	gboolean (*check_transition) (DfsmMachine *machine, DfsmMachineStateNumber from_state, DfsmMachineStateNumber to_state,
 	                              DfsmAstTransition *transition, const gchar *nickname);
 } DfsmMachineClass;

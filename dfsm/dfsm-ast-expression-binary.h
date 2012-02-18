@@ -70,12 +70,23 @@ typedef enum {
 
 typedef struct _DfsmAstExpressionBinaryPrivate	DfsmAstExpressionBinaryPrivate;
 
+/**
+ * DfsmAstExpressionBinary:
+ *
+ * All the fields in the #DfsmAstExpressionBinary structure are private and should never be accessed directly.
+ */
 typedef struct {
 	DfsmAstExpression parent;
 	DfsmAstExpressionBinaryPrivate *priv;
 } DfsmAstExpressionBinary;
 
+/**
+ * DfsmAstExpressionBinaryClass:
+ *
+ * All the fields in the #DfsmAstExpressionBinary structure are private and should never be accessed directly.
+ */
 typedef struct {
+	/*< private >*/
 	DfsmAstExpressionClass parent;
 } DfsmAstExpressionBinaryClass;
 

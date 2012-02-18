@@ -28,9 +28,26 @@
 
 G_BEGIN_DECLS
 
+/**
+ * DfsmAstObjectStateNumber:
+ *
+ * A unique identifier for a DFSM state in a given #DfsmAstObject. Same as #DfsmMachineStateNumber.
+ */
 typedef guint DfsmAstObjectStateNumber; /* same as DfsmMachineStateNumber */
 
+/**
+ * DfsmAstObjectTransition:
+ * @from_state: state number of the state the transition moves out of
+ * @to_state: state number of the state the transition moves in to
+ * @transition: preconditions and statements which form the transition
+ * @nickname: (allow-none): user-provided nickname for this combination of @from_state, @to_state and @transition, or %NULL
+ *
+ * A wrapper for #DfsmAstTransition which specifies which states it moves between, and an optional user-provided nickname for this combination of
+ * state numbers and transition. This allows the re-use of #DfsmAstTransition<!-- -->s (for example) when they're specified to be used inside several
+ * states by the user.
+ */
 typedef struct {
+	/*< public >*/
 	DfsmAstObjectStateNumber from_state;
 	DfsmAstObjectStateNumber to_state;
 	DfsmAstTransition *transition;
@@ -55,12 +72,23 @@ gchar *dfsm_ast_object_transition_build_friendly_name (DfsmAstObjectTransition *
 
 typedef struct _DfsmAstObjectPrivate	DfsmAstObjectPrivate;
 
+/**
+ * DfsmAstObject:
+ *
+ * All the fields in the #DfsmAstObject structure are private and should never be accessed directly.
+ */
 typedef struct {
 	DfsmAstNode parent;
 	DfsmAstObjectPrivate *priv;
 } DfsmAstObject;
 
+/**
+ * DfsmAstObjectClass:
+ *
+ * All the fields in the #DfsmAstObjectClass structure are private and should never be accessed directly.
+ */
 typedef struct {
+	/*< private >*/
 	DfsmAstNodeClass parent;
 } DfsmAstObjectClass;
 

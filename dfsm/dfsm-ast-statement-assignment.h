@@ -41,12 +41,23 @@ G_BEGIN_DECLS
 
 typedef struct _DfsmAstStatementAssignmentPrivate	DfsmAstStatementAssignmentPrivate;
 
+/**
+ * DfsmAstStatementAssignment:
+ *
+ * All the fields in the #DfsmAstStatementAssignment structure are private and should never be accessed directly.
+ */
 typedef struct {
 	DfsmAstStatement parent;
 	DfsmAstStatementAssignmentPrivate *priv;
 } DfsmAstStatementAssignment;
 
+/**
+ * DfsmAstStatementAssignmentClass:
+ *
+ * All the fields in the #DfsmAstStatementAssignmentClass structure are private and should never be accessed directly.
+ */
 typedef struct {
+	/*< private >*/
 	DfsmAstStatementClass parent;
 } DfsmAstStatementAssignmentClass;
 

@@ -51,12 +51,23 @@ typedef enum {
 
 typedef struct _DfsmAstTransitionPrivate	DfsmAstTransitionPrivate;
 
+/**
+ * DfsmAstTransition:
+ *
+ * All the fields in the #DfsmAstTransition structure are private and should never be accessed directly.
+ */
 typedef struct {
 	DfsmAstNode parent;
 	DfsmAstTransitionPrivate *priv;
 } DfsmAstTransition;
 
+/**
+ * DfsmAstTransitionClass:
+ *
+ * All the fields in the #DfsmAstTransitionClass structure are private and should never be accessed directly.
+ */
 typedef struct {
+	/*< private >*/
 	DfsmAstNodeClass parent;
 } DfsmAstTransitionClass;
 

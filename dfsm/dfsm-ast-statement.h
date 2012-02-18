@@ -38,14 +38,27 @@ G_BEGIN_DECLS
 
 typedef struct _DfsmAstStatementPrivate	DfsmAstStatementPrivate;
 
+/**
+ * DfsmAstStatement:
+ *
+ * All the fields in the #DfsmAstStatement structure are private and should never be accessed directly.
+ */
 typedef struct {
 	DfsmAstNode parent;
 	DfsmAstStatementPrivate *priv;
 } DfsmAstStatement;
 
+/**
+ * DfsmAstStatementClass:
+ * @execute: executes the statement and all its children, appending any state-changing operations to the @output_sequence for later output
+ *
+ * Class structure for #DfsmAstStatement.
+ */
 typedef struct {
+	/*< private >*/
 	DfsmAstNodeClass parent;
 
+	/*< public >*/
 	/* Virtual methods */
 	void (*execute) (DfsmAstStatement *self, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence);
 } DfsmAstStatementClass;

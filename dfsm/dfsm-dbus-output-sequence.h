@@ -38,12 +38,23 @@ G_BEGIN_DECLS
 
 typedef struct _DfsmDBusOutputSequencePrivate	DfsmDBusOutputSequencePrivate;
 
+/**
+ * DfsmDBusOutputSequence:
+ *
+ * All the fields in the #DfsmDBusOutputSequence structure are private and should never be accessed directly.
+ */
 typedef struct {
 	GObject parent;
 	DfsmDBusOutputSequencePrivate *priv;
 } DfsmDBusOutputSequence;
 
+/**
+ * DfsmDBusOutputSequenceClass:
+ *
+ * All the fields in the #DfsmDBusOutputSequenceClass structure are private and should never be accessed directly.
+ */
 typedef struct {
+	/*< private >*/
 	GObjectClass parent;
 } DfsmDBusOutputSequenceClass;
 

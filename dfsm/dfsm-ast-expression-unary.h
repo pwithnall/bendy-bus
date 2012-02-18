@@ -46,12 +46,23 @@ typedef enum {
 
 typedef struct _DfsmAstExpressionUnaryPrivate	DfsmAstExpressionUnaryPrivate;
 
+/**
+ * DfsmAstExpressionUnary:
+ *
+ * All the fields in the #DfsmAstExpressionUnary structure are private and should never be accessed directly.
+ */
 typedef struct {
 	DfsmAstExpression parent;
 	DfsmAstExpressionUnaryPrivate *priv;
 } DfsmAstExpressionUnary;
 
+/**
+ * DfsmAstExpressionUnaryClass:
+ *
+ * All the fields in the #DfsmAstExpressionUnaryClass structure are private and should never be accessed directly.
+ */
 typedef struct {
+	/*< private >*/
 	DfsmAstExpressionClass parent;
 } DfsmAstExpressionUnaryClass;
 

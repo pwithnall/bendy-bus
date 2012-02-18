@@ -33,9 +33,22 @@ G_BEGIN_DECLS
 
 typedef struct _DfsmOutputSequence		DfsmOutputSequence; /* dummy typedef */
 
+/**
+ * DfsmOutputSequenceInterface:
+ * @output: output all state-changing actions queued up in the #DfsmOutputSequence, in order, returning any errors in @error
+ * @add_reply: append a D-Bus reply action with the given @parameters tuple to the sequence of actions queued up in the #DfsmOutputSequence
+ * @add_throw: add a D-Bus error reply action with the given #GError domain, code and message to the sequence of actions queued up in
+ * the #DfsmOutputSequence
+ * @add_emit: add a D-Bus signal emission for the given @signal_name on the given @interface_name with the given @parameters tuple to the sequence of
+ * actions queued up in the #DfsmOutputSequence.
+ *
+ * Interface structure for #DfsmOutputSequence.
+ */
 typedef struct {
+	/*< private >*/
 	GTypeInterface parent;
 
+	/*< public >*/
 	void (*output) (DfsmOutputSequence *self, GError **error);
 
 	void (*add_reply) (DfsmOutputSequence *self, GVariant *parameters);

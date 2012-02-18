@@ -51,14 +51,29 @@ GType dfsm_simulation_status_get_type (void) G_GNUC_CONST;
 
 typedef struct _DfsmObjectPrivate	DfsmObjectPrivate;
 
+/**
+ * DfsmObject:
+ *
+ * All the fields in the #DfsmObject structure are private and should never be accessed directly.
+ */
 typedef struct {
 	GObject parent;
 	DfsmObjectPrivate *priv;
 } DfsmObject;
 
+/**
+ * DfsmObjectClass:
+ * @dbus_method_call: default handler for the #DfsmObject::dbus-method-call signal
+ * @dbus_set_property: default handler for the #DfsmObject::dbus-set-property signal
+ * @arbitrary_transition: default handler for the #DfsmObject::arbitrary-transition signal
+ *
+ * Class structure for #DfsmObject.
+ */
 typedef struct {
+	/*< private >*/
 	GObjectClass parent;
 
+	/*< public >*/
 	gboolean (*dbus_method_call) (DfsmObject *obj, DfsmOutputSequence *output_sequence, const gchar *interface_name, const gchar *method_name,
 	                              GVariant *parameters, gboolean enable_fuzzing);
 	gboolean (*dbus_set_property) (DfsmObject *obj, DfsmOutputSequence *output_sequence, const gchar *interface_name, const gchar *property_name,

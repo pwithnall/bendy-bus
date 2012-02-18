@@ -330,7 +330,7 @@ dfsm_dbus_output_sequence_add_emit (DfsmOutputSequence *sequence, const gchar *i
 }
 
 /**
- * dfsm_dbus_output_sequence:
+ * dfsm_dbus_output_sequence_new:
  * @connection: a D-Bus connection to output the sequence over
  * @object_path: D-Bus path of the object the output sequence will occur on
  * @invocation: (allow-none): details of the triggering method invocation, or %NULL

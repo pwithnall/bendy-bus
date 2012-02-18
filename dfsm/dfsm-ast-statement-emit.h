@@ -37,12 +37,23 @@ G_BEGIN_DECLS
 
 typedef struct _DfsmAstStatementEmitPrivate	DfsmAstStatementEmitPrivate;
 
+/**
+ * DfsmAstStatementEmit:
+ *
+ * All the fields in the #DfsmAstStatementEmit structure are private and should never be accessed directly.
+ */
 typedef struct {
 	DfsmAstStatement parent;
 	DfsmAstStatementEmitPrivate *priv;
 } DfsmAstStatementEmit;
 
+/**
+ * DfsmAstStatementEmitClass:
+ *
+ * All the fields in the #DfsmAstStatementEmitClass structure are private and should never be accessed directly.
+ */
 typedef struct {
+	/*< private >*/
 	DfsmAstStatementClass parent;
 } DfsmAstStatementEmitClass;
 

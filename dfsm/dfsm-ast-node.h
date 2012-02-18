@@ -36,14 +36,32 @@ G_BEGIN_DECLS
 
 typedef struct _DfsmAstNodePrivate	DfsmAstNodePrivate;
 
+/**
+ * DfsmAstNode:
+ *
+ * All the fields in the #DfsmAstNode structure are private and should never be accessed directly.
+ */
 typedef struct {
 	GObject parent;
 	DfsmAstNodePrivate *priv;
 } DfsmAstNode;
 
+/**
+ * DfsmAstNodeClass:
+ * @sanity_check: sanity checks the #DfsmAstNode and its children at any time and aborts if anything is amiss; sanity checks should be assertions which
+ * should hold regardless of the stage of interpretation the #DfsmAstNode is in
+ * @pre_check_and_register: performs all checks on the #DfsmAstNode and its children which don't require variable lookup in an environment, and registers
+ * any variables' types in the @environment; errors are reported in @error, which is guaranteed to be non-%NULL
+ * @check: performs all checks on the #DfsmAstNode and its children which weren't performed in #DfsmAstNodeClass.pre_check_and_register, or which
+ * require variable lookup in the @environment; errors are reported in @error, which is guaranteed to be non-%NULL
+ *
+ * Class structure for #DfsmAstNode.
+ */
 typedef struct {
+	/*< private >*/
 	GObjectClass parent;
 
+	/*< public >*/
 	/* Virtual methods, all options */
 	void (*sanity_check) (DfsmAstNode *self); /* assertions which should always hold, regardless of the stage of interpretation we're in */
 	void (*pre_check_and_register) (DfsmAstNode *self, DfsmEnvironment *environment, GError **error /* guaranteed to be non-NULL */);

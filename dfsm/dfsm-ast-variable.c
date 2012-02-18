@@ -157,7 +157,7 @@ dfsm_ast_variable_calculate_type (DfsmAstVariable *self, DfsmEnvironment *enviro
 }
 
 /**
- * dfsm_ast_variable_to_variable:
+ * dfsm_ast_variable_to_variant:
  * @self: a #DfsmAstVariable
  * @environment: a #DfsmEnvironment containing all variables
  *

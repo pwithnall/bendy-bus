@@ -35,6 +35,11 @@ G_BEGIN_DECLS
 #define DFSM_IS_AST_EXPRESSION_CLASS(k)		(G_TYPE_CHECK_CLASS_TYPE ((k), DFSM_TYPE_AST_EXPRESSION))
 #define DFSM_AST_EXPRESSION_GET_CLASS(o)	(G_TYPE_INSTANCE_GET_CLASS ((o), DFSM_TYPE_AST_EXPRESSION, DfsmAstExpressionClass))
 
+/**
+ * DfsmAstExpression:
+ *
+ * All the fields in the #DfsmAstExpression structure are private and should never be accessed directly.
+ */
 typedef struct _DfsmAstExpression		DfsmAstExpression;
 typedef struct _DfsmAstExpressionPrivate	DfsmAstExpressionPrivate;
 
@@ -43,9 +48,19 @@ struct _DfsmAstExpression {
 	DfsmAstExpressionPrivate *priv;
 };
 
+/**
+ * DfsmAstExpressionClass:
+ * @calculate_type: calculates the static type of the #DfsmAstExpression given its children and an @environment to resolve variables in
+ * @evaluate: evaluates the dynamic value of the #DfsmAstExpression given its children and an @environment to resolve variables in
+ * @calculate_weight: calculates the fuzzing weight of the #DfsmAstExpression
+ *
+ * Class structure for #DfsmAstExpression.
+ */
 typedef struct {
+	/*< private >*/
 	DfsmAstNodeClass parent;
 
+	/*< public >*/
 	/* Virtual methods */
 	GVariantType *(*calculate_type) (DfsmAstExpression *self, DfsmEnvironment *environment);
 	GVariant *(*evaluate) (DfsmAstExpression *self, DfsmEnvironment *environment);

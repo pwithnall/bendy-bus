@@ -39,12 +39,23 @@ G_BEGIN_DECLS
 
 typedef struct _DfsmAstPreconditionPrivate	DfsmAstPreconditionPrivate;
 
+/**
+ * DfsmAstPrecondition:
+ *
+ * All the fields in the #DfsmAstPrecondition structure are private and should never be accessed directly.
+ */
 typedef struct {
 	DfsmAstNode parent;
 	DfsmAstPreconditionPrivate *priv;
 } DfsmAstPrecondition;
 
+/**
+ * DfsmAstPreconditionClass:
+ *
+ * All the fields in the #DfsmAstPreconditionClass structure are private and should never be accessed directly.
+ */
 typedef struct {
+	/*< private >*/
 	DfsmAstNodeClass parent;
 } DfsmAstPreconditionClass;
 

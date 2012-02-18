@@ -40,12 +40,23 @@ G_BEGIN_DECLS
 
 typedef struct _DfsmAstExpressionFunctionCallPrivate	DfsmAstExpressionFunctionCallPrivate;
 
+/**
+ * DfsmAstExpressionFunctionCall:
+ *
+ * All the fields in the #DfsmAstExpressionFunctionCall structure are private and should never be accessed directly.
+ */
 typedef struct {
 	DfsmAstExpression parent;
 	DfsmAstExpressionFunctionCallPrivate *priv;
 } DfsmAstExpressionFunctionCall;
 
+/**
+ * DfsmAstExpressionFunctionCallClass:
+ *
+ * All the fields in the #DfsmAstExpressionFunctionCallClass structure are private and should never be accessed directly.
+ */
 typedef struct {
+	/*< private >*/
 	DfsmAstExpressionClass parent;
 } DfsmAstExpressionFunctionCallClass;
 
