@@ -89,7 +89,6 @@ struct _DfsmObjectPrivate {
 	GPtrArray/*<string>*/ *interfaces;
 	GArray/*<uint>*/ *registration_ids; /* IDs for all the D-Bus interface registrations we've made, in the same order as ->interfaces. */
 	GHashTable/*<string, uint>*/ *bus_name_ids; /* map from well-known bus name to its ownership ID */
-	guint outstanding_bus_ownership_callbacks; /* number of calls to g_bus_own_name() which are outstanding */
 	guint dbus_activity_count;
 };
 
@@ -789,7 +788,7 @@ schedule_arbitrary_transition (DfsmObject *self)
 }
 
 static void
-start_simulation (DfsmObject *self, GDBusConnection *connection, GSimpleAsyncResult *async_result)
+start_simulation (DfsmObject *self, GDBusConnection *connection)
 {
 	DfsmObjectPrivate *priv = self->priv;
 
@@ -813,36 +812,89 @@ start_simulation (DfsmObject *self, GDBusConnection *connection, GSimpleAsyncRes
 	/* Change simulation status. */
 	priv->simulation_status = DFSM_SIMULATION_STATUS_STARTED;
 	g_object_notify (G_OBJECT (self), "simulation-status");
+}
 
-	/* Return in the async result. */
-	g_simple_async_result_complete_in_idle (async_result);
+typedef struct {
+	DfsmObject *simulated_object;
+	/* unowned */ GDBusConnection *connection; /* NOTE: no ref. is held here as that would introduce a ref. loop */
+	guint outstanding_bus_ownership_callbacks; /* number of calls to g_bus_own_name() which are outstanding */
+	GSimpleAsyncResult *async_result;
+	GError *error; /* set iff one of the names couldn't be acquired */
+	guint ref_count; /* should be > 0 */
+} RegisterOnBusData;
+
+static RegisterOnBusData *
+register_on_bus_data_ref (RegisterOnBusData *data)
+{
+	g_atomic_int_inc (&data->ref_count);
+
+	return data;
 }
 
 static void
-name_acquired_cb (GDBusConnection *connection, const gchar *name, GSimpleAsyncResult *async_result)
+register_on_bus_data_unref (RegisterOnBusData *data)
 {
-	DfsmObject *self;
-	DfsmObjectPrivate *priv;
+	if (g_atomic_int_dec_and_test (&data->ref_count) == TRUE) {
+		g_clear_error (&data->error);
+		g_clear_object (&data->async_result);
+		data->connection = NULL;
+		g_clear_object (&data->simulated_object);
+		g_slice_free (RegisterOnBusData, data);
+	}
+}
 
-	self = DFSM_OBJECT (g_async_result_get_source_object (G_ASYNC_RESULT (async_result)));
-	priv = self->priv;
+static void
+register_on_bus_finish (RegisterOnBusData *data)
+{
+	g_assert (data->outstanding_bus_ownership_callbacks == 0);
 
+	if (data->error == NULL) {
+		/* Start the simulation! */
+		start_simulation (data->simulated_object, data->connection);
+	} else {
+		/* Propagate the error. */
+		g_simple_async_result_take_error (data->async_result, data->error);
+		data->error = NULL;
+	}
+
+	/* Return in the async result, then clear it to indicate the operation's finished. */
+	g_simple_async_result_complete_in_idle (data->async_result);
+	g_clear_object (&data->async_result);
+
+	register_on_bus_data_unref (data);
+}
+
+static void
+name_acquired_cb (GDBusConnection *connection, const gchar *name, RegisterOnBusData *data)
+{
 	g_debug ("Acquired ownership of well-known bus name: %s", name);
 
-	/* Bail if this isn't the last callback. */
-	priv->outstanding_bus_ownership_callbacks--;
-	if (priv->outstanding_bus_ownership_callbacks > 0) {
+	/* Bail if this isn't the last callback or if the operation's already finished. */
+	if (data->async_result == NULL || --data->outstanding_bus_ownership_callbacks > 0) {
 		return;
 	}
 
-	/* Start the simulation! */
-	start_simulation (self, connection, async_result);
+	/* Finish off. */
+	register_on_bus_finish (data);
 }
 
 static void
-name_lost_cb (GDBusConnection *connection, const gchar *name, GAsyncResult *async_result)
+name_lost_cb (GDBusConnection *connection, const gchar *name, RegisterOnBusData *data)
 {
 	g_debug ("Lost ownership of well-known bus name: %s", name);
+
+	/* Set the error. */
+	if (data->error == NULL) {
+		data->error = g_error_new (G_IO_ERROR, G_IO_ERROR_EXISTS, _("A D-Bus object already owns the well-known name ‘%s’."), name);
+	}
+
+	/* Bail if this isn't the last callback or if the operation's already finished. */
+	if (data->async_result == NULL || --data->outstanding_bus_ownership_callbacks > 0) {
+		return;
+	}
+
+	/* Finish off. */
+	register_on_bus_finish (data);
 }
 
 /**
@@ -873,6 +925,7 @@ dfsm_object_register_on_bus (DfsmObject *self, GDBusConnection *connection, GAsy
 	GPtrArray/*<string>*/ *bus_names = NULL;
 	GHashTable/*<string, uint> */ *bus_name_ids = NULL;
 	GSimpleAsyncResult *async_result;
+	RegisterOnBusData *data;
 	GError *child_error = NULL;
 
 	g_return_if_fail (DFSM_IS_OBJECT (self));
@@ -933,9 +986,17 @@ dfsm_object_register_on_bus (DfsmObject *self, GDBusConnection *connection, GAsy
 	/* Register the process for all the object's well-known names. */
 	bus_names = dfsm_object_get_well_known_bus_names (self);
 
+	data = g_slice_new (RegisterOnBusData);
+	data->simulated_object = g_object_ref (self);
+	data->connection = connection; /* NOTE: no ref. is held here since the data should only ever be alive while the connection is */
+	data->outstanding_bus_ownership_callbacks = 0;
+	data->async_result = g_object_ref (async_result);
+	data->error = NULL;
+	data->ref_count = 1;
+
 	/* Hold an outstanding callback while we loop over the bus names, so that don't spawn the program under test before we've finished
 	 * requesting to own all our bus names (e.g. if their callbacks are called very quickly. */
-	priv->outstanding_bus_ownership_callbacks++;
+	data->outstanding_bus_ownership_callbacks++;
 	bus_name_ids = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
 
 	for (i = 0; i < bus_names->len; i++) {
@@ -950,17 +1011,17 @@ dfsm_object_register_on_bus (DfsmObject *self, GDBusConnection *connection, GAsy
 		}
 
 		/* Own the name. We keep a count of all the outstanding callbacks and only start the simulation once all are complete. */
-		priv->outstanding_bus_ownership_callbacks++;
+		data->outstanding_bus_ownership_callbacks++;
 		bus_name_id = g_bus_own_name_on_connection (connection, bus_name, G_BUS_NAME_OWNER_FLAGS_NONE,
 		                                            (GBusNameAcquiredCallback) name_acquired_cb, (GBusNameLostCallback) name_lost_cb,
-		                                            g_object_ref (async_result), g_object_unref);
+		                                            register_on_bus_data_ref (data), (GDestroyNotify) register_on_bus_data_unref);
 		g_hash_table_insert (bus_name_ids, g_strdup (bus_name), GUINT_TO_POINTER (bus_name_id));
 	}
 
 	/* Release our outstanding callback and start the simulation if it hasn't been started already. */
-	priv->outstanding_bus_ownership_callbacks--;
-	if (priv->outstanding_bus_ownership_callbacks == 0) {
-		start_simulation (self, connection, async_result);
+	data->outstanding_bus_ownership_callbacks--;
+	if (data->outstanding_bus_ownership_callbacks == 0) {
+		register_on_bus_finish (data);
 	}
 
 	/* Success! Save the array of bus name IDs so we can unown them later. */
