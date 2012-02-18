@@ -1143,6 +1143,76 @@ _dict_get_evaluate (DfsmAstExpression *parameters_expression, const GVariantType
 }
 
 static GVariantType *
+_dict_to_tuple_array_calculate_type (const GVariantType *parameters_type, GError **error)
+{
+	const GVariantType *parameters_supertype = (const GVariantType*) "(a{?*})";
+	const GVariantType *dict_entry_type, *key_type, *value_type;
+	const GVariantType *items[2];
+	GVariantType *array_type, *tuple_type;
+
+	/* The parameters have to conform to the supertype. */
+	if (g_variant_type_is_subtype_of (parameters_type, parameters_supertype) == FALSE) {
+		/* Error */
+		func_set_calculate_type_error (error, "dictToTupleArray", parameters_supertype, parameters_type);
+		return NULL;
+	}
+
+	dict_entry_type = g_variant_type_element (g_variant_type_first (parameters_type));
+	key_type = g_variant_type_key (dict_entry_type);
+	value_type = g_variant_type_value (dict_entry_type);
+
+	/* Return an array of tuples containing the keys and values. */
+	items[0] = key_type;
+	items[1] = value_type;
+	tuple_type = g_variant_type_new_tuple (items, 2);
+	array_type = g_variant_type_new_array (tuple_type);
+	g_variant_type_free (tuple_type);
+
+	return array_type;
+}
+
+static GVariant *
+_dict_to_tuple_array_evaluate (DfsmAstExpression *parameters_expression, const GVariantType *return_type, DfsmEnvironment *environment)
+{
+	GVariantIter iter;
+	GVariant *parameters, *dict, *child_entry, *output_array = NULL;
+	GVariantBuilder array_builder;
+
+	parameters = dfsm_ast_expression_evaluate (parameters_expression, environment);
+	dict = g_variant_get_child_value (parameters, 0);
+	g_variant_unref (parameters);
+
+	/* Iterate through the dict and copy all its entries into a new array of tuples. This function is designed primarily to bridge the gap between
+	 * http://telepathy.freedesktop.org/spec/Connection_Interface_Aliasing.html#Method:SetAliases and
+	 * http://telepathy.freedesktop.org/spec/Connection_Interface_Aliasing.html#Signal:AliasesChanged, since one uses a dict while the other
+	 * (erroneously) uses an array of tuples. */
+	g_variant_builder_init (&array_builder, return_type);
+	g_variant_iter_init (&iter, dict);
+
+	while ((child_entry = g_variant_iter_next_value (&iter)) != NULL) {
+		GVariant *current_key, *current_value;
+		GVariant *children[2];
+
+		current_key = g_variant_get_child_value (child_entry, 0);
+		current_value = g_variant_get_child_value (child_entry, 1);
+
+		children[0] = current_key;
+		children[1] = current_value;
+		g_variant_builder_add_value (&array_builder, g_variant_new_tuple (children, 2));
+
+		g_variant_unref (current_key);
+		g_variant_unref (child_entry);
+	}
+
+	output_array = g_variant_ref_sink (g_variant_builder_end (&array_builder));
+
+	g_variant_unref (dict);
+
+	/* Return the new array. */
+	return output_array;
+}
+
+static GVariantType *
 _struct_head_calculate_type (const GVariantType *parameters_type, GError **error)
 {
 	const GVariantType *parameters_supertype = (const GVariantType*) "(r)";
@@ -1250,6 +1320,7 @@ static const DfsmFunctionInfo _function_info[] = {
 	{ "dictSet",		_dict_set_calculate_type,	_dict_set_evaluate },
 	{ "dictUnset",		_dict_unset_calculate_type,	_dict_unset_evaluate },
 	{ "dictGet",		_dict_get_calculate_type,	_dict_get_evaluate },
+	{ "dictToTupleArray",	_dict_to_tuple_array_calculate_type,	_dict_to_tuple_array_evaluate },
 	{ "structHead",		_struct_head_calculate_type,	_struct_head_evaluate },
 	{ "stringJoin",		_string_join_calculate_type,	_string_join_evaluate },
 };
