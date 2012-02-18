@@ -103,3 +103,4 @@ dfsm_output_sequence_add_reply
 dfsm_output_sequence_add_throw
 dfsm_output_sequence_add_emit
 dfsm_parse_error_quark
+dfsm_simulation_status_get_type
