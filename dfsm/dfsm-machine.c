@@ -37,6 +37,9 @@ static void dfsm_machine_dispose (GObject *object);
 static void dfsm_machine_get_gobject_property (GObject *object, guint property_id, GValue *value, GParamSpec *pspec);
 static void dfsm_machine_set_gobject_property (GObject *object, guint property_id, const GValue *value, GParamSpec *pspec);
 
+static gboolean dfsm_machine_check_transition_default (DfsmMachine *machine, DfsmMachineStateNumber from_state, DfsmMachineStateNumber to_state,
+                                                       DfsmAstTransition *transition, const gchar *nickname);
+
 struct _DfsmMachinePrivate {
 	/* Simulation data */
 	DfsmMachineStateNumber machine_state;
@@ -56,6 +59,13 @@ enum {
 	PROP_ENVIRONMENT,
 };
 
+enum {
+	SIGNAL_CHECK_TRANSITION,
+	LAST_SIGNAL,
+};
+
+static guint machine_signals[LAST_SIGNAL] = { 0, };
+
 G_DEFINE_TYPE (DfsmMachine, dfsm_machine, G_TYPE_OBJECT)
 
 static void
@@ -68,6 +78,8 @@ dfsm_machine_class_init (DfsmMachineClass *klass)
 	gobject_class->get_property = dfsm_machine_get_gobject_property;
 	gobject_class->set_property = dfsm_machine_set_gobject_property;
 	gobject_class->dispose = dfsm_machine_dispose;
+
+	klass->check_transition = dfsm_machine_check_transition_default;
 
 	/**
 	 * DfsmMachine:machine-state:
@@ -90,6 +102,19 @@ dfsm_machine_class_init (DfsmMachineClass *klass)
 	                                                      "Environment", "The execution environment this machine simulation is using.",
 	                                                      DFSM_TYPE_ENVIRONMENT,
 	                                                      G_PARAM_CONSTRUCT_ONLY | G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+	/**
+	 * DfsmMachine::check-transition:
+	 *
+	 * Check a transition before it's executed, in order to selectively filter transitions from being executed. For example, a handler may return
+	 * %FALSE for all arbitrary transitions to prevent any of them from being executed.
+	 */
+	machine_signals[SIGNAL_CHECK_TRANSITION] = g_signal_new ("check-transition",
+	                                                         G_TYPE_FROM_CLASS (klass), G_SIGNAL_RUN_LAST | G_SIGNAL_DETAILED,
+	                                                         G_STRUCT_OFFSET (DfsmMachineClass, check_transition),
+	                                                         g_signal_accumulator_first_wins, NULL,
+	                                                         dfsm_marshal_BOOLEAN__UINT_UINT_OBJECT_STRING,
+	                                                         G_TYPE_BOOLEAN, 4, G_TYPE_UINT, G_TYPE_UINT, DFSM_TYPE_AST_TRANSITION, G_TYPE_STRING);
 }
 
 static void
@@ -213,6 +238,14 @@ execute_transition (DfsmMachine *self, DfsmAstObjectTransition *object_transitio
 }
 
 static gboolean
+dfsm_machine_check_transition_default (DfsmMachine *machine, DfsmMachineStateNumber from_state, DfsmMachineStateNumber to_state,
+                                       DfsmAstTransition *transition, const gchar *nickname)
+{
+	/* Execute all transitions by default. */
+	return TRUE;
+}
+
+static gboolean
 find_and_execute_random_transition (DfsmMachine *self, DfsmOutputSequence *output_sequence, GPtrArray/*<DfsmAstObjectTransition>*/ *possible_transitions,
                                     gboolean enable_fuzzing)
 {
@@ -246,6 +279,7 @@ find_and_execute_random_transition (DfsmMachine *self, DfsmOutputSequence *outpu
 		DfsmAstObjectTransition *object_transition;
 		DfsmAstTransition *transition;
 		gboolean will_throw_error = FALSE;
+		gboolean transition_is_executable = FALSE;
 
 		object_transition = g_ptr_array_index (possible_transitions, (i + rand_offset) % possible_transitions->len);
 		transition = object_transition->transition;
@@ -256,6 +290,23 @@ find_and_execute_random_transition (DfsmMachine *self, DfsmOutputSequence *outpu
 			g_debug ("…Skipping transition %s from ‘%s’ to ‘%s’ due to being in the wrong state (‘%s’).", friendly_transition_name,
 			         get_state_name (self, object_transition->from_state), get_state_name (self, object_transition->to_state),
 			         get_state_name (self, priv->machine_state));
+			g_free (friendly_transition_name);
+
+			continue;
+		}
+
+		/* Check whether this transition is eligible to be executed. If we're running unit tests, the test might not want this transition to
+		 * be executed at all. */
+		g_signal_emit (self, machine_signals[SIGNAL_CHECK_TRANSITION], g_quark_from_string (object_transition->nickname),
+		               object_transition->from_state, object_transition->to_state, object_transition->transition, object_transition->nickname,
+		               &transition_is_executable);
+
+		if (transition_is_executable == FALSE) {
+			gchar *friendly_transition_name;
+
+			friendly_transition_name = dfsm_ast_object_transition_build_friendly_name (object_transition);
+			g_debug ("…Skipping transition %s from ‘%s’ to ‘%s’ due to being manually overridden.", friendly_transition_name,
+			         get_state_name (self, object_transition->from_state), get_state_name (self, object_transition->to_state));
 			g_free (friendly_transition_name);
 
 			continue;

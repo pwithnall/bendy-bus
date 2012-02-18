@@ -58,6 +58,12 @@ typedef struct {
 
 typedef struct {
 	GObjectClass parent;
+
+	gboolean (*dbus_method_call) (DfsmObject *obj, DfsmOutputSequence *output_sequence, const gchar *interface_name, const gchar *method_name,
+	                              GVariant *parameters, gboolean enable_fuzzing);
+	gboolean (*dbus_set_property) (DfsmObject *obj, DfsmOutputSequence *output_sequence, const gchar *interface_name, const gchar *property_name,
+	                               GVariant *value, gboolean enable_fuzzing);
+	gboolean (*arbitrary_transition) (DfsmObject *obj, DfsmOutputSequence *output_sequence, gboolean enable_fuzzing);
 } DfsmObjectClass;
 
 GType dfsm_object_get_type (void) G_GNUC_CONST;

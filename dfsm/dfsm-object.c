@@ -27,6 +27,7 @@
 #include "dfsm-ast.h"
 #include "dfsm-dbus-output-sequence.h"
 #include "dfsm-machine.h"
+#include "dfsm-marshal.h"
 #include "dfsm-parser.h"
 #include "dfsm-parser-internal.h"
 #include "dfsm-probabilities.h"
@@ -58,6 +59,12 @@ static void dfsm_object_dispose (GObject *object);
 static void dfsm_object_finalize (GObject *object);
 static void dfsm_object_get_property (GObject *object, guint property_id, GValue *value, GParamSpec *pspec);
 static void dfsm_object_set_property (GObject *object, guint property_id, const GValue *value, GParamSpec *pspec);
+
+static gboolean dfsm_object_dbus_method_call_default (DfsmObject *obj, DfsmOutputSequence *output_sequence, const gchar *interface_name,
+                                                      const gchar *method_name, GVariant *parameters, gboolean enable_fuzzing);
+static gboolean dfsm_object_dbus_set_property_default (DfsmObject *obj, DfsmOutputSequence *output_sequence, const gchar *interface_name,
+                                                       const gchar *property_name, GVariant *value, gboolean enable_fuzzing);
+static gboolean dfsm_object_arbitrary_transition_default (DfsmObject *obj, DfsmOutputSequence *output_sequence, gboolean enable_fuzzing);
 
 static void dfsm_object_dbus_method_call (GDBusConnection *connection, const gchar *sender, const gchar *object_path, const gchar *interface_name,
                                           const gchar *method_name, GVariant *parameters, GDBusMethodInvocation *invocation, gpointer user_data);
@@ -100,6 +107,15 @@ enum {
 	PROP_SIMULATION_STATUS,
 };
 
+enum {
+	SIGNAL_DBUS_METHOD_CALL,
+	SIGNAL_DBUS_SET_PROPERTY,
+	SIGNAL_ARBITRARY_TRANSITION,
+	LAST_SIGNAL,
+};
+
+static guint object_signals[LAST_SIGNAL] = { 0, };
+
 G_DEFINE_TYPE (DfsmObject, dfsm_object, G_TYPE_OBJECT)
 
 static void
@@ -113,6 +129,10 @@ dfsm_object_class_init (DfsmObjectClass *klass)
 	gobject_class->set_property = dfsm_object_set_property;
 	gobject_class->dispose = dfsm_object_dispose;
 	gobject_class->finalize = dfsm_object_finalize;
+
+	klass->dbus_method_call = dfsm_object_dbus_method_call_default;
+	klass->dbus_set_property = dfsm_object_dbus_set_property_default;
+	klass->arbitrary_transition = dfsm_object_arbitrary_transition_default;
 
 	/**
 	 * DfsmObject:connection:
@@ -196,6 +216,51 @@ dfsm_object_class_init (DfsmObjectClass *klass)
 	                                                    "Simulation status", "The status of the simulation.",
 	                                                    DFSM_TYPE_SIMULATION_STATUS, DFSM_SIMULATION_STATUS_STOPPED,
 	                                                    G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+
+	/**
+	 * DfsmObject::dbus-method-call:
+	 *
+	 * Handle an incoming D-Bus method call. The default implementation for this signal will pass the method call through to this #DfsmObject's
+	 * #DfsmObject:machine. However, other consumers of the signal may elect to handle the method call themselves, then return %TRUE to prevent
+	 * others from doing so.
+	 */
+	object_signals[SIGNAL_DBUS_METHOD_CALL] = g_signal_new ("dbus-method-call",
+	                                                        G_TYPE_FROM_CLASS (klass), G_SIGNAL_RUN_LAST | G_SIGNAL_DETAILED,
+	                                                        G_STRUCT_OFFSET (DfsmObjectClass, dbus_method_call),
+	                                                        g_signal_accumulator_true_handled, NULL,
+	                                                        dfsm_marshal_BOOLEAN__OBJECT_STRING_STRING_VARIANT_BOOLEAN,
+	                                                        G_TYPE_BOOLEAN, 5, DFSM_TYPE_OUTPUT_SEQUENCE, G_TYPE_STRING, G_TYPE_STRING,
+	                                                        G_TYPE_VARIANT, G_TYPE_BOOLEAN);
+
+	/**
+	 * DfsmObject::dbus-set-property:
+	 *
+	 * Handle an incoming D-Bus property value to be set. The default implementation for this signal will pass the property set through to this
+	 * #DfsmObject's #DfsmObject:machine. However, other consumers of the signal may elect to handle the property set themselves, then return
+	 * %TRUE to prevent others from doing so.
+	 */
+	object_signals[SIGNAL_DBUS_SET_PROPERTY] = g_signal_new ("dbus-set-property",
+	                                                         G_TYPE_FROM_CLASS (klass), G_SIGNAL_RUN_LAST | G_SIGNAL_DETAILED,
+	                                                         G_STRUCT_OFFSET (DfsmObjectClass, dbus_set_property),
+	                                                         g_signal_accumulator_true_handled, NULL,
+	                                                         dfsm_marshal_BOOLEAN__OBJECT_STRING_STRING_VARIANT_BOOLEAN,
+	                                                         G_TYPE_BOOLEAN, 5, DFSM_TYPE_OUTPUT_SEQUENCE, G_TYPE_STRING, G_TYPE_STRING,
+	                                                         G_TYPE_VARIANT, G_TYPE_BOOLEAN);
+
+	/**
+	 * DfsmObject::arbitrary-transition:
+	 *
+	 * Handle a scheduled arbitrary transition in the state of the object. The default implementation for this signal will pass the trigger through
+	 * to this #DfsmObject's #DfsmObject:machine. However, other consumers of the signal may elect to handle the trigger themselves, then return
+	 * %TRUE to prevent others from doing so. One typical use for this is to selectively disable arbitrary transitions by returning %TRUE without
+	 * actually handling the transitions.
+	 */
+	object_signals[SIGNAL_ARBITRARY_TRANSITION] = g_signal_new ("arbitrary-transition",
+	                                                            G_TYPE_FROM_CLASS (klass), G_SIGNAL_RUN_LAST,
+	                                                            G_STRUCT_OFFSET (DfsmObjectClass, arbitrary_transition),
+	                                                            g_signal_accumulator_true_handled, NULL,
+	                                                            dfsm_marshal_BOOLEAN__OBJECT_BOOLEAN,
+	                                                            G_TYPE_BOOLEAN, 2, DFSM_TYPE_OUTPUT_SEQUENCE, G_TYPE_BOOLEAN);
 }
 
 static void
@@ -508,13 +573,23 @@ dfsm_object_factory_set_unfuzzed_transition_limit (guint transition_limit)
 	unfuzzed_transition_limit = transition_limit;
 }
 
+static gboolean
+dfsm_object_dbus_method_call_default (DfsmObject *obj, DfsmOutputSequence *output_sequence, const gchar *interface_name, const gchar *method_name,
+                                      GVariant *parameters, gboolean enable_fuzzing)
+{
+	dfsm_machine_call_method (obj->priv->machine, output_sequence, interface_name, method_name, parameters, enable_fuzzing);
+	return TRUE;
+}
+
 static void
 dfsm_object_dbus_method_call (GDBusConnection *connection, const gchar *sender, const gchar *object_path, const gchar *interface_name,
                               const gchar *method_name, GVariant *parameters, GDBusMethodInvocation *invocation, gpointer user_data)
 {
-	DfsmObjectPrivate *priv = DFSM_OBJECT (user_data)->priv;
+	DfsmObject *self = DFSM_OBJECT (user_data);
+	DfsmObjectPrivate *priv = self->priv;
 	gchar *parameters_string;
 	DfsmOutputSequence *output_sequence;
+	gboolean method_call_handled = FALSE;
 	GError *child_error = NULL;
 
 	/* Debug output. */
@@ -529,8 +604,14 @@ dfsm_object_dbus_method_call (GDBusConnection *connection, const gchar *sender, 
 
 	/* Pass the method call through to the DFSM. */
 	output_sequence = DFSM_OUTPUT_SEQUENCE (dfsm_dbus_output_sequence_new (connection, object_path, invocation));
-	dfsm_machine_call_method (priv->machine, output_sequence, interface_name, method_name, parameters,
-	                          (unfuzzed_transition_count >= unfuzzed_transition_limit) ? TRUE : FALSE);
+
+	g_signal_emit (self, object_signals[SIGNAL_DBUS_METHOD_CALL], g_quark_from_string (method_name),
+	               output_sequence, interface_name, method_name, parameters,
+	               (unfuzzed_transition_count >= unfuzzed_transition_limit) ? TRUE : FALSE,
+	               &method_call_handled);
+
+	/* In any case, the method call should fall through to this class' default implementation. */
+	g_assert (method_call_handled == TRUE);
 
 	if (unfuzzed_transition_count < unfuzzed_transition_limit) {
 		unfuzzed_transition_count++;
@@ -580,12 +661,21 @@ dfsm_object_dbus_get_property (GDBusConnection *connection, const gchar *sender,
 }
 
 static gboolean
+dfsm_object_dbus_set_property_default (DfsmObject *obj, DfsmOutputSequence *output_sequence, const gchar *interface_name, const gchar *property_name,
+                                       GVariant *value, gboolean enable_fuzzing)
+{
+	return dfsm_machine_set_property (obj->priv->machine, output_sequence, interface_name, property_name, value, enable_fuzzing);
+}
+
+static gboolean
 dfsm_object_dbus_set_property (GDBusConnection *connection, const gchar *sender, const gchar *object_path, const gchar *interface_name,
                                const gchar *property_name, GVariant *value, GError **error, gpointer user_data)
 {
-	DfsmObjectPrivate *priv = DFSM_OBJECT (user_data)->priv;
+	DfsmObject *self = DFSM_OBJECT (user_data);
+	DfsmObjectPrivate *priv = self->priv;
 	gchar *value_string;
 	DfsmOutputSequence *output_sequence;
+	gboolean property_set_handled_and_changed = FALSE;
 	GError *child_error = NULL;
 
 	value_string = g_variant_print (value, FALSE);
@@ -600,8 +690,11 @@ dfsm_object_dbus_set_property (GDBusConnection *connection, const gchar *sender,
 	/* Set the property on the machine. */
 	output_sequence = DFSM_OUTPUT_SEQUENCE (dfsm_dbus_output_sequence_new (connection, object_path, NULL));
 
-	if (dfsm_machine_set_property (priv->machine, output_sequence, interface_name, property_name, value,
-	                               (unfuzzed_transition_count >= unfuzzed_transition_limit) ? TRUE : FALSE) == TRUE) {
+	g_signal_emit (self, object_signals[SIGNAL_DBUS_SET_PROPERTY], g_quark_from_string (property_name),
+	               output_sequence, interface_name, property_name, value, (unfuzzed_transition_count >= unfuzzed_transition_limit) ? TRUE : FALSE,
+	               &property_set_handled_and_changed);
+
+	if (property_set_handled_and_changed == TRUE) {
 		GVariantBuilder *builder;
 		GVariant *parameters;
 
@@ -634,6 +727,13 @@ dfsm_object_dbus_set_property (GDBusConnection *connection, const gchar *sender,
 
 static void schedule_arbitrary_transition (DfsmObject *self);
 
+static gboolean
+dfsm_object_arbitrary_transition_default (DfsmObject *obj, DfsmOutputSequence *output_sequence, gboolean enable_fuzzing)
+{
+	dfsm_machine_make_arbitrary_transition (obj->priv->machine, output_sequence, enable_fuzzing);
+	return TRUE;
+}
+
 /* This gets called continuously at random intervals while the simulation's running. It checks whether any arbitrary transitions can be taken,
  * and if so, follows one of them. */
 static gboolean
@@ -641,12 +741,18 @@ arbitrary_transition_timeout_cb (DfsmObject *self)
 {
 	DfsmObjectPrivate *priv = self->priv;
 	DfsmOutputSequence *output_sequence;
+	gboolean arbitrary_transition_handled = FALSE;
 	GError *child_error = NULL;
 
 	/* Make an arbitrary transition. */
 	output_sequence = DFSM_OUTPUT_SEQUENCE (dfsm_dbus_output_sequence_new (priv->connection, priv->object_path, NULL));
-	dfsm_machine_make_arbitrary_transition (self->priv->machine, output_sequence,
-	                                        (unfuzzed_transition_count >= unfuzzed_transition_limit) ? TRUE : FALSE);
+
+	g_signal_emit (self, object_signals[SIGNAL_ARBITRARY_TRANSITION], 0,
+	               output_sequence, (unfuzzed_transition_count >= unfuzzed_transition_limit) ? TRUE : FALSE,
+	               &arbitrary_transition_handled);
+
+	/* In any case, the transition should fall through to this class' default implementation. */
+	g_assert (arbitrary_transition_handled == TRUE);
 
 	if (unfuzzed_transition_count < unfuzzed_transition_limit) {
 		unfuzzed_transition_count++;

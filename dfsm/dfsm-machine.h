@@ -23,6 +23,7 @@
 #include <glib.h>
 #include <glib-object.h>
 
+#include "dfsm-ast-transition.h"
 #include "dfsm-environment.h"
 #include "dfsm-output-sequence.h"
 #include "dfsm-utils.h"
@@ -66,6 +67,9 @@ typedef struct {
 
 typedef struct {
 	GObjectClass parent;
+
+	gboolean (*check_transition) (DfsmMachine *machine, DfsmMachineStateNumber from_state, DfsmMachineStateNumber to_state,
+	                              DfsmAstTransition *transition, const gchar *nickname);
 } DfsmMachineClass;
 
 GType dfsm_machine_get_type (void) G_GNUC_CONST;
