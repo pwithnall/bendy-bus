@@ -16,6 +16,7 @@ IGNORE_HFILES = \
 	dfsm-internal.h \
 	dfsm-marshal.h \
 	dfsm-parser-internal.h \
+	dfsm-probabilities.h \
 	$(NULL)
 
 HTML_IMAGES =

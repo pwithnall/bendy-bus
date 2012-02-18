@@ -19,7 +19,10 @@ dfsm_ast_data_structure_calculate_type
 dfsm_ast_data_structure_get_nickname
 dfsm_ast_data_structure_get_weight
 dfsm_ast_data_structure_is_variable
+dfsm_ast_data_structure_set_from_variant
+dfsm_ast_data_structure_to_variant
 dfsm_ast_dictionary_entry_new
+dfsm_ast_dictionary_entry_free
 <SUBSECTION Standard>
 DFSM_AST_DATA_STRUCTURE
 DFSM_AST_DATA_STRUCTURE_CLASS
@@ -37,6 +40,8 @@ dfsm_ast_data_structure_get_type
 DfsmAstExpression
 DfsmAstExpressionClass
 dfsm_ast_expression_calculate_type
+dfsm_ast_expression_calculate_weight
+dfsm_ast_expression_evaluate
 <SUBSECTION Standard>
 DFSM_AST_EXPRESSION
 DFSM_AST_EXPRESSION_CLASS
@@ -72,6 +77,7 @@ DfsmAstExpressionDataStructure
 DfsmAstExpressionDataStructureClass
 dfsm_ast_expression_data_structure_get_data_structure
 dfsm_ast_expression_data_structure_to_variant
+dfsm_ast_expression_data_structure_set_from_variant
 <SUBSECTION Standard>
 DFSM_AST_EXPRESSION_DATA_STRUCTURE
 DFSM_AST_EXPRESSION_DATA_STRUCTURE_CLASS
@@ -137,6 +143,9 @@ dfsm_ast_node_get_type
 
 <SECTION>
 <FILE>dfsm-ast-object</FILE>
+<TITLE>DfsmAstObject</TITLE>
+DfsmAstObject
+DfsmAstObjectClass
 DfsmAstObjectStateNumber
 DfsmAstObjectTransition
 dfsm_ast_object_get_environment
@@ -144,7 +153,17 @@ dfsm_ast_object_get_object_path
 dfsm_ast_object_initial_check
 dfsm_ast_object_transition_build_friendly_name
 dfsm_ast_object_transition_new
+dfsm_ast_object_transition_ref
 dfsm_ast_object_transition_unref
+<SUBSECTION Standard>
+DFSM_AST_OBJECT
+DFSM_AST_OBJECT_CLASS
+DFSM_AST_OBJECT_GET_CLASS
+DFSM_IS_AST_OBJECT
+DFSM_IS_AST_OBJECT_CLASS
+DFSM_TYPE_AST_OBJECT
+DfsmAstObjectPrivate
+dfsm_ast_object_get_type
 </SECTION>
 
 <SECTION>
@@ -277,6 +296,8 @@ dfsm_ast_transition_get_type
 DfsmAstVariable
 DfsmAstVariableClass
 dfsm_ast_variable_calculate_type
+dfsm_ast_variable_set_from_variant
+dfsm_ast_variable_to_variant
 <SUBSECTION Standard>
 DFSM_AST_VARIABLE
 DFSM_AST_VARIABLE_CLASS
@@ -293,6 +314,7 @@ dfsm_ast_variable_get_type
 <TITLE>DfsmDBusOutputSequence</TITLE>
 DfsmDBusOutputSequence
 DfsmDBusOutputSequenceClass
+dfsm_dbus_output_sequence_new
 <SUBSECTION Standard>
 DFSM_DBUS_OUTPUT_SEQUENCE
 DFSM_DBUS_OUTPUT_SEQUENCE_CLASS
@@ -319,6 +341,9 @@ dfsm_environment_has_variable
 dfsm_environment_reset
 dfsm_environment_save_reset_point
 dfsm_environment_unset_variable_value
+dfsm_environment_function_evaluate
+dfsm_environment_set_variable_type
+dfsm_environment_set_variable_value
 <SUBSECTION Standard>
 DFSM_ENVIRONMENT
 DFSM_ENVIRONMENT_CLASS
@@ -404,20 +429,15 @@ dfsm_output_sequence_get_type
 
 <SECTION>
 <FILE>dfsm-parser</FILE>
+<TITLE>Parser</TITLE>
 DFSM_PARSE_ERROR
 DfsmParseError
 dfsm_parse_error_quark
 </SECTION>
 
 <SECTION>
-<FILE>dfsm-probabilities</FILE>
-DFSM_BIASED_COIN_FLIP
-DFSM_NONUNIFORM_DISTRIBUTION
-DFSM_NONUNIFORM_DISTRIBUTION_END
-</SECTION>
-
-<SECTION>
 <FILE>dfsm-utils</FILE>
+<TITLE>Utilities</TITLE>
 dfsm_is_function_name
 dfsm_is_state_name
 dfsm_is_variable_name

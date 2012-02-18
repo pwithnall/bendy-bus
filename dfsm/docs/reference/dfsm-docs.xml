@@ -28,7 +28,6 @@
 			<xi:include href="xml/dfsm-object.xml"/>
 			<xi:include href="xml/dfsm-output-sequence.xml"/>
 			<xi:include href="xml/dfsm-parser.xml"/>
-			<xi:include href="xml/dfsm-probabilities.xml"/>
 			<xi:include href="xml/dfsm-utils.xml"/>
 		</chapter>
 

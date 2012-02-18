@@ -50,7 +50,7 @@ typedef struct {
 
 GType dfsm_ast_precondition_get_type (void) G_GNUC_CONST;
 
-gboolean dfsm_ast_precondition_check_is_satisfied (DfsmAstPrecondition *precondition, DfsmEnvironment *environment);
+gboolean dfsm_ast_precondition_check_is_satisfied (DfsmAstPrecondition *self, DfsmEnvironment *environment);
 void dfsm_ast_precondition_throw_error (DfsmAstPrecondition *self, DfsmOutputSequence *output_sequence);
 const gchar *dfsm_ast_precondition_get_error_name (DfsmAstPrecondition *self) G_GNUC_PURE;
 

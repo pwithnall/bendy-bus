@@ -63,9 +63,9 @@ typedef struct {
 GType dfsm_ast_transition_get_type (void) G_GNUC_CONST;
 
 GPtrArray/*<DfsmAstPrecondition>*/ *dfsm_ast_transition_get_preconditions (DfsmAstTransition *self) G_GNUC_PURE;
-gboolean dfsm_ast_transition_check_preconditions (DfsmAstTransition *transition, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence,
+gboolean dfsm_ast_transition_check_preconditions (DfsmAstTransition *self, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence,
                                                   gboolean *will_throw_error);
-void dfsm_ast_transition_execute (DfsmAstTransition *transition, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence);
+void dfsm_ast_transition_execute (DfsmAstTransition *self, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence);
 
 DfsmAstTransitionTrigger dfsm_ast_transition_get_trigger (DfsmAstTransition *self) G_GNUC_PURE;
 const gchar *dfsm_ast_transition_get_trigger_method_name (DfsmAstTransition *self) G_GNUC_PURE;

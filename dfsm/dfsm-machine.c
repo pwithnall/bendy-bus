@@ -646,7 +646,7 @@ done:
  * @self: a #DfsmMachine
  * @output_sequence: an output sequence to append effects of setting the property to
  * @interface_name: the name of the D-Bus interface that @property_name is defined on
- * @method_name: the name of the D-Bus property to set
+ * @property_name: the name of the D-Bus property to set
  * @value: new value for the property
  * @enable_fuzzing: %TRUE to enable fuzzing and error-throwing transitions, %FALSE to disable them
  *

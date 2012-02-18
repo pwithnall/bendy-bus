@@ -556,7 +556,6 @@ dfsm_ast_transition_check_preconditions (DfsmAstTransition *self, DfsmEnvironmen
  * @self: a #DfsmAstTransition
  * @environment: the environment to execute the transition in
  * @output_sequence: an output sequence to append the transition's effects to
- * @error: a #GError
  *
  * Execute a given state machine transition. This may modify the @environment. It assumes that dfsm_ast_transition_check_preconditions() has already
  * been called for this transition and @environment and has returned %TRUE. It is an error to call this function otherwise.
