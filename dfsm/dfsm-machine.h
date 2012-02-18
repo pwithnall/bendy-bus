@@ -96,7 +96,7 @@ typedef enum {
 	DFSM_STATE_REACHABLE = 2,
 } DfsmStateReachability;
 
-GArray/*<DfsmStateReachability>*/ *dfsm_machine_calculate_state_reachability (DfsmMachine *self) DFSM_CONSTRUCTOR;
+GArray/*<DfsmStateReachability>*/ *dfsm_machine_calculate_state_reachability (DfsmMachine *self) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
 DfsmMachineStateNumber dfsm_machine_look_up_state (DfsmMachine *self, const gchar *state_name) G_GNUC_PURE;
 const gchar *dfsm_machine_get_state_name (DfsmMachine *self, DfsmMachineStateNumber state_number) G_GNUC_PURE;

@@ -27,7 +27,7 @@
 
 G_BEGIN_DECLS
 
-G_GNUC_INTERNAL GVariantType *dfsm_internal_dbus_arg_info_array_to_variant_type (const GDBusArgInfo **args) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL GVariantType *dfsm_internal_dbus_arg_info_array_to_variant_type (const GDBusArgInfo **args) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
 G_END_DECLS
 

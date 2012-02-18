@@ -24,14 +24,6 @@
 
 G_BEGIN_DECLS
 
-/**
- * DFSM_CONSTRUCTOR:
- *
- * Expands to a set of gcc function attributes suitable for constructors if the code is being compiled using gcc. Otherwise, expands to nothing.
- * This should be used at the end of the declaration of constructors.
- */
-#define DFSM_CONSTRUCTOR G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC
-
 gboolean dfsm_is_variable_name (const gchar *variable_name) G_GNUC_PURE;
 gboolean dfsm_is_state_name (const gchar *state_name) G_GNUC_PURE;
 gboolean dfsm_is_function_name (const gchar *function_name) G_GNUC_PURE;

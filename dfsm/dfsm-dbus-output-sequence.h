@@ -50,7 +50,7 @@ typedef struct {
 GType dfsm_dbus_output_sequence_get_type (void) G_GNUC_CONST;
 
 DfsmDBusOutputSequence *dfsm_dbus_output_sequence_new (GDBusConnection *connection, const gchar *object_path,
-                                                       GDBusMethodInvocation *invocation) DFSM_CONSTRUCTOR;
+                                                       GDBusMethodInvocation *invocation) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
 G_END_DECLS
 

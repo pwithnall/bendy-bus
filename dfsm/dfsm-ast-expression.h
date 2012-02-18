@@ -54,8 +54,8 @@ typedef struct {
 
 GType dfsm_ast_expression_get_type (void) G_GNUC_CONST;
 
-GVariantType *dfsm_ast_expression_calculate_type (DfsmAstExpression *self, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
-GVariant *dfsm_ast_expression_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
+GVariantType *dfsm_ast_expression_calculate_type (DfsmAstExpression *self, DfsmEnvironment *environment) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
+GVariant *dfsm_ast_expression_evaluate (DfsmAstExpression *self, DfsmEnvironment *environment) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 gdouble dfsm_ast_expression_calculate_weight (DfsmAstExpression *self);
 
 G_END_DECLS

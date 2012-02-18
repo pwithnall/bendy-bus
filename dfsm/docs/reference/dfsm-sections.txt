@@ -418,7 +418,6 @@ DFSM_NONUNIFORM_DISTRIBUTION_END
 
 <SECTION>
 <FILE>dfsm-utils</FILE>
-DFSM_CONSTRUCTOR
 dfsm_is_function_name
 dfsm_is_state_name
 dfsm_is_variable_name

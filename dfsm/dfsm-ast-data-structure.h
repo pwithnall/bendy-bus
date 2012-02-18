@@ -34,7 +34,7 @@ typedef struct {
 	DfsmAstExpression *value;
 } DfsmAstDictionaryEntry;
 
-DfsmAstDictionaryEntry *dfsm_ast_dictionary_entry_new (DfsmAstExpression *key, DfsmAstExpression *value) DFSM_CONSTRUCTOR;
+DfsmAstDictionaryEntry *dfsm_ast_dictionary_entry_new (DfsmAstExpression *key, DfsmAstExpression *value) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 void dfsm_ast_dictionary_entry_free (DfsmAstDictionaryEntry *entry);
 
 /**
@@ -104,9 +104,9 @@ GType dfsm_ast_data_structure_get_type (void) G_GNUC_CONST;
 gdouble dfsm_ast_data_structure_get_weight (DfsmAstDataStructure *self) G_GNUC_PURE;
 const gchar *dfsm_ast_data_structure_get_nickname (DfsmAstDataStructure *self) G_GNUC_PURE;
 
-GVariantType *dfsm_ast_data_structure_calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
+GVariantType *dfsm_ast_data_structure_calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
-GVariant *dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
+GVariant *dfsm_ast_data_structure_to_variant (DfsmAstDataStructure *self, DfsmEnvironment *environment) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 void dfsm_ast_data_structure_set_from_variant (DfsmAstDataStructure *self, DfsmEnvironment *environment, GVariant *new_value);
 
 gboolean dfsm_ast_data_structure_is_variable (DfsmAstDataStructure *self);

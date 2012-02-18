@@ -42,7 +42,8 @@ typedef struct {
 	glong source_pos; /* in characters, not bytes */
 } DfsmParserData;
 
-G_GNUC_INTERNAL GPtrArray *dfsm_bison_parse (GDBusNodeInfo *dbus_node_info, const gchar *source_buf, GError **error) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL GPtrArray *dfsm_bison_parse (GDBusNodeInfo *dbus_node_info, const gchar *source_buf,
+                                             GError **error) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
 typedef struct {
 	GPtrArray *data_blocks; /* array of GHashTables */
@@ -50,7 +51,7 @@ typedef struct {
 	GPtrArray *transitions; /* array of DfsmParserTransitionBlocks */
 } DfsmParserBlockList;
 
-G_GNUC_INTERNAL DfsmParserBlockList *dfsm_parser_block_list_new (void) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmParserBlockList *dfsm_parser_block_list_new (void) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 G_GNUC_INTERNAL void dfsm_parser_block_list_free (DfsmParserBlockList *block_list);
 
 typedef enum {
@@ -65,7 +66,7 @@ typedef struct {
 } DfsmParserTransitionDetails;
 
 G_GNUC_INTERNAL DfsmParserTransitionDetails *dfsm_parser_transition_details_new (DfsmParserTransitionType transition_type,
-                                                                                 const gchar *str) DFSM_CONSTRUCTOR;
+                                                                                 const gchar *str) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 G_GNUC_INTERNAL void dfsm_parser_transition_details_free (DfsmParserTransitionDetails *details);
 
 #include "dfsm-ast-transition.h"
@@ -76,7 +77,8 @@ typedef struct {
 } DfsmParserTransitionBlock;
 
 G_GNUC_INTERNAL DfsmParserTransitionBlock *dfsm_parser_transition_block_new (DfsmAstTransition *transition,
-                                                                             GPtrArray/*<DfsmParserStatePair>*/ *state_pairs) DFSM_CONSTRUCTOR;
+                                                                             GPtrArray/*<DfsmParserStatePair>*/ *state_pairs)
+                                                                             G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 G_GNUC_INTERNAL void dfsm_parser_transition_block_free (DfsmParserTransitionBlock *block);
 
 typedef struct {
@@ -86,17 +88,18 @@ typedef struct {
 } DfsmParserStatePair;
 
 G_GNUC_INTERNAL DfsmParserStatePair *dfsm_parser_state_pair_new (const gchar *from_state_name, const gchar *to_state_name,
-                                                                 const gchar *nickname) DFSM_CONSTRUCTOR;
+                                                                 const gchar *nickname) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 G_GNUC_INTERNAL void dfsm_parser_state_pair_free (DfsmParserStatePair *state_pair);
 
 /* AST node constructors */
-G_GNUC_INTERNAL DfsmEnvironment *_dfsm_environment_new (GPtrArray/*<GDBusInterfaceInfo>*/ *interfaces) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmEnvironment *_dfsm_environment_new (GPtrArray/*<GDBusInterfaceInfo>*/ *interfaces) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 G_GNUC_INTERNAL DfsmMachine *_dfsm_machine_new (DfsmEnvironment *environment, GPtrArray/*<string>*/ *state_names,
-                                                GPtrArray/*<DfsmAstTransition>*/ *transitions) DFSM_CONSTRUCTOR;
+                                                GPtrArray/*<DfsmAstTransition>*/ *transitions) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
 #include "dfsm-ast-data-structure.h"
 
-G_GNUC_INTERNAL DfsmAstDataStructure *dfsm_ast_data_structure_new (DfsmAstDataStructureType data_structure_type, gpointer value) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmAstDataStructure *dfsm_ast_data_structure_new (DfsmAstDataStructureType data_structure_type,
+                                                                   gpointer value) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
 G_GNUC_INTERNAL void dfsm_ast_data_structure_set_weight (DfsmAstDataStructure *self, gdouble weight);
 G_GNUC_INTERNAL void dfsm_ast_data_structure_set_type_annotation (DfsmAstDataStructure *self, const gchar *type_annotation);
@@ -107,46 +110,51 @@ G_GNUC_INTERNAL void dfsm_ast_data_structure_set_fuzzing_enabled (gboolean enabl
 #include "dfsm-ast-expression-binary.h"
 
 G_GNUC_INTERNAL DfsmAstExpression *dfsm_ast_expression_binary_new (DfsmAstExpressionBinaryType expression_type, DfsmAstExpression *left_node,
-                                                                   DfsmAstExpression *right_node) DFSM_CONSTRUCTOR;
+                                                                   DfsmAstExpression *right_node) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
-G_GNUC_INTERNAL DfsmAstExpression *dfsm_ast_expression_data_structure_new (DfsmAstDataStructure *data_structure) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmAstExpression *dfsm_ast_expression_data_structure_new (DfsmAstDataStructure *data_structure)
+                                                                           G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
-G_GNUC_INTERNAL DfsmAstExpression *dfsm_ast_expression_function_call_new (const gchar *function_name, DfsmAstExpression *parameters) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmAstExpression *dfsm_ast_expression_function_call_new (const gchar *function_name,
+                                                                          DfsmAstExpression *parameters) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
 #include "dfsm-ast-expression-unary.h"
 
 G_GNUC_INTERNAL DfsmAstExpression *dfsm_ast_expression_unary_new (DfsmAstExpressionUnaryType expression_type,
-                                                                  DfsmAstExpression *child_node) DFSM_CONSTRUCTOR;
+                                                                  DfsmAstExpression *child_node) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
 #include "dfsm-ast-object.h"
 
 G_GNUC_INTERNAL DfsmAstObject *dfsm_ast_object_new (GDBusNodeInfo *dbus_node_info, const gchar *object_path, GPtrArray/*<string>*/ *bus_names,
                                                     GPtrArray/*<string>*/ *interface_names,
                                                     GPtrArray/*<GHashTable>*/ *data_blocks, GPtrArray/*<GPtrArray>*/ *state_blocks,
-                                                    GPtrArray/*<DfsmParserTransitionBlock>*/ *transition_blocks) DFSM_CONSTRUCTOR;
+                                                    GPtrArray/*<DfsmParserTransitionBlock>*/ *transition_blocks)
+                                                    G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
 #include "dfsm-ast-precondition.h"
 
-G_GNUC_INTERNAL DfsmAstPrecondition *dfsm_ast_precondition_new (const gchar *error_name /* nullable */, DfsmAstExpression *condition) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmAstPrecondition *dfsm_ast_precondition_new (const gchar *error_name /* nullable */,
+                                                                DfsmAstExpression *condition) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
 #include "dfsm-ast-statement.h"
 
 G_GNUC_INTERNAL DfsmAstStatement *dfsm_ast_statement_assignment_new (DfsmAstDataStructure *data_structure,
-                                                                     DfsmAstExpression *expression) DFSM_CONSTRUCTOR;
+                                                                     DfsmAstExpression *expression) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
-G_GNUC_INTERNAL DfsmAstStatement *dfsm_ast_statement_emit_new (const gchar *signal_name, DfsmAstExpression *expression) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmAstStatement *dfsm_ast_statement_emit_new (const gchar *signal_name,
+                                                               DfsmAstExpression *expression) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
-G_GNUC_INTERNAL DfsmAstStatement *dfsm_ast_statement_reply_new (DfsmAstExpression *expression) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmAstStatement *dfsm_ast_statement_reply_new (DfsmAstExpression *expression) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
-G_GNUC_INTERNAL DfsmAstStatement *dfsm_ast_statement_throw_new (const gchar *error_name) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmAstStatement *dfsm_ast_statement_throw_new (const gchar *error_name) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
 G_GNUC_INTERNAL DfsmAstTransition *dfsm_ast_transition_new (const DfsmParserTransitionDetails *details,
                                                             GPtrArray/*<DfsmAstPrecondition>*/ *preconditions,
-                                                            GPtrArray/*<DfsmAstStatement>*/ *statements) DFSM_CONSTRUCTOR;
+                                                            GPtrArray/*<DfsmAstStatement>*/ *statements) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
 #include "dfsm-ast-variable.h"
 
-G_GNUC_INTERNAL DfsmAstVariable *dfsm_ast_variable_new (DfsmVariableScope scope, const gchar *variable_name) DFSM_CONSTRUCTOR;
+G_GNUC_INTERNAL DfsmAstVariable *dfsm_ast_variable_new (DfsmVariableScope scope, const gchar *variable_name) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
 G_END_DECLS
 

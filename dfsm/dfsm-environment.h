@@ -54,9 +54,11 @@ typedef struct {
 GType dfsm_environment_get_type (void) G_GNUC_CONST;
 
 gboolean dfsm_environment_has_variable (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name) G_GNUC_PURE;
-GVariantType *dfsm_environment_dup_variable_type (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name) DFSM_CONSTRUCTOR;
+GVariantType *dfsm_environment_dup_variable_type (DfsmEnvironment *self, DfsmVariableScope scope,
+                                                  const gchar *variable_name) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 void dfsm_environment_set_variable_type (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name, const GVariantType *new_type);
-GVariant *dfsm_environment_dup_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name) DFSM_CONSTRUCTOR;
+GVariant *dfsm_environment_dup_variable_value (DfsmEnvironment *self, DfsmVariableScope scope,
+                                               const gchar *variable_name) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 void dfsm_environment_set_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name, GVariant *new_value);
 void dfsm_environment_unset_variable_value (DfsmEnvironment *self, DfsmVariableScope scope, const gchar *variable_name);
 
@@ -68,9 +70,9 @@ typedef struct _DfsmAstExpression DfsmAstExpression;
 
 gboolean dfsm_environment_function_exists (const gchar *function_name) G_GNUC_PURE;
 GVariantType *dfsm_environment_function_calculate_type (const gchar *function_name, const GVariantType *parameters_type,
-                                                        GError **error) DFSM_CONSTRUCTOR;
+                                                        GError **error) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 GVariant *dfsm_environment_function_evaluate (const gchar *function_name, DfsmAstExpression *parameters_expression,
-                                              DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
+                                              DfsmEnvironment *environment) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
 GPtrArray/*<GDBusInterfaceInfo>*/ *dfsm_environment_get_interfaces (DfsmEnvironment *self) G_GNUC_PURE;
 

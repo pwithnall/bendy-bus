@@ -48,9 +48,9 @@ typedef struct {
 
 GType dfsm_ast_variable_get_type (void) G_GNUC_CONST;
 
-GVariantType *dfsm_ast_variable_calculate_type (DfsmAstVariable *self, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
+GVariantType *dfsm_ast_variable_calculate_type (DfsmAstVariable *self, DfsmEnvironment *environment) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
-GVariant *dfsm_ast_variable_to_variant (DfsmAstVariable *self, DfsmEnvironment *environment) DFSM_CONSTRUCTOR;
+GVariant *dfsm_ast_variable_to_variant (DfsmAstVariable *self, DfsmEnvironment *environment) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 void dfsm_ast_variable_set_from_variant (DfsmAstVariable *self, DfsmEnvironment *environment, GVariant *new_value);
 
 G_END_DECLS

@@ -69,9 +69,9 @@ typedef struct {
 GType dfsm_object_get_type (void) G_GNUC_CONST;
 
 GPtrArray/*<DfsmAstObject>*/ *dfsm_object_factory_asts_from_files (const gchar *simulation_code, const gchar *introspection_xml,
-                                                                   GError **error) DFSM_CONSTRUCTOR;
+                                                                   GError **error) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 GPtrArray/*<DfsmObject>*/ *dfsm_object_factory_from_files (const gchar *simulation_code, const gchar *introspection_xml,
-                                                           GError **error) DFSM_CONSTRUCTOR;
+                                                           GError **error) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
 
 void dfsm_object_factory_set_unfuzzed_transition_limit (guint transition_limit);
 
