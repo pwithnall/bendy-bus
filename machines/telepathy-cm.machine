@@ -151,6 +151,11 @@ object at /org/freedesktop/Telepathy/Connection/cm/protocol/account, org.freedes
 			("org", @as []?, 1u?, 1u?),
 			("url", ["type=home"]?, 1u?, 1u?),
 		]?;
+
+		/* Handles */
+		RequestedHandleCounter = 100u; /* give it an offset from the normal handles; this tries to prevent handle re-use which would confuse Telepathy clients. It's a hacky approach, but works well enough. */
+		AddedHandles = @as [];
+		AddedIdentifiers = @a{su} {};
 	}
 
 	states {
@@ -170,6 +175,18 @@ object at /org/freedesktop/Telepathy/Connection/cm/protocol/account, org.freedes
 	}
 
 	transition inside Connected on method GetContactAttributes {
+		/* Added contacts */
+		precondition { arrayGet (object->AddedHandles, arrayGet (Handles, 0u, 0u) - 100u, "") != "" }
+
+		reply ({arrayGet (Handles, 0u, 0u): {
+			"org.freedesktop.Telepathy.Connection/contact-id" : <arrayGet (object->AddedHandles, arrayGet (Handles, 0u, 0u) - 100u, "1@example.com"?)>,
+		}});
+	}
+
+	transition inside Connected on method GetContactAttributes {
+		/* Existing contacts */
+		precondition { arrayGet (object->AddedHandles, arrayGet (Handles, 0u, 0u) - 100u, "") == "" }
+
 		reply (pairKeys (Handles, {
 			"org.freedesktop.Telepathy.Connection/contact-id" : <"1@example.com"?>,
 			"org.freedesktop.Telepathy.Connection.Interface.Aliasing/alias" : <""?>,
@@ -298,6 +315,24 @@ object at /org/freedesktop/Telepathy/Connection/cm/protocol/account, org.freedes
 			("url", ["type=home"]?, ["http://example.com/"]?),
 		]?);
 	}
+
+	transition inside Connected on method RequestHandles {
+		/* Request a previously-added handle */
+		precondition { dictGet (object->AddedIdentifiers, arrayGet (Identifiers, 0u, ""), 0u) != 0u }
+
+		reply ([dictGet (object->AddedIdentifiers, arrayGet (Identifiers, 0u, ""), 0u)]);
+	}
+
+	transition inside Connected on method RequestHandles {
+		/* Request to add a handle */
+		precondition { dictGet (object->AddedIdentifiers, arrayGet (Identifiers, 0u, ""), 0u) == 0u }
+
+		reply ([object->RequestedHandleCounter]);
+
+		object->AddedHandles = arrayInsert (object->AddedHandles, object->RequestedHandleCounter, arrayGet (Identifiers, 0u, ""));
+		object->AddedIdentifiers = dictSet (object->AddedIdentifiers, arrayGet (Identifiers, 0u, ""), object->RequestedHandleCounter);
+		object->RequestedHandleCounter = object->RequestedHandleCounter + 1u;
+	}
 }
 
 object at /org/freedesktop/Telepathy/Connection/cm/protocol/account/subscribe implements org.freedesktop.Telepathy.Channel, org.freedesktop.Telepathy.Channel.Type.ContactList, org.freedesktop.Telepathy.Channel.Interface.Group {
@@ -317,7 +352,7 @@ object at /org/freedesktop/Telepathy/Connection/cm/protocol/account/subscribe im
 		InitiatorID = ""?;
 
 		/* Channel.I.Group */
-		GroupFlags = 6144u; /* Properties | Members_Changed_Detailed */
+		GroupFlags = 6147u; /* Can_Add | Can_Remove | Properties | Members_Changed_Detailed */
 		HandleOwners = @a{uu} {};
 		LocalPendingMembers = @a(uuus) [];
 		Members = @au [ 1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u, 9u, 10u ];
@@ -388,6 +423,15 @@ object at /org/freedesktop/Telepathy/Connection/cm/protocol/account/subscribe im
 
 	transition inside Open on method GetLocalPendingMembersWithInfo {
 		reply (object->LocalPendingMembers);
+	}
+
+	transition inside Open on method AddMembers {
+		object->Members = arrayInsert (object->Members, 0u, arrayGet (Contacts, 0u, 0u));
+		object->MemberIdentifiers = dictSet (object->MemberIdentifiers, arrayGet (Contacts, 0u, 0u), "1@example.com"?);
+
+		emit MembersChangedDetailed (Contacts, @au [], @au [], @au [], @a{sv} {});
+
+		reply ();
 	}
 }
 
