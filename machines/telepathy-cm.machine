@@ -333,6 +333,16 @@ object at /org/freedesktop/Telepathy/Connection/cm/protocol/account, org.freedes
 		object->AddedIdentifiers = dictSet (object->AddedIdentifiers, arrayGet (Identifiers, 0u, ""), object->RequestedHandleCounter);
 		object->RequestedHandleCounter = object->RequestedHandleCounter + 1u;
 	}
+
+	transition inside Connected on method SetAliases {
+		emit AliasesChanged (dictToTupleArray (Aliases));
+		reply ();
+	}
+
+	transition inside Connected on method SetContactInfo {
+		emit ContactInfoChanged (object->SelfHandle, ContactInfo);
+		reply ();
+	}
 }
 
 object at /org/freedesktop/Telepathy/Connection/cm/protocol/account/subscribe implements org.freedesktop.Telepathy.Channel, org.freedesktop.Telepathy.Channel.Type.ContactList, org.freedesktop.Telepathy.Channel.Interface.Group {
