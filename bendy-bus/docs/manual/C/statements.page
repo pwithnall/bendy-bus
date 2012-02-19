@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<page xmlns="http://projectmallard.org/1.0/" type="topic" id="statements">
+<info>
+	<link type="guide" xref="language"/>
+</info>
+<title>Statements</title>
+
+<p>The simulation language contains four types of statement, sequences of which form the bodies of <link xref="transitions">transitions</link>.
+Statements are imperative, and are the only part of the language which may have side-effects. Statements take only well typed inputs, but have no return
+type.</p>
+
+<p>Statements in sequences inside transition bodies are separated by semi-colons and are executed in program order (i.e. the order in which they appear
+in the simulation description). Their side-effects occur in program order as well, so a <code>reply</code> statement followed by an <code>emit</code>
+statement will produce a different sequence of messages on D-Bus than if the <code>emit</code> statement was listed first.</p>
+
+<section id="assignment">
+<title>Assignment</title>
+
+<p>The most common type of statement, assignments may be used in all types of transition. They assign the value of the expression on their right-hand
+side to the variable (or structure of variables) on their left-hand side.</p>
+
+<listing>
+	<title>Single Variable Assignment</title>
+	<code><![CDATA[
+object->PropertyName = "new value"
+]]></code>
+</listing>
+
+<listing>
+	<title>Multiple Variable Assignment</title>
+	<code><![CDATA[
+(Variable1, Variable2) = ([1u, 2u], [3u, 4u])
+]]></code>
+</listing>
+
+<note style="warning">
+	<p>Assignment to structures is only permitted if all of the leaves/atomic values in the structure are variables. None of them may be other
+		values, such as string literals.</p>
+</note>
+
+</section>
+
+<section id="emit">
+<title>Signal Emission</title>
+
+<p>Signal emissions may be used in all types of transition, and have the side-effect of emitting a D-Bus signal. They take a signal name and a tuple of
+parameters for the signal. The signal must be defined on an interface implemented by the containing object.</p>
+
+<listing>
+	<title>Signal Emission</title>
+	<code><![CDATA[
+emit SignalName ("parameter1", 5u, ["list", "of", "things"])
+]]></code>
+</listing>
+
+</section>
+
+<section id="reply">
+<title>Method Call Replies</title>
+
+<p>Method call replies may only be used in <link xref="transitions#methods">method-triggered transitions</link>. They take a tuple of output parameters
+from the method and have the side-effect of returning that tuple to the client over D-Bus as a method reply message. The type of the parameter tuple
+must match the method's definition in the set of interfaces implemented by the containing object.</p>
+
+<listing>
+	<title>Method Call Reply</title>
+	<code><![CDATA[
+reply ("out parameter1", 42u, {
+	"dict" : <5u>,
+	"of" : <true>,
+	"variants" : <"value">,
+})
+]]></code>
+</listing>
+
+</section>
+
+<section id="throw">
+<title>Method Call Errors</title>
+
+<p>As with method call replies, method call errors may only be used in <link xref="transitions#methods">method-triggered transitions</link>. They take
+the name of an error and have the side-effect of throwing that error to the client over D-Bus as a method reply message. No restrictions are placed on
+the error name past those given in the <link href="http://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-names-error">D-Bus
+specification</link>.</p>
+
+<listing>
+	<title>Method Call Error</title>
+	<code><![CDATA[
+throw ErrorName
+]]></code>
+</listing>
+
+</section>
+
+</page>

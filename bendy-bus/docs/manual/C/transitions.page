@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<page xmlns="http://projectmallard.org/1.0/" type="topic" id="transitions">
+<info>
+	<link type="guide" xref="language"/>
+</info>
+<title>Transitions</title>
+
+<p>Each transaction can be associated with a list of from and to states, to be able to handle the situation where a D-Bus method acts as a property
+getter and operates in multiple states. Such lists are comma-separated; e.g. <code>from State1 to State2, Nickname2 inside State2, Nickname3 from State1
+to State5</code>.</p>
+
+<p>The trigger for a transition instructs the simulator when to consider the transition for execution, and can be one of three things, described in
+more detail in the sections below:</p>
+<terms>
+	<item>
+		<title><code>method MethodName</code></title>
+		<p>Triggered by a client call to the named server D-Bus method on this D-Bus object.</p>
+	</item>
+	<item>
+		<title><code>property PropertyName</code></title>
+		<p>Triggered by the client setting the named server D-Bus property on this D-Bus object.</p>
+	</item>
+	<item>
+		<title><code>random</code></title>
+		<p>Triggered arbitrarily on a timer inside the simulator.</p>
+	</item>
+</terms>
+
+<section id="methods">
+<title>Method-Triggered Transitions</title>
+
+<p>Defining a transition which is triggered by a given method is roughly equivalent to implementing that method on the D-Bus object, with a couple of
+caveats. The transition is only eligible for execution if:</p>
+<list>
+	<item><p>the <link xref="objects">object</link> is in one of the from states listed by the transition; and</p></item>
+	<item><p>all of the transition's <link xref="preconditions">preconditions</link> are satisfied.</p></item>
+</list>
+
+<p>That is, when a D-Bus client calls a server method, the following occurs:</p>
+<list type="numbered">
+	<item><p>D-Bus client calls the server method <code>Foo</code> on a simulated object.</p></item>
+	<item><p>All transitions in that object which have a from state matching the object's current state are listed as potentially eligible for
+		execution. If no such transitions exist, the simulator will warn the user (since the simulation description is incomplete) and throw
+		a generic D-Bus error back to the client.</p></item>
+	<item><p>Starting from a random offset in the list of potentially eligible transitions, each transition's preconditions are tested in turn. If
+		a transition is found which either has no preconditions or whose preconditions are all satisfied, that transition is executed.</p></item>
+	<item><p>If no transition's preconditions were satisfied but one set of preconditions threw a D-Bus error, that D-Bus error is thrown to the
+		client. If no preconditions threw a D-Bus error, the simulator will warn the user and throw a generic D-Bus error to the
+		client.</p></item>
+</list>
+
+<p>As method-triggered transitions are effectively method implementations, the simulator adds the method's input parameters to the local scope when
+executing the transition. These are available for use by the transition's preconditions as well as its statements.</p>
+
+<p>Similarly, the output from a method-triggered transition is sent back to the simulator by the <code>reply</code> and <code>throw</code> statements,
+corresponding to successful and unsuccessful method executions, respectively. The <code>reply</code> statement takes a tuple of the output parameters
+to return to the D-Bus client in the reply message to its method call. The <code>throw</code> statement takes a string giving an error name to return
+to the D-Bus client in an error reply to its method call. This error name is typically well-known, but no restrictions are placed on it beyond
+<link href="http://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-names-error">those in the D-Bus specification</link>.</p>
+
+<p>Each method-triggered transition <em>must</em> contain exactly one <code>reply</code> or <code>throw</code> statement in its body, in order to ensure
+that each method call made by a D-Bus client results in exactly one reply message.</p>
+
+</section>
+
+<section id="properties">
+<title>Property-Triggered Transitions</title>
+
+<p>Property-triggered transitions are similar to method-triggered transitions, except they are triggered when a D-Bus client sets the value of a property
+on a server D-Bus object. As with method-triggered transitions, they are only considered as eligible for execution when the object is in the right
+state and all of the transition's preconditions are satisfied.</p>
+
+<p>Unlike method-triggered transitions, however, the simulator provides a default implementation for setting properties which means that transitions
+only have to be defined for setting properties if the simulation needs to implement more complex behaviour when setting the property (such as emitting
+a D-Bus signal). The default implementation sets the value of the object-level variable corresponding to the property, and emits the
+<code>PropertiesChanged</code> signal if this changes the value of the property.</p>
+
+<p>The simulator adds the new value of the property to the local scope as the <code>value</code> variable when executing a property-triggered
+transition.</p>
+
+<p>It does not make sense for property-triggered transitions to return a reply or error to the client as a result of setting the property (as D-Bus
+provides no way for this to happen), so use of the <code>reply</code> and <code>throw</code> statements inside property-triggered transitions is not
+allowed.</p>
+
+</section>
+
+<section id="random">
+<title>Arbitrary Transitions</title>
+
+<p>While method- and property-triggered transitions can be considered to model client interaction with the server simulation, arbitrary transitions can
+be considered to model external interactions with the server, such as network traffic. The simulator runs a timer for each simulated D-Bus object (with
+a frequently changing period); when this timer fires, the simulator chooses a transition out of all the eligible arbitrary transitions and executes
+it.</p>
+
+<p>As with the other types of transitions, arbitrary transitions are considered eligible for execution if the object is in the right state and all of the
+transition's preconditions are satisfied. One difference between arbitrary and other transitions, however, is that the simulator is not <em>required</em>
+to execute an arbitrary transition when the timer fires — it may choose to execute none of them.</p>
+
+<p>No changes are made to the local- or object-scope environments when executing an arbitrary transition.</p>
+
+<p>It does not make sense for arbitrary transitions to return a reply or error to the client as a result of execution (as D-Bus provides no way for
+this to happen), so use of the <code>reply</code> and <code>throw</code> statements inside property-triggered transitions is not allowed.</p>
+
+</section>
+
+</page>

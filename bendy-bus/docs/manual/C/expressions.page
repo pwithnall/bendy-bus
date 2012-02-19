@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<page xmlns="http://projectmallard.org/1.0/" type="topic" id="expressions">
+<info>
+	<link type="guide" xref="language"/>
+</info>
+<title>Expressions</title>
+
+<p>The simulation language contains a variety of expressions, each of which are well typed and evaluation of which will <em>not</em> cause side-effects,
+so can be considered to be functional.</p>
+
+<section id="data-structures">
+<title>Data Structures</title>
+
+<p>Data structures are atomic expressions and are described fully on the <link xref="data-structures">data structures</link> page.</p>
+
+</section>
+
+<section id="function-calls">
+<title>Function Calls</title>
+
+<p>Function calls in the simulation language are provided as a “get out clause” from the necessity of providing a richer set of operations on data
+structures. Instead of providing a full and complex set of operators for strings and arrays (for example, string concatenation or array indexing), it was
+decided to implement such operations as built-in functions in the simulator/language runtime. This keeps the core simulation language simple, while
+providing enough flexibility in data structure manipulation where necessary.</p>
+
+<note>
+	<p>The language provides no way for users to define their own functions — all function calls from expressions are to built-in functions in the
+		simulator itself. If you need a new built-in function to be added to the language, please file a bug report.</p>
+</note>
+
+<p>Functions in the simulation language have the following characteristics:</p>
+<list>
+	<item><p>No side-effects and no dependence on global state. All functions are completely pure.</p></item>
+	<item><p>Strong polymorphic typing. The return type of a function is itself a pure function of the input types so that, for example, the
+		<code>structHead</code> function has return type <code>s</code> when given input of type <code>(sas)</code>, and return type
+		<code>u</code> when given input of type <code>(ua{sv}a{sv})</code>.</p></item>
+	<item><p>Static typing. All function types are checked at parse time rather than run time.</p></item>
+	<item><p>Call-by-reference or call-by-value. Most functions use call-by-value semantics, but the <code>pairKeys</code> function is defined to
+		use call-by-reference for its second parameter to better allow fuzzing.</p></item>
+</list>
+
+<p>A function call is made using the function's name, followed by a tuple of its parameters. A full listing of the built-in functions can be found on
+the <link xref="functions">functions</link> page.</p>
+
+<listing>
+	<title>Function Call</title>
+	<code><![CDATA[
+arrayRemove (object->ArrayOfThings, 0u)]]></code>
+</listing>
+
+</section>
+
+<section id="numerical-operators">
+<title>Numerical Operators</title>
+
+<p>A standard selection of numerical operators are defined in the language, all binary operators. The type of such a numerical expression is the
+type of its left-hand child expression. The types of the two child expressions do not have to be equal, though both have to be numeric types.</p>
+<terms>
+	<item><title><code><input>x</input> * <input>y</input></code></title>
+		<p>Multiply one numeric value with another.</p></item>
+	<item><title><code><input>x</input> / <input>y</input></code></title>
+		<p>Divide one numeric value by another. Integer division truncates fractional parts.</p></item>
+	<item><title><code><input>x</input> % <input>y</input></code></title>
+		<p>Take the modulus of one numeric value with respect to another. Floating point values are converted
+			to 64-bit unsigned integers before the modulus is taken.</p></item>
+	<item><title><code><input>x</input> + <input>y</input></code></title>
+		<p>Add one numeric value to another.</p></item>
+	<item><title><code><input>x</input> - <input>y</input></code></title>
+		<p>Subtract one numeric value from another.</p></item>
+</terms>
+
+</section>
+
+<section id="boolean-operators">
+<title>Boolean Operators</title>
+
+<p>A standard selection of boolean operators are defined in the language, with two binary and one unary operator. The type of a boolean expression is
+boolean, and all of its children must have boolean type.</p>
+<terms>
+	<item><title><code><input>x</input> &amp;&amp; <input>y</input></code></title>
+		<p>Multiply one numeric value with another (potentially of a different type).</p></item>
+	<item><title><code><input>x</input> || <input>y</input></code></title>
+		<p>Multiply one numeric value with another (potentially of a different type).</p></item>
+	<item><title><code>!<input>x</input></code></title>
+		<p>Multiply one numeric value with another (potentially of a different type).</p></item>
+</terms>
+
+</section>
+
+<section id="comparison-operators">
+<title>Comparison Operators</title>
+
+<p>A standard selection of comparison operators are defined in the language, all binary operators. The four numerical comparison operators only accept
+numerical values (of any numerical type — integeric or floating point), though the left- and right-hand values may be of different types. The two
+equality comparison operators accept any type (basic or complex) of values, but the left- and right-hand values must be of the same type. The type of
+any comparison expression is boolean.</p>
+<terms>
+	<item><title><code><input>x</input> &lt;~ <input>y</input></code></title>
+		<p>Test whether the first number is less than the second.</p></item>
+	<item><title><code><input>x</input> &lt;= <input>y</input></code></title>
+		<p>Test whether the first number is less than or equal to the second.</p></item>
+	<item><title><code><input>x</input> ~&gt; <input>y</input></code></title>
+		<p>Test whether the first number is greater than the second.</p></item>
+	<item><title><code><input>x</input> &gt;= <input>y</input></code></title>
+		<p>Test whether the first number is greater than or equal to the second.</p></item>
+	<item><title><code><input>x</input> == <input>y</input></code></title>
+		<p>Test whether the two values are equal.</p></item>
+	<item><title><code><input>x</input> != <input>y</input></code></title>
+		<p>Test whether the two values are not equal.</p></item>
+</terms>
+
+</section>
+
+</page>

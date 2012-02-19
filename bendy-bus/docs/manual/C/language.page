@@ -1,71 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<page xmlns="http://projectmallard.org/1.0/" type="topic" id="language">
-<info>
-	<link type="guide" xref="index"/>
-</info>
+<page xmlns="http://projectmallard.org/1.0/" type="guide" id="language">
 <title>Simulation Language</title>
 
 <p>The simulation language used by Bendy Bus is block structured, and makes use of small basic blocks (sequences of statements) arranged into larger
 blocks representing D-Bus objects. The type system in the simulation language is equivalent to the D-Bus type system, and its syntax mirrors the
 <link href="http://developer.gnome.org/glib/stable/gvariant-text.html">GVariant</link> text format, which is itself based on Python syntax. The syntax for
 the rest of the language loosely follows C — so, for example, comments are delimited by <code>/*</code> and <code>*/</code>.</p>
-
-<section id="structure">
-<title>Structure</title>
-
-<p>The overall structure of a <em>simulation description</em> (a file written in the <em>simulation language</em>, describing the behaviour of a single
-D-Bus server) is as a collection of <em>object blocks</em>. Each object block represents a single D-Bus object exposed on the bus by the server, and must
-contain a <em>states block</em>. Each object block will typically contain a <em>data block</em> and one or more <em>transition blocks</em> as well.</p>
-
-<p>A states block defines the names of the states that the D-Bus object can be in, and at least one state must be listed. The first state listed in the
-block is the starting state for that D-Bus object. By convention, state names are CamelCase. State names are separated by semi-colons.</p>
-
-<listing>
-	<title>States Block</title>
-	<code><![CDATA[
-states {
-	Disconnected; /* starting state */
-	Connecting;
-	Connected;
-}]]></code>
-</listing>
-
-<p>A data block defines the names of the object-level variables in the D-Bus object. These variables will be accessible from all transitions inside the
-object, but not from any transitions outside the object. One important requirement is that all D-Bus properties of the object must be defined as
-object-level variables inside a data block of the same names as the D-Bus properties.</p>
-
-<p>The types of variables in data blocks aren't specified explicitly, but each variable must be initialised with a default value. Variables in a
-simulation must never be undefined. It's conventional to name all other (non-D-Bus-property) variables with a preceding underscore, to differentiate
-them from D-Bus property variables. As with D-Bus properties, it's also conventional to use CamelCase in variable names.</p>
-
-<listing>
-	<title>Data Block</title>
-	<code><![CDATA[
-data {
-	_NonPropertyVariable = 5u;
-	PropertyVariable = [
-		("available", true, false),
-		("away", false, true),
-	];
-}]]></code>
-</listing>
-
-<p>A transition block defines a single transition between two states (which may be equal) in the simulation of a D-Bus object. The head of the
-transition block gives the <em>from state</em>, <em>to state</em>, <em>trigger</em> and (optional) <em>nickname</em> for the transition; while the body
-of the block gives the transition's <em>statements</em> and (optional) <em>preconditions</em>.</p>
-
-<listing>
-	<title>Transition Block</title>
-	<code><![CDATA[
-transition Nickname from Disconnected to Connecting on method Connect {
-	/* Preconditions */
-	precondition { object->_NonPropertyVariable = 42u }
-
-	/* Statements */
-	object->PropertyVariable = @a(sbb) [];
-	emit SomeSignal ("parameters");
-}]]></code>
-</listing>
 
 <!-- TODO:
  * Interfaces
@@ -74,32 +14,5 @@ transition Nickname from Disconnected to Connecting on method Connect {
  * Data structures
  * Fuzzing
 -->
-
-</section>
-
-<section id="transitions">
-<title>Transitions</title>
-
-<p>Each transaction can be associated with a list of from and to states, to be able to handle the situation where a D-Bus method acts as a property
-getter and operates in multiple states. Such lists are comma-separated; e.g. <code>from State1 to State2, Nickname2 inside State2, Nickname3 from State1
-to State5</code>.</p>
-
-<p>The trigger for a transition instructs the simulator when to consider the transition for execution, and can be one of three things:</p>
-<terms>
-	<item>
-		<title><code>method MethodName</code></title>
-		<p>Triggered by a client call to the named server D-Bus method on this D-Bus object. <!-- TODO: More detail --></p>
-	</item>
-	<item>
-		<title><code>property PropertyName</code></title>
-		<p>Triggered by the client setting the named server D-Bus property on this D-Bus object. <!-- TODO: More detail --></p>
-	</item>
-	<item>
-		<title><code>random</code></title>
-		<p>Triggered arbitrarily on a timer inside the simulator. <!-- TODO: More detail --></p>
-	</item>
-</terms>
-
-</section>
 
 </page>

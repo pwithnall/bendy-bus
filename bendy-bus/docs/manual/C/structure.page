@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<page xmlns="http://projectmallard.org/1.0/" type="topic" id="structure">
+<info>
+	<link type="guide" xref="language"/>
+</info>
+<title>Structure</title>
+
+<p>The overall structure of a <em>simulation description</em> (a file written in the <em>simulation language</em>, describing the behaviour of a single
+D-Bus server) is as a collection of <em>object blocks</em>. Each object block represents a single D-Bus object exposed on the bus by the server, and must
+contain a <em>states block</em>. Each object block will typically contain a <em>data block</em> and one or more <em>transition blocks</em> as well.</p>
+
+<listing>
+	<title>Object Block</title>
+	<code><![CDATA[
+object at /object/path, well.known.name implements interface.name1, interface.name2 {
+	/* States, data and transition blocks */
+}]]></code>
+</listing>
+
+<p>A states block defines the names of the states that the D-Bus object can be in, and at least one state must be listed. The first state listed in the
+block is the starting state for that D-Bus object. By convention, state names are CamelCase. State names are separated by semi-colons.</p>
+
+<listing>
+	<title>States Block</title>
+	<code><![CDATA[
+states {
+	Disconnected; /* starting state */
+	Connecting;
+	Connected;
+}]]></code>
+</listing>
+
+<p>A data block defines the names of the object-level variables in the D-Bus object. These variables will be accessible from all transitions inside the
+object, but not from any transitions outside the object. One important requirement is that all D-Bus properties of the object must be defined as
+object-level variables inside a data block of the same names as the D-Bus properties.</p>
+
+<p>The types of variables in data blocks aren't specified explicitly, but each variable must be initialised with a default value. Variables in a
+simulation must never be undefined. It's conventional to name all other (non-D-Bus-property) variables with a preceding underscore, to differentiate
+them from D-Bus property variables. As with D-Bus properties, it's also conventional to use CamelCase in variable names.</p>
+
+<listing>
+	<title>Data Block</title>
+	<code><![CDATA[
+data {
+	_NonPropertyVariable = 5u;
+	PropertyVariable = [
+		("available", true, false),
+		("away", false, true),
+	];
+}]]></code>
+</listing>
+
+<p>A transition block defines a single transition between two states (which may be equal) in the simulation of a D-Bus object. The head of the
+transition block gives the <em>from state</em>, <em>to state</em>, <em>trigger</em> and (optional) <em>nickname</em> for the transition; while the body
+of the block gives the transition's <em>statements</em> and (optional) <em>preconditions</em>.</p>
+
+<listing>
+	<title>Transition Block</title>
+	<code><![CDATA[
+transition Nickname from Disconnected to Connecting on method Connect {
+	/* Preconditions */
+	precondition { object->_NonPropertyVariable = 42u }
+
+	/* Statements */
+	object->PropertyVariable = @a(sbb) [];
+	emit SomeSignal ("parameters");
+}]]></code>
+</listing>
+
+</page>

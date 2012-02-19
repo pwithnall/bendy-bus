@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<page xmlns="http://projectmallard.org/1.0/" type="topic" id="preconditions">
+<info>
+	<link type="guide" xref="language"/>
+</info>
+<title>Preconditions</title>
+
+<p>Each <link xref="transitions">transition</link> in a simulation may define zero or more preconditions which must be satisfied before the transition
+is eligible for execution. Each precondition is simply a boolean expression which is evaluated in the transition's local scope — if the expression
+evaluates to <code>true</code> then the precondition is satisfied; if it evaluates to <code>false</code> then the precondition fails.</p>
+
+<note>
+	<p>Since a precondition contains a single <link xref="expressions">expression</link> (not a <link xref="statements">statement</link>) it can have
+		no side-effects.</p>
+</note>
+
+<p>However, each precondition may also specify a D-Bus error name that it throws. If the precondition fails then the simulator may return this error to
+the D-Bus client as the result of (for example) a method call. Method-triggered transitions are explained more fully on the
+<link xref="transitions#methods">transitions page</link>.</p>
+
+<listing>
+	<title>Precondition with an Error</title>
+	<code><![CDATA[precondition throwing ErrorName { Variable == "value" }]]></code>
+</listing>
+
+<p>Three important things to note about preconditions is that they're tested in program order; failure short-circuits testing of subsequent preconditions;
+and all preconditions in a transition have to evaluate to <code>true</code> for the transition to be eligible for execution.</p>
+
+</page>

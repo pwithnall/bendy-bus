@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<page xmlns="http://projectmallard.org/1.0/" type="topic" id="objects">
+<info>
+	<link type="guide" xref="language"/>
+</info>
+<title>Objects</title>
+
+<p>Each object represents a single D-Bus object exposed on the bus by the simulation, and is thus intended to simulate a D-Bus server object which will
+be interacted with by one or more client programs under test.</p>
+
+<p>As with any D-Bus object, each object block in the simulation language has an <em>object path</em> and (optionally) one or more <em>well-known
+names</em>. At least one D-Bus interface must be listed as being implemented by the object block, and while all the properties defined by that interface
+must be defined as object-level variables in the object, there is no need for transitions to be defined for every method in the interface. This is
+because it's typical for all properties on a D-Bus object to be needed in simulation (for example, if a client calls the <code>GetAll</code> method on
+the object), whereas not all methods may be needed — so forcing all of them to be defined is a waste of effort.</p>
+
+<p>In order for an object block to implement a given interface, the introspection XML for that interface must be provided to the simulator in a
+separate introspection XML file.</p>
+
+</page>
