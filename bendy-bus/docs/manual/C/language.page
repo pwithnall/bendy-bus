@@ -1,18 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <page xmlns="http://projectmallard.org/1.0/" type="guide" id="language">
+<info>
+	<link type="guide" xref="index"/>
+	<link type="next" xref="structure"/>
+	<credit type="author">
+		<name>Philip Withnall</name>
+		<email>philip@tecnocode.co.uk</email>
+	</credit>
+	<license><p>Creative Commons Share Alike 3.0</p></license>
+</info>
 <title>Simulation Language</title>
 
 <p>The simulation language used by Bendy Bus is block structured, and makes use of small basic blocks (sequences of statements) arranged into larger
 blocks representing D-Bus objects. The type system in the simulation language is equivalent to the D-Bus type system, and its syntax mirrors the
-<link href="http://developer.gnome.org/glib/stable/gvariant-text.html">GVariant</link> text format, which is itself based on Python syntax. The syntax for
+<link href="http://developer.gnome.org/glib/stable/gvariant-text.html">GVariant text format</link>, which is itself based on Python syntax. The syntax for
 the rest of the language loosely follows C — so, for example, comments are delimited by <code>/*</code> and <code>*/</code>.</p>
+
+<section id="overview">
+	<title>Overview</title>
+</section>
+<section id="details" style="2column">
+	<title>Specifics</title>
+</section>
 
 <!-- TODO:
  * Interfaces
  * Simulation (separate page?)
- * Type system
- * Data structures
- * Fuzzing
 -->
 
 </page>

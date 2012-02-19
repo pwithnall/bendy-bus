@@ -1,10 +1,104 @@
 <?xml version="1.0" encoding="utf-8"?>
 <page xmlns="http://projectmallard.org/1.0/" type="topic" id="functions">
 <info>
-	<link type="guide" xref="language"/>
+	<link type="guide" xref="language#details"/>
+	<link type="seealso" xref="expressions"/>
+	<credit type="author">
+		<name>Philip Withnall</name>
+		<email>philip@tecnocode.co.uk</email>
+	</credit>
+	<license><p>Creative Commons Share Alike 3.0</p></license>
 </info>
 <title>Functions</title>
 
-<!-- TODO -->
+<p>The behaviour of the built-in functions in the simulation language is described in the <link xref="expressions#function-calls">section on function
+call expressions</link>. Each of the currently available built-in functions are described below.</p>
+
+<p>In the documentation below, each function is described with its parameters, followed by a colon, then the function's type. The type is given as a
+<link href="http://developer.gnome.org/glib/stable/glib-GVariantType.html#gvariant-typestrings">GVariant type string</link>, augmented with Greek
+characters to describe the type's polymorphism. α, β and γ represent any well-formed type, and each occurrence of such a character in a given type
+string must be instantiated with the same concrete type. ψ represents any well-formed <em>basic</em> type (booleans, bytes, integers, doubles, strings,
+object paths and signatures; but <em>not</em> arrays, tuples, variants and dictionaries), and the same relationship between occurrences of ψ in a given
+type applies.</p>
+
+<p>As is conventional, the rightwards arrow (→) separates the input parameters from the return type of functions.</p>
+
+<section id="arrays">
+<title>Array Functions</title>
+
+<terms>
+	<item><title><code>inArray (<input>x</input>, <input>a</input>)</code> : <sys>αaα → b</sys></title>
+		<p>Returns a boolean value indicating whether element <code>x</code> exists in array <code>a</code>. <code>x</code> must be of the same
+			type as all elements of <code>a</code>.</p></item>
+	<item><title><code>arrayGet (<input>a</input>, <input>i</input>, <input>d</input>)</code> : <sys>aαuα → α</sys></title>
+		<p>Returns the element at (zero-based) index <code>i</code> of array <code>a</code>, or the default value <code>d</code> if the index
+			doesn't exist in the array. <code>d</code> must be of the same type as all elements of <code>a</code>, and <code>i</code> must
+			be a 32-bit unsigned integer.</p></item>
+	<item><title><code>arrayInsert (<input>a</input>, <input>i</input>, <input>e</input>)</code> : <sys>aαuα → aα</sys></title>
+		<p>Inserts element <code>e</code> into array <code>a</code> at (zero-based) index <code>i</code>, preceding any element which was
+			previously at that index, and returns the updated array. <code>i</code> is clamped to the array length before insertion.
+			<code>e</code> must be of the same type as all elements of <code>a</code>, and <code>i</code> must be a 32-bit unsigned
+			integer.</p></item>
+	<item><title><code>arrayRemove (<input>a</input>, <input>i</input>)</code> : <sys>aαu → aα</sys></title>
+		<p>Removes the element at index <code>i</code> from array <code>a</code>, if it exists, and returns the updated array. If no element
+			exists at the given index, the array will be returned unmodified. <code>i</code> must be a 32-bit unsigned integer.</p></item>
+</terms>
+
+</section>
+
+<section id="dicts">
+<title>Dictionary Functions</title>
+
+<terms>
+	<item><title><code>keys (<input>d</input>)</code> : <sys>a{ψα} → aψ</sys></title>
+		<p>Returns an array of the keys of dictionary <code>d</code>. <code>d</code> must be a dictionary with keys and values of any
+			type.</p></item>
+	<item><title><code>pairKeys (<input>k</input>, <input>v</input>)</code> : <sys>aψα → a{ψα}</sys></title>
+		<p>Returns a dictionary formed by pairing the values in the array <code>k</code> (as the keys) with parameter <code>v</code> (as the
+			value). Parameter <code>v</code> is <em>passed by reference</em> to <code>pairKeys</code>, and is evaluated once for each element
+			of <code>k</code>. It is exected that <code>v</code> will be a <link xref="data-structures">fuzzy data structure</link> to get
+			the most benefit from this behaviour. <code>k</code> must be an array of basic-typed elements (i.e. they must be suitable for
+			use as dictionary keys), while <code>v</code> may have any type.</p></item>
+	<item><title><code>dictSet (<input>d</input>, <input>k</input>, <input>v</input>)</code> : <sys>a{ψα}ψα → a{ψα}</sys></title>
+		<p>Sets the entry keyed by <code>k</code> in dictionary <code>d</code> to the new value <code>v</code>. If an entry with key
+			<code>k</code> already exists in the dictionary, it is overwritten; if not, a new entry is added. The updated dictionary is
+			returned. <code>k</code> must be of the same type as all keys of <code>d</code> and <code>v</code> must be of the same type as
+			all values of <code>d</code>.</p></item>
+	<item><title><code>dictUnset (<input>d</input>, <input>k</input>)</code> : <sys>a{ψα}ψ → a{ψα}</sys></title>
+		<p>Unsets the entry keyed by <code>k</code> in dictionary <code>d</code> and returns the updated dictionary. If no entry with key
+			<code>k</code> exists in the dictionary, it is returned unmodified. <code>k</code> must be of the same type as all keys of
+			<code>d</code>.</p></item>
+	<item><title><code>dictGet (<input>d</input>, <input>k</input>, <input>v</input>)</code> : <sys>a{ψα}ψα → α</sys></title>
+		<p>Returns the value keyed by <code>k</code> in dictionary <code>d</code>, or the default value <code>v</code> if no such entry exists
+			in the dictionary. <code>k</code> must be of the same type as all keys of <code>d</code> and <code>v</code> must be of the same
+			type as all values of <code>d</code>.</p></item>
+	<item><title><code>dictToTupleArray (<input>d</input>)</code> : <sys>a{ψα} → a(ψα)</sys></title>
+		<p>Returns an array of all entries in dictionary <code>d</code>, with each entry converted to a two-tuple of its key and value.
+			<code>d</code> must be a dictionary with keys and values of any type.</p></item>
+</terms>
+
+</section>
+
+<section id="structs">
+<title>Tuple Functions</title>
+
+<terms>
+	<item><title><code>structHead (<input>s</input>)</code> : <sys>(αβγ⋯) → α</sys></title>
+		<p>Returns the head element of tuple/struct <code>s</code>. <code>s</code> must be a tuple with at least one (head) element.</p></item>
+</terms>
+
+</section>
+
+<section id="strings">
+<title>String Functions</title>
+
+<terms>
+	<item><title><code>stringJoin (<input>j</input>, <input>s</input>)</code> : <sys>(sas) → s</sys></title>
+		<p>Returns the concatenation of all strings in array <code>s</code>, each separated by separator string <code>j</code>. <code>j</code>
+			is not appended to the resulting string. <code>j</code> may be the empty string, and <code>s</code> may be an empty array in
+			order to return an empty string. <code>j</code> must be a string and <code>s</code> must be an array of strings.</p></item>
+</terms>
+
+</section>
 
 </page>

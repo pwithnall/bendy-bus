@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <page xmlns="http://projectmallard.org/1.0/" type="topic" id="expressions">
 <info>
-	<link type="guide" xref="language"/>
+	<link type="guide" xref="language#details"/>
+	<link type="seealso" xref="data-structures"/>
+	<link type="seealso" xref="functions"/>
+	<credit type="author">
+		<name>Philip Withnall</name>
+		<email>philip@tecnocode.co.uk</email>
+	</credit>
+	<license><p>Creative Commons Share Alike 3.0</p></license>
 </info>
 <title>Expressions</title>
 
@@ -92,7 +99,7 @@ boolean, and all of its children must have boolean type.</p>
 
 <p>A standard selection of comparison operators are defined in the language, all binary operators. The four numerical comparison operators only accept
 numerical values (of any numerical type — integeric or floating point), though the left- and right-hand values may be of different types. The two
-equality comparison operators accept any type (basic or complex) of values, but the left- and right-hand values must be of the same type. The type of
+equality comparison operators accept any type (basic or container) of values, but the left- and right-hand values must be of the same type. The type of
 any comparison expression is boolean.</p>
 <terms>
 	<item><title><code><input>x</input> &lt;~ <input>y</input></code></title>

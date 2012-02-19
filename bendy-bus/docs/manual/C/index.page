@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<page xmlns="http://projectmallard.org/1.0/" type="guide" id="index">
+<info>
+	<credit type="author">
+		<name>Philip Withnall</name>
+		<email>philip@tecnocode.co.uk</email>
+	</credit>
+	<license><p>Creative Commons Share Alike 3.0</p></license>
+</info>
+<title>Bendy Bus</title>
+
+<p>Bendy Bus is a simulator for D-Bus servers, designed to aid in unit and fuzz testing D-Bus clients by simulating one half of a D-Bus conversation
+with them.</p>
+
+<links type="guide"/>
+
+<!-- TODO:
+ * Interfaces
+ * Simulation (separate page?)
+-->
+
+</page>

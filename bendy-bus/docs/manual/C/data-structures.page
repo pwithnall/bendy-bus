@@ -1,10 +1,131 @@
 <?xml version="1.0" encoding="utf-8"?>
 <page xmlns="http://projectmallard.org/1.0/" type="topic" id="data-structures">
 <info>
-	<link type="guide" xref="language"/>
+	<link type="guide" xref="language#details"/>
+	<credit type="author">
+		<name>Philip Withnall</name>
+		<email>philip@tecnocode.co.uk</email>
+	</credit>
+	<license><p>Creative Commons Share Alike 3.0</p></license>
 </info>
 <title>Data Structures</title>
 
-<!-- TODO -->
+<p>The data structures supported by the simulation language directly map to the D-Bus type system, and their syntax closely follows the syntax used in
+the <link href="http://developer.gnome.org/glib/stable/gvariant-text.html">GVariant text format</link>, which is itself based on Python syntax. However,
+there are several variations in the simulation language's syntax, which exist for no good reason at all. They may be resolved in future versions of the
+simulation language.</p>
+
+<p>Two data structures which the simulation language does not support are: maybe types and Unix FDs. Maybe types are not serialisable over D-Bus and just
+exist within GVariant, so are not relevant to the simulation language. Unix FDs are serialisable over D-Bus, but not widely used and the simulator
+currently doesn't have the infrastructure to handle simulating or fuzzing file streams.</p>
+
+<p>Fuzzing of data structures (to produce <em>fuzzy data structures</em>) is achieved by suffixing the data structure with <code>?</code>. For example,
+<code>"fuzz me"?</code> evaluates to a fuzzed version of the string “fuzz me”. It is possible to suffix data structures with the fuzzing symbol at any
+point inside a data structure AST, which will result in just the immediately preceding data structure (and potentially its children) being fuzzed.</p>
+
+<listing>
+	<title>Fuzzing a Data Structure AST</title>
+	<code><![CDATA[
+{
+	"contact-id" : <"1@example.com"?>,
+	"alias" : <""?>,
+	"presence" : <(3u?, "available", "Status message!"?)>,
+}?]]></code>
+</listing>
+
+<section id="basic-types">
+<title>Basic Types</title>
+
+<terms>
+	<item><title>Booleans: <code>true</code>, <code>false</code></title>
+		<p>Boolean literals are (case sensitively) denoted by <code>true</code> and <code>false</code>. Due to the strict type system, there is
+			no correspondence between boolean values and integers as there is in C.</p></item>
+	<item><title>Strings: delimited by <code>"</code></title>
+		<p>String literals can only be delimited by double quotation marks in the simulation language, whereas in GVariant text format, single
+			quotation marks are also allowed. In the simulation language, backslashes (<code>\</code>) are used to escape extra quotation
+			marks, new line characters and for escape sequences: <code>\n</code>, <code>\t</code>, <code>\r</code>, <code>\b</code> and
+			<code>\f</code>, which have the same semantics as in C.</p>
+		<code>"This is a \"sample string\".\nIt contains a line break."</code></item>
+	<item><title>Object paths: strings with a preceding <code>@o</code> type annotation</title>
+		<p>No special syntax is required for object paths, but they must have a type annotation and must be a
+			<link href="http://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-marshaling-object-path">valid object
+			path</link>. There is no support for implicit conversion of normal strings to object paths (or vice-versa). Note that only
+			at-syntax type annotations are supported: the GVariant text format <code>objectpath</code> annotation is not supported.</p>
+		<code>@o "/org/freedesktop/Telepathy/AccountManager"</code></item>
+	<item><title>Type signatures: strings with a preceding <code>@g</code> type annotation</title>
+		<p>As with object paths, no special syntax is required for type strings, but they must have a type annotation and must be a
+			<link href="http://dbus.freedesktop.org/doc/dbus-specification.html#message-protocol-marshaling-signature">valid type
+			signature</link>.</p>
+		<code>@g "a{sv}"</code></item>
+	<item><title>Numbers: numeric constants followed by the D-Bus type character for their type</title>
+		<p>The simulation language deviates from the GVariant text format in its handling of numbers. In the simulation language, numbers are
+			written literally, and then the type character for their type is appended. The GVariant text format approach of using type
+			annotations is not supported, but probably should be. Some examples follow.</p>
+		<code>15u /* 32-bit unsigned integer of value 15 */</code>
+		<code>-12.5d /* IEEE 754 double of value -12.5 */</code>
+		<code>255y /* byte of value 255 */</code>
+		<code>-666666x /* 64-bit signed integer of value -666666 */</code></item>
+</terms>
+
+</section>
+
+<section id="container-types">
+<title>Container Types</title>
+
+<terms>
+	<item><title>Tuples/Structs: delimited by <code>(</code> and <code>)</code>, with elements separated by <code>,</code></title>
+		<p>Tuples must contain zero or more elements, separated by commas. A trailing comma is allowed after the final element if it makes
+			code look nicer. The unit tuple, <code>()</code>, has its own concrete type so does not require a type annotation.</p>
+		<code>("hello", "world")</code></item>
+	<item><title>Arrays: delimited by <code>[</code> and <code>]</code>, with elements separated by <code>,</code></title>
+		<p>Arrays must have a concrete type, so empty arrays must be preceded by a type annotation giving their type and the type of their
+			elements. As with tuples, a trailing comma is allowed after the final element of an array if it makes code look nicer.</p>
+		<code>[1u, 2u, 3u]</code>
+		<code>@au []</code></item>
+	<item><title>Dictionaries: delimited by <code>{</code> and <code>}</code>, with entries partitioned by <code>:</code> and separated
+			by <code>,</code></title>
+		<p>As with arrays, dictionaries must have a concrete type, so empty dictionaries must be preceded by a type annotation giving their
+			type and the type of their entries. As with tuples and arrays, a trailing comma is allowed after the final entry of a dictionary
+			if it makes code look nicer.</p>
+		<code>{ "key" : "value", "another key" : "another value" }</code>
+		<code>{ "key" : &lt;"variant value"&gt;, "another key" : &lt;false&gt; }</code>
+		<code>@a{sv} {}</code></item>
+	<item><title>Variants: delimited by <code>&lt;</code> and <code>&gt;</code></title>
+		<p>Since the type of the value of a variant is handled at run time, variants do <em>not</em> need type annotations. Note that variants
+			cannot be fuzzed, but their values can.</p>
+		<code>&lt;"hello"&gt;</code>
+		<code>&lt;(1u, "some tuple")&gt;</code></item>
+</terms>
+
+</section>
+
+<section id="variables">
+<title>Variables</title>
+
+<p>Variables exist outside of the GVariant type system, added by the simulation language. The simulator uses two scopes for variables: object scope and
+local scope.</p>
+
+<p>Object-scoped variables are defined in a <link xref="structure">data block</link> of an object, and are accessible to all
+<link xref="transitions">transitions</link> in the object (but to nothing outside the object). They are accessed by preceding the variable name with
+<code>object-></code>. For example: <code>object->VariableName</code>.</p>
+
+<p>Local-scoped variables are defined upon execution of a method- or property-triggered transition. In the case of a method-triggered transition, they're
+declared as the method's input parameters by the D-Bus interface declaring the method being called. In the case of a property-triggered transition,
+only the variable <code>value</code> is defined. Local-scoped variables are accessed just using their variable name. For example: <code>value</code> or
+<code>Parameter1</code>.</p>
+
+<p>Fuzzing of variables is not supported. The variable values must instead be fuzzed before being assigned to the variables (for example, in the data
+block which originally defines the variable).</p>
+
+</section>
+
+<section id="expressions">
+<title>Expressions</title>
+
+<p>Container data structures may have <link xref="expressions">expressions</link> as some of their leaf nodes to build the data structure. This is
+perfectly valid as long as the expressions are well typed. Note that expressions are pure, so evaluation of a data structure can never result in side
+effects.</p>
+
+</section>
 
 </page>
