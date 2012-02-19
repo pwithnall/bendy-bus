@@ -1,4 +1,4 @@
-SUBDIRS = po . dfsm/docs/reference
+SUBDIRS = po . dfsm/docs/reference bendy-bus/docs/manual
 
 # Setup
 bin_PROGRAMS =
@@ -248,6 +248,14 @@ bendy_bus_bendy_bus_LDADD = \
 GITIGNOREFILES += \
 	bendy-bus/.dirstamp \
 	bendy-bus/.libs/ \
+	$(NULL)
+
+# bendy-bus manual
+EXTRA_DIST += gnome-doc-utils.make
+MAINTAINERCLEANFILES += \
+	gnome-doc-utils.make \
+	omf.make \
+	xmldocs.make \
 	$(NULL)
 
 # bendy-bus-lcov

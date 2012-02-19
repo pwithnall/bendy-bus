@@ -27,6 +27,12 @@ GTK_DOC_CHECK([1.14],[--flavour no-tmpl])
 AM_CONDITIONAL([ENABLE_GTK_DOC], false)
 ])
 
+m4_ifdef([GNOME_DOC_INIT],[
+GNOME_DOC_INIT
+],[
+AM_CONDITIONAL([ENABLE_GNOME_DOC_UTILS], false)
+])
+
 # Internationalisation
 GETTEXT_PACKAGE=bendy-bus
 AC_SUBST(GETTEXT_PACKAGE)
@@ -54,6 +60,7 @@ PKG_CHECK_MODULES([GIO],[gio-2.0 >= $GIO_REQS gio-unix-2.0 >= $GIO_REQS])
 # Output!
 AC_CONFIG_FILES([
 Makefile
+bendy-bus/docs/manual/Makefile
 dfsm/dfsm.pc
 dfsm/docs/reference/Makefile
 po/Makefile.in
