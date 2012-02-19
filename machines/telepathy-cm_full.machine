@@ -5,7 +5,7 @@ object at /org/freedesktop/Telepathy/AccountManager, org.freedesktop.Telepathy.A
 			"org.freedesktop.Telepathy.AccountManager",
 		];
 		ValidAccounts = @ao [
-			@o "/org/freedesktop/Telepathy/Account/cmname/proto/account",
+			@o "/org/freedesktop/Telepathy/Account/cm/protocol/account",
 		];
 		InvalidAccounts = @ao [];
 		SupportedAccountProperties = @as [
@@ -20,7 +20,7 @@ object at /org/freedesktop/Telepathy/AccountManager, org.freedesktop.Telepathy.A
 	}
 }
 
-object at /org/freedesktop/Telepathy/Account/cmname/proto/account implements org.freedesktop.Telepathy.Account {
+object at /org/freedesktop/Telepathy/Account/cm/protocol/account implements org.freedesktop.Telepathy.Account {
 	data {
 		/* Properties */
 		Interfaces = @as [
@@ -84,7 +84,7 @@ object at /org/freedesktop/Telepathy/Account/cmname/proto/account implements org
 		object->ChangingPresence = false;
 		object->ConnectionStatus = 0u;
 		object->ConnectionStatusReason = 1u;
-		object->Connection = @o "/org/freedesktop/Telepathy/Connection/cmname/proto/account";
+		object->Connection = @o "/org/freedesktop/Telepathy/Connection/cm/protocol/account";
 		object->HasBeenOnline = true;
 
 		emit AccountPropertyChanged ({
@@ -118,7 +118,7 @@ object at /org/freedesktop/Telepathy/Account/cmname/proto/account implements org
 	}
 }
 
-object at /org/freedesktop/Telepathy/ConnectionManager/cmname, org.freedesktop.Telepathy.ConnectionManager.cmname implements org.freedesktop.Telepathy.ConnectionManager {
+object at /org/freedesktop/Telepathy/ConnectionManager/cm, org.freedesktop.Telepathy.ConnectionManager.cm implements org.freedesktop.Telepathy.ConnectionManager {
 	data {
 		/* Properties */
 		Protocols = @a{sa{sv}} {};
@@ -128,8 +128,8 @@ object at /org/freedesktop/Telepathy/ConnectionManager/cmname, org.freedesktop.T
 		];
 
 		/* Other variables */
-		_ConnectionObjectPath = @o "/org/freedesktop/Telepathy/ConnectionManager/cmname"; /* nonsensical default value */
-		_ConnectionBusName = "org.freedesktop.Telepathy.ConnectionManager.cmname";
+		_ConnectionObjectPath = @o "/org/freedesktop/Telepathy/ConnectionManager/cm"; /* nonsensical default value */
+		_ConnectionBusName = "org.freedesktop.Telepathy.ConnectionManager.cm";
 		_Params = @a(susv) [];
 	}
 
@@ -164,7 +164,7 @@ object at /org/freedesktop/Telepathy/ConnectionManager/cmname, org.freedesktop.T
 	}
 }
 
-object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freedesktop.Telepathy.Connection.cmname.proto.account implements org.freedesktop.Telepathy.Connection, org.freedesktop.Telepathy.Connection.Interface.Contacts, org.freedesktop.Telepathy.Connection.Interface.Requests, org.freedesktop.Telepathy.Connection.Interface.Aliasing, org.freedesktop.Telepathy.Connection.Interface.Avatars, org.freedesktop.Telepathy.Connection.Interface.SimplePresence, org.freedesktop.Telepathy.Connection.Interface.ContactCapabilities, org.freedesktop.Telepathy.Connection.Interface.ContactInfo {
+object at /org/freedesktop/Telepathy/Connection/cm/protocol/account, org.freedesktop.Telepathy.Connection.cm.protocol.account implements org.freedesktop.Telepathy.Connection, org.freedesktop.Telepathy.Connection.Interface.Contacts, org.freedesktop.Telepathy.Connection.Interface.Requests, org.freedesktop.Telepathy.Connection.Interface.Aliasing, org.freedesktop.Telepathy.Connection.Interface.Avatars, org.freedesktop.Telepathy.Connection.Interface.SimplePresence, org.freedesktop.Telepathy.Connection.Interface.ContactCapabilities, org.freedesktop.Telepathy.Connection.Interface.ContactInfo {
 	data {
 		/* Properties */
 		Interfaces = @as [
@@ -276,7 +276,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 			dictGet (Request, "org.freedesktop.Telepathy.Channel.TargetID", <"">) == <"subscribe">
 		}
 
-		object->Channels = arrayInsert (object->Channels, 1u, (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe", {
+		object->Channels = arrayInsert (object->Channels, 1u, (@o "/org/freedesktop/Telepathy/Connection/cm/protocol/account/subscribe", {
 			"org.freedesktop.Telepathy.Channel.ChannelType" : <"org.freedesktop.Telepathy.Channel.Type.ContactList">,
 			"org.freedesktop.Telepathy.Channel.TargetHandleType" : <3u>,
 			"org.freedesktop.Telepathy.Channel.TargetHandle" : <0u?>,
@@ -284,11 +284,11 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 			"org.freedesktop.Telepathy.Channel.Requested" : <false?>,
 		}));
 
-		reply (true, @o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe", @a{sv} []);
+		reply (true, @o "/org/freedesktop/Telepathy/Connection/cm/protocol/account/subscribe", @a{sv} []);
 	}
 
 	transition inside Connected on random {
-		object->Channels = arrayInsert (object->Channels, 0u, (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe", {
+		object->Channels = arrayInsert (object->Channels, 0u, (@o "/org/freedesktop/Telepathy/Connection/cm/protocol/account/subscribe", {
 			"org.freedesktop.Telepathy.Channel.ChannelType" : <"org.freedesktop.Telepathy.Channel.Type.ContactList">,
 			"org.freedesktop.Telepathy.Channel.TargetHandleType" : <3u>,
 			"org.freedesktop.Telepathy.Channel.TargetHandle" : <0u?>,
@@ -297,12 +297,12 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 		}));
 
 		emit NewChannels ([arrayGet (object->Channels, 0u, (@o "/p", @a{sv} {}))]);
-		emit NewChannel (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe",
+		emit NewChannel (@o "/org/freedesktop/Telepathy/Connection/cm/protocol/account/subscribe",
 		                 "org.freedesktop.Telepathy.Channel.Type.ContactList", 3u, 0u?, false?);
 	}
 
 	transition inside Connected on random {
-		object->Channels = arrayInsert (object->Channels, 0u, (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/group1", {
+		object->Channels = arrayInsert (object->Channels, 0u, (@o "/org/freedesktop/Telepathy/Connection/cm/protocol/account/group1", {
 			"org.freedesktop.Telepathy.Channel.ChannelType" : <"org.freedesktop.Telepathy.Channel.Type.ContactList">,
 			"org.freedesktop.Telepathy.Channel.TargetHandleType" : <4u>,
 			"org.freedesktop.Telepathy.Channel.TargetHandle" : <0u?>,
@@ -311,7 +311,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 		}));
 
 		emit NewChannels ([arrayGet (object->Channels, 0u, (@o "/p", @a{sv} {}))]);
-		emit NewChannel (@o "/org/freedesktop/Telepathy/Connection/cmname/proto/account/group1",
+		emit NewChannel (@o "/org/freedesktop/Telepathy/Connection/cm/protocol/account/group1",
 		                 "org.freedesktop.Telepathy.Channel.Type.ContactList", 4u, 0u?, false?);
 	}
 
@@ -374,7 +374,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account, org.freede
 	}
 }
 
-object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe implements org.freedesktop.Telepathy.Channel, org.freedesktop.Telepathy.Channel.Type.ContactList, org.freedesktop.Telepathy.Channel.Interface.Group {
+object at /org/freedesktop/Telepathy/Connection/cm/protocol/account/subscribe implements org.freedesktop.Telepathy.Channel, org.freedesktop.Telepathy.Channel.Type.ContactList, org.freedesktop.Telepathy.Channel.Interface.Group {
 	data {
 		/* Channel */
 		ChannelType = "org.freedesktop.Telepathy.Channel.Type.ContactList";
@@ -465,7 +465,7 @@ object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/subscribe i
 	}
 }
 
-object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/group1 implements org.freedesktop.Telepathy.Channel, org.freedesktop.Telepathy.Channel.Type.ContactList, org.freedesktop.Telepathy.Channel.Interface.Group {
+object at /org/freedesktop/Telepathy/Connection/cm/protocol/account/group1 implements org.freedesktop.Telepathy.Channel, org.freedesktop.Telepathy.Channel.Type.ContactList, org.freedesktop.Telepathy.Channel.Interface.Group {
 	data {
 		/* Channel */
 		ChannelType = "org.freedesktop.Telepathy.Channel.Type.ContactList";
