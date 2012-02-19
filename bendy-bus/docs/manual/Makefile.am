@@ -8,6 +8,7 @@ DOC_PAGES = \
 	data-structures.page \
 	expressions.page \
 	functions.page \
+	index.page \
 	language.page \
 	objects.page \
 	preconditions.page \
