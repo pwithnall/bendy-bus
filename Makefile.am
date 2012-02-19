@@ -38,6 +38,7 @@ dfsm_public_headers = \
 	dfsm/dfsm-ast-variable.h \
 	dfsm/dfsm-dbus-output-sequence.h \
 	dfsm/dfsm-environment.h \
+	dfsm/dfsm-environment-functions.h \
 	dfsm/dfsm-machine.h \
 	dfsm/dfsm-object.h \
 	dfsm/dfsm-output-sequence.h \

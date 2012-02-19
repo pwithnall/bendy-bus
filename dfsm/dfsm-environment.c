@@ -24,6 +24,7 @@
 #include <glib/gi18n-lib.h>
 
 #include "dfsm-environment.h"
+#include "dfsm-environment-functions.h"
 #include "dfsm-marshal.h"
 #include "dfsm-parser.h"
 #include "dfsm-parser-internal.h"

@@ -23,6 +23,7 @@
 #include <glib/gi18n-lib.h>
 
 #include "dfsm-ast-expression-function-call.h"
+#include "dfsm-environment-functions.h"
 #include "dfsm-parser.h"
 #include "dfsm-parser-internal.h"
 

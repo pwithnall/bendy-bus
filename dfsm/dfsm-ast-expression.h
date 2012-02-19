@@ -35,18 +35,17 @@ G_BEGIN_DECLS
 #define DFSM_IS_AST_EXPRESSION_CLASS(k)		(G_TYPE_CHECK_CLASS_TYPE ((k), DFSM_TYPE_AST_EXPRESSION))
 #define DFSM_AST_EXPRESSION_GET_CLASS(o)	(G_TYPE_INSTANCE_GET_CLASS ((o), DFSM_TYPE_AST_EXPRESSION, DfsmAstExpressionClass))
 
+typedef struct _DfsmAstExpressionPrivate	DfsmAstExpressionPrivate;
+
 /**
  * DfsmAstExpression:
  *
  * All the fields in the #DfsmAstExpression structure are private and should never be accessed directly.
  */
-typedef struct _DfsmAstExpression		DfsmAstExpression;
-typedef struct _DfsmAstExpressionPrivate	DfsmAstExpressionPrivate;
-
-struct _DfsmAstExpression {
+typedef struct {
 	DfsmAstNode parent;
 	DfsmAstExpressionPrivate *priv;
-};
+} DfsmAstExpression;
 
 /**
  * DfsmAstExpressionClass:
