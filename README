@@ -3,6 +3,11 @@ D-Bus Simulator
 
 D-Bus Simulator is a system to mock up parts of D-Bus server–client systems in order to test the other part.
 
+The user manual is available online at http://tecnocode.co.uk/bendy-bus/manual/, or can be compiled using
+	cd bendy-bus/docs/manual
+	make xhtml
+if yelp-tools are installed.
+
 News
 ====
 
