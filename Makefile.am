@@ -208,6 +208,13 @@ dfsm_tests_reachability_CPPFLAGS = $(test_cppflags)
 dfsm_tests_reachability_CFLAGS = $(test_cflags)
 dfsm_tests_reachability_LDADD = $(test_ldadd)
 
+noinst_PROGRAMS += dfsm/tests/simulation
+
+dfsm_tests_simulation_SOURCES = $(test_sources) dfsm/tests/simulation.c dfsm/tests/test-output-sequence.c
+dfsm_tests_simulation_CPPFLAGS = $(test_cppflags)
+dfsm_tests_simulation_CFLAGS = $(test_cflags)
+dfsm_tests_simulation_LDADD = $(test_ldadd)
+
 GITIGNOREFILES += \
 	dfsm/tests/.dirstamp \
 	dfsm/tests/.libs/ \

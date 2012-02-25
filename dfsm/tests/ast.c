@@ -241,13 +241,6 @@ test_ast_parser_errors (void)
 	"}");
 }
 
-static GVariant *
-new_unary_tuple (GVariant *element)
-{
-	GVariant *elements[2] = { element, NULL };
-	return g_variant_new_tuple (elements, 1);
-}
-
 static void
 test_ast_execution_output_sequence (void)
 {

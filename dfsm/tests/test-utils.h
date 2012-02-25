@@ -24,7 +24,8 @@
 
 G_BEGIN_DECLS
 
-gchar *load_test_file (const gchar *filename);
+gchar *load_test_file (const gchar *filename) G_GNUC_MALLOC G_GNUC_WARN_UNUSED_RESULT;
+GVariant *new_unary_tuple (GVariant *element) G_GNUC_MALLOC G_GNUC_WARN_UNUSED_RESULT;
 
 G_END_DECLS
 

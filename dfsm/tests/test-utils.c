@@ -41,3 +41,10 @@ load_test_file (const gchar *filename)
 
 	return (gchar*) contents; /* assume it's text; g_file_load_contents() guarantees it's nul-terminated */
 }
+
+GVariant *
+new_unary_tuple (GVariant *element)
+{
+	GVariant *elements[2] = { element, NULL };
+	return g_variant_new_tuple (elements, 1);
+}
