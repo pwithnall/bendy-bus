@@ -1604,17 +1604,160 @@ whitespace:
 static gchar *
 fuzz_object_path (const gchar *default_value)
 {
-	/* For the moment, we treat object paths just like strings. In future, we may want to ensure that any fuzzing we apply maintains the
-	 * validity of the object path, even if it no longer points to a valid object. */
-	return fuzz_string (default_value);
+	gchar *output;
+
+	DFSM_NONUNIFORM_DISTRIBUTION (2,
+		DEFAULT, 0.7, /* default value */
+		APPENDED, 0.3 /* append a digit to the path */
+	)
+		case DEFAULT:
+			output = g_strdup (default_value);
+			break;
+		case APPENDED:
+			output = g_strdup_printf ("%s%u", default_value, g_random_int_range (0, 100));
+			break;
+	DFSM_NONUNIFORM_DISTRIBUTION_END
+
+	/* Sanity check. */
+	g_assert (g_variant_is_object_path (output) == TRUE);
+
+	return output;
+}
+
+static GVariantType *
+generate_basic_type_signature (void)
+{
+	GVariantType *type_signature;
+
+	/* Generate a basic type signature. */
+	DFSM_NONUNIFORM_DISTRIBUTION (12,
+		BOOLEAN, 0.05,
+		BYTE, 0.05,
+		INT16, 0.1,
+		UINT16, 0.1,
+		INT32, 0.1,
+		UINT32, 0.1,
+		INT64, 0.1,
+		UINT64, 0.1,
+		DOUBLE, 0.1,
+		STRING, 0.1,
+		OBJECT_PATH, 0.05,
+		SIGNATURE, 0.05
+	)
+#define BASIC_TYPE(T) \
+		case T: \
+			type_signature = g_variant_type_copy (G_VARIANT_TYPE_##T); \
+			break;
+		BASIC_TYPE (BOOLEAN)
+		BASIC_TYPE (BYTE)
+		BASIC_TYPE (INT16)
+		BASIC_TYPE (UINT16)
+		BASIC_TYPE (INT32)
+		BASIC_TYPE (UINT32)
+		BASIC_TYPE (INT64)
+		BASIC_TYPE (UINT64)
+		BASIC_TYPE (DOUBLE)
+		BASIC_TYPE (STRING)
+		BASIC_TYPE (OBJECT_PATH)
+		BASIC_TYPE (SIGNATURE)
+#undef BASIC_TYPE
+	DFSM_NONUNIFORM_DISTRIBUTION_END
+
+	return type_signature;
+}
+
+static GVariantType *
+generate_type_signature (void)
+{
+	GVariantType *type_signature;
+
+	/* Recursively generate a type signature. */
+	DFSM_NONUNIFORM_DISTRIBUTION (5,
+		BASIC, 0.6,
+		VARIANT, 0.1,
+		ARRAY, 0.1,
+		TUPLE, 0.1,
+		DICTIONARY, 0.1
+	)
+		case BASIC:
+			type_signature = generate_basic_type_signature ();
+			break;
+		case VARIANT:
+			type_signature = g_variant_type_copy (G_VARIANT_TYPE_VARIANT);
+			break;
+		case ARRAY: {
+			GVariantType *element_type = generate_type_signature ();
+			type_signature = g_variant_type_new_array (element_type);
+			g_variant_type_free (element_type);
+
+			break;
+		}
+		case TUPLE: {
+			guint i;
+			GPtrArray/*<GVariantType>*/ *element_types;
+
+			i = g_random_int_range (0, 6);
+			element_types = g_ptr_array_sized_new (i);
+			g_ptr_array_set_free_func (element_types, (GDestroyNotify) g_variant_type_free);
+
+			while (i-- > 0) {
+				g_ptr_array_add (element_types, generate_type_signature ());
+			}
+
+			type_signature = g_variant_type_new_tuple ((const GVariantType* const*) element_types->pdata, element_types->len);
+
+			g_ptr_array_unref (element_types);
+
+			break;
+		}
+		case DICTIONARY: {
+			GVariantType *key_type, *value_type, *entry_type;
+
+			key_type = generate_basic_type_signature ();
+			value_type = generate_type_signature ();
+			entry_type = g_variant_type_new_dict_entry (key_type, value_type);
+
+			type_signature = g_variant_type_new_array (entry_type);
+
+			g_variant_type_free (entry_type);
+			g_variant_type_free (value_type);
+			g_variant_type_free (key_type);
+
+			break;
+		}
+	DFSM_NONUNIFORM_DISTRIBUTION_END
+
+	return type_signature;
 }
 
 static gchar *
 fuzz_type_signature (const gchar *default_value)
 {
-	/* For the moment, we treat type signatures just like strings. In future, we may want to ensure that any fuzzing we apply maintains the
-	 * validity of the type signature. One example would be to selectively replace types with their supertypes. */
-	return fuzz_string (default_value);
+	gchar *output;
+
+	DFSM_NONUNIFORM_DISTRIBUTION (2,
+		DEFAULT, 0.6, /* default value */
+		GENERATED, 0.4 /* a randomly generated type signature */
+	)
+		case DEFAULT:
+			/* Default value. */
+			output = g_strdup (default_value);
+
+			break;
+		case GENERATED: {
+			/* Generated type signature. */
+			GVariantType *type_signature = generate_type_signature ();
+			output = g_variant_type_dup_string (type_signature);
+			g_variant_type_free (type_signature);
+
+			break;
+		}
+	DFSM_NONUNIFORM_DISTRIBUTION_END
+
+	/* Sanity check. */
+	g_assert (g_variant_is_signature (output) == TRUE);
+
+	return output;
 }
 
 /* Evaluate a data structure, ensuring that it's fuzzed in the process. A bit hacky. */
