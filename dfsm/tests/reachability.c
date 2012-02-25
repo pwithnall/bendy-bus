@@ -19,25 +19,7 @@
 
 #include <dfsm/dfsm.h>
 
-static gchar *
-load_test_file (const gchar *filename)
-{
-	guint8 *contents = NULL;
-	gsize length;
-	GFile *machine_file;
-	GError *error = NULL;
-
-	machine_file = g_file_new_for_path (filename);
-
-	/* Load the file. */
-	g_file_load_contents (machine_file, NULL, (gchar**) &contents, &length, NULL, &error);
-	g_assert_no_error (error);
-	g_assert_cmpuint (length, >, 0);
-
-	g_object_unref (machine_file);
-
-	return (gchar*) contents; /* assume it's text; g_file_load_contents() guarantees it's nul-terminated */
-}
+#include "test-utils.h"
 
 static void
 test_reachability (void)

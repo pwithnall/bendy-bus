@@ -18,6 +18,7 @@ IGNORE_HFILES = \
 	dfsm-parser-internal.h \
 	dfsm-probabilities.h \
 	test-output-sequence.h \
+	test-utils.h \
 	$(NULL)
 
 HTML_IMAGES =

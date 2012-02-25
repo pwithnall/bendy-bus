@@ -166,6 +166,10 @@ EXTRA_DIST += dfsm/dfsm.pc.in
 CLEANFILES += $(pkgconfig_DATA)
 
 # libdfsm tests
+test_sources = \
+	dfsm/tests/test-utils.c \
+	$(NULL)
+
 test_cppflags = \
 	-I$(top_srcdir) \
 	$(DISABLE_DEPRECATED) \
@@ -185,14 +189,14 @@ test_ldadd = \
 
 noinst_PROGRAMS += dfsm/tests/ast
 
-dfsm_tests_ast_SOURCES = dfsm/tests/ast.c dfsm/tests/test-output-sequence.c
+dfsm_tests_ast_SOURCES = $(test_sources) dfsm/tests/ast.c dfsm/tests/test-output-sequence.c
 dfsm_tests_ast_CPPFLAGS = $(test_cppflags)
 dfsm_tests_ast_CFLAGS = $(test_cflags)
 dfsm_tests_ast_LDADD = $(test_ldadd)
 
 noinst_PROGRAMS += dfsm/tests/reachability
 
-dfsm_tests_reachability_SOURCES = dfsm/tests/reachability.c
+dfsm_tests_reachability_SOURCES = $(test_sources) dfsm/tests/reachability.c
 dfsm_tests_reachability_CPPFLAGS = $(test_cppflags)
 dfsm_tests_reachability_CFLAGS = $(test_cflags)
 dfsm_tests_reachability_LDADD = $(test_ldadd)
