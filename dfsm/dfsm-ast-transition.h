@@ -83,6 +83,8 @@ const gchar *dfsm_ast_transition_get_trigger_method_name (DfsmAstTransition *sel
 const gchar *dfsm_ast_transition_get_trigger_property_name (DfsmAstTransition *self) G_GNUC_PURE;
 gboolean dfsm_ast_transition_contains_throw_statement (DfsmAstTransition *self) G_GNUC_PURE;
 
+GPtrArray *dfsm_ast_transition_get_statements (DfsmAstTransition *self) G_GNUC_PURE; /* array of DfsmAstStatements */
+
 G_END_DECLS
 
 #endif /* !DFSM_AST_TRANSITION_H */

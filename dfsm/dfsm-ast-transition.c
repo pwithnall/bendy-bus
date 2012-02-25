@@ -676,3 +676,20 @@ dfsm_ast_transition_contains_throw_statement (DfsmAstTransition *self)
 
 	return (self->priv->throw_statement != NULL) ? TRUE : FALSE;
 }
+
+/**
+ * dfsm_ast_transition_get_statements:
+ * @self: a #DfsmAstTransition
+ *
+ * Returns an array of the transition's #DfsmAstStatement<!-- -->s. The array will always contain at least one element, and will never be %NULL.
+ *
+ * Return value: (transfer none) (element-type DfsmAstStatement): array of statements
+ */
+GPtrArray/*<DfsmAstStatement>*/ *
+dfsm_ast_transition_get_statements (DfsmAstTransition *self)
+{
+	g_return_val_if_fail (DFSM_IS_AST_TRANSITION (self), NULL);
+
+	g_assert (self->priv->statements->len > 0);
+	return self->priv->statements;
+}
