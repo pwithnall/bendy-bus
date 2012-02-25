@@ -133,10 +133,10 @@ test_ast_parser (void)
 	ASSERT_TRANSITION_PARSES ("transition inside Main on property ArbitraryProperty { emit CounterSignal (1u); }");
 
 	/* Preconditions, -> operator, == operator, != operator. */
-	ASSERT_TRANSITION_PARSES ("transition inside Main on random {"
+	ASSERT_TRANSITION_PARSES ("transition inside Main on method TwoStateEcho {"
 		"precondition { object->ArbitraryProperty == \"foo\" }"
 		"precondition throwing RandomError { object->ArbitraryProperty != \"foo\" }"
-		"emit SingleStateSignal (\"\");"
+		"reply (\"\");"
 	"}");
 
 	/* Arithmetic operators. */

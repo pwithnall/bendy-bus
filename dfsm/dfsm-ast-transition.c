@@ -196,6 +196,7 @@ dfsm_ast_transition_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *
 			g_assert_not_reached ();
 	}
 
+	/* Check each of our preconditions, and also ensure that we only throw errors from preconditions if we're method-triggered. */
 	for (i = 0; i < priv->preconditions->len; i++) {
 		DfsmAstPrecondition *precondition;
 
@@ -205,6 +206,24 @@ dfsm_ast_transition_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *
 
 		if (*error != NULL) {
 			return;
+		}
+
+		/* Have we illegally included an error in the precondition? */
+		if (dfsm_ast_precondition_get_error_name (precondition) != NULL) {
+			switch (priv->trigger) {
+				case DFSM_AST_TRANSITION_METHOD_CALL:
+					/* Nothing to do here. */
+					break;
+				case DFSM_AST_TRANSITION_PROPERTY_SET:
+				case DFSM_AST_TRANSITION_ARBITRARY:
+					/* Extraneous error in precondition. */
+					g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
+					             _("Unexpected ‘throwing’ clause on precondition. Preconditions on property-triggered and random "
+					               "transitions must not throw errors."));
+					return;
+				default:
+					g_assert_not_reached ();
+			}
 		}
 	}
 
