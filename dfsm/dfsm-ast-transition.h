@@ -73,7 +73,7 @@ typedef struct {
 
 GType dfsm_ast_transition_get_type (void) G_GNUC_CONST;
 
-GPtrArray/*<DfsmAstPrecondition>*/ *dfsm_ast_transition_get_preconditions (DfsmAstTransition *self) G_GNUC_PURE;
+GPtrArray *dfsm_ast_transition_get_preconditions (DfsmAstTransition *self) G_GNUC_PURE; /* array of DfsmAstPreconditions */
 gboolean dfsm_ast_transition_check_preconditions (DfsmAstTransition *self, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence,
                                                   gboolean *will_throw_error);
 void dfsm_ast_transition_execute (DfsmAstTransition *self, DfsmEnvironment *environment, DfsmOutputSequence *output_sequence);
