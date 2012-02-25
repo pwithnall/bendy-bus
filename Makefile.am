@@ -220,6 +220,12 @@ GITIGNOREFILES += \
 	dfsm/tests/.libs/ \
 	$(NULL)
 
+EXTRA_DIST += \
+	dfsm/tests/reachability-test.machine \
+	dfsm/tests/simple-test.machine \
+	dfsm/tests/simple-test.xml \
+	$(NULL)
+
 # libdfsm documentation
 DISTCHECK_CONFIGURE_FLAGS += --enable-gtk-doc
 EXTRA_DIST += gtk-doc.make
