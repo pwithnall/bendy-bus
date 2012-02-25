@@ -19,6 +19,8 @@
 
 #include <dfsm/dfsm.h>
 
+#include "test-output-sequence.h"
+
 static gchar *
 load_test_file (const gchar *filename)
 {
@@ -69,7 +71,7 @@ test_ast_single_object (void)
 }
 
 static GPtrArray/*<DfsmObject>*/ *
-test_machine_description_transition_snippet (const gchar *snippet, GError **error)
+build_machine_description_from_transition_snippet (const gchar *snippet, GError **error)
 {
 	gchar *machine_description, *introspection_xml;
 	GPtrArray/*<DfsmObject>*/ *object_array;
@@ -105,7 +107,7 @@ test_machine_description_transition_snippet (const gchar *snippet, GError **erro
 }
 
 #define ASSERT_TRANSITION_PARSES(Snippet) G_STMT_START { \
-	object_array = test_machine_description_transition_snippet ((Snippet), &error); \
+	object_array = build_machine_description_from_transition_snippet ((Snippet), &error); \
 	\
 	g_assert_no_error (error); \
 	g_assert (object_array != NULL); \
@@ -177,7 +179,7 @@ test_ast_parser (void)
 }
 
 #define ASSERT_TRANSITION_FAILS(ErrorCode, Snippet) G_STMT_START { \
-	object_array = test_machine_description_transition_snippet ((Snippet), &error); \
+	object_array = build_machine_description_from_transition_snippet ((Snippet), &error); \
 	\
 	g_assert_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_##ErrorCode); \
 	g_assert (object_array == NULL); \
@@ -258,6 +260,73 @@ test_ast_parser_errors (void)
 	"}");
 }
 
+static GVariant *
+new_unary_tuple (GVariant *element)
+{
+	GVariant *elements[2] = { element, NULL };
+	return g_variant_new_tuple (elements, 1);
+}
+
+static void
+test_ast_execution_output_sequence (void)
+{
+	DfsmOutputSequence *output_sequence;
+	GPtrArray/*<DfsmObject>*/ *simulated_objects;
+	DfsmObject *simulated_object;
+	DfsmMachine *machine;
+	GVariant *params;
+	GError *error = NULL;
+
+	simulated_objects = build_machine_description_from_transition_snippet (
+		"transition inside Main on random {"
+			"object->Bool = false;" /* no emissions */
+		"}"
+		"transition inside Main on method SingleStateEcho {"
+			"reply (\"test reply\");"
+		"}"
+		"transition inside Main on method TwoStateEcho {"
+			"reply (\"another reply\");"
+			"emit SingleStateSignal (\"message\");"
+			"emit CounterSignal (1153u);"
+		"}", &error);
+	g_assert_no_error (error);
+	g_assert_cmpuint (simulated_objects->len, ==, 1);
+
+	simulated_object = g_ptr_array_index (simulated_objects, 0);
+	machine = dfsm_object_get_machine (simulated_object);
+
+	params = g_variant_ref_sink (new_unary_tuple (g_variant_new_string ("test")));
+
+	/* Test no output. */
+	output_sequence = test_output_sequence_new (ENTRY_NONE);
+	dfsm_machine_make_arbitrary_transition (machine, output_sequence, TRUE);
+	dfsm_output_sequence_output (output_sequence, &error);
+	g_assert_no_error (error);
+	g_object_unref (output_sequence);
+
+	/* Test a single reply. */
+	output_sequence = test_output_sequence_new (ENTRY_REPLY, new_unary_tuple (g_variant_new_string ("test reply")), ENTRY_NONE);
+	dfsm_machine_call_method (machine, output_sequence, "uk.ac.cam.cl.DBusSimulator.SimpleTest", "SingleStateEcho", params, TRUE);
+	dfsm_output_sequence_output (output_sequence, &error);
+	g_assert_no_error (error);
+	g_object_unref (output_sequence);
+
+	/* Test a reply then two signal emissions. */
+	output_sequence = test_output_sequence_new (ENTRY_REPLY, new_unary_tuple (g_variant_new_string ("another reply")),
+	                                            ENTRY_EMIT, "uk.ac.cam.cl.DBusSimulator.SimpleTest", "SingleStateSignal",
+	                                                        new_unary_tuple (g_variant_new_string ("message")),
+	                                            ENTRY_EMIT, "uk.ac.cam.cl.DBusSimulator.SimpleTest", "CounterSignal",
+	                                                        new_unary_tuple (g_variant_new_uint32 (1153)),
+	                                            ENTRY_NONE);
+	dfsm_machine_call_method (machine, output_sequence, "uk.ac.cam.cl.DBusSimulator.SimpleTest", "TwoStateEcho", params, TRUE);
+	dfsm_output_sequence_output (output_sequence, &error);
+	g_assert_no_error (error);
+	g_object_unref (output_sequence);
+
+	g_variant_unref (params);
+	g_ptr_array_unref (simulated_objects);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -270,6 +339,7 @@ main (int argc, char *argv[])
 	g_test_add_func ("/ast/single-object", test_ast_single_object);
 	g_test_add_func ("/ast/parser", test_ast_parser);
 	g_test_add_func ("/ast/parser/errors", test_ast_parser_errors);
+	g_test_add_func ("/ast/execution/output-sequence", test_ast_execution_output_sequence);
 
 	return g_test_run ();
 }

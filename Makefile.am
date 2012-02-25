@@ -185,7 +185,7 @@ test_ldadd = \
 
 noinst_PROGRAMS += dfsm/tests/ast
 
-dfsm_tests_ast_SOURCES = dfsm/tests/ast.c
+dfsm_tests_ast_SOURCES = dfsm/tests/ast.c dfsm/tests/test-output-sequence.c
 dfsm_tests_ast_CPPFLAGS = $(test_cppflags)
 dfsm_tests_ast_CFLAGS = $(test_cflags)
 dfsm_tests_ast_LDADD = $(test_ldadd)
