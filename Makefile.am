@@ -194,6 +194,13 @@ dfsm_tests_ast_CPPFLAGS = $(test_cppflags)
 dfsm_tests_ast_CFLAGS = $(test_cflags)
 dfsm_tests_ast_LDADD = $(test_ldadd)
 
+noinst_PROGRAMS += dfsm/tests/fuzzing
+
+dfsm_tests_fuzzing_SOURCES = $(test_sources) dfsm/tests/fuzzing.c
+dfsm_tests_fuzzing_CPPFLAGS = $(test_cppflags)
+dfsm_tests_fuzzing_CFLAGS = $(test_cflags)
+dfsm_tests_fuzzing_LDADD = $(test_ldadd)
+
 noinst_PROGRAMS += dfsm/tests/reachability
 
 dfsm_tests_reachability_SOURCES = $(test_sources) dfsm/tests/reachability.c
