@@ -85,6 +85,8 @@ test_machine_description_transition_snippet (const gchar *snippet, GError **erro
 				"NonEmptyString = \"hello world\";"
 				"UnicodeString = \"hállö wèrlđ\";"
 				"TypeSignature = @av [];"
+				"Integer = 5u;"
+				"Bool = false;"
 			"}"
 			"states {"
 				"Main;"
@@ -174,6 +176,88 @@ test_ast_parser (void)
 	ASSERT_TRANSITION_PARSES ("transition inside Main on random { (object->UnicodeString, object->NonEmptyString) = (\"…\", \"Test string\"); }");
 }
 
+#define ASSERT_TRANSITION_FAILS(ErrorCode, Snippet) G_STMT_START { \
+	object_array = test_machine_description_transition_snippet ((Snippet), &error); \
+	\
+	g_assert_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_##ErrorCode); \
+	g_assert (object_array == NULL); \
+	\
+	g_clear_error (&error); \
+	if (object_array != NULL) { \
+		g_ptr_array_unref (object_array); \
+	} \
+} G_STMT_END
+
+static void
+test_ast_parser_errors (void)
+{
+	GPtrArray/*<DfsmObject>*/ *object_array = NULL;
+	GError *error = NULL;
+
+	/* Unannotated integers. */
+	ASSERT_TRANSITION_FAILS (SYNTAX, "transition inside Main on random { object->Integer = 5; }");
+	ASSERT_TRANSITION_FAILS (SYNTAX, "transition inside Main on random { object->Integer = -5; }");
+
+	/* Reference non-existent variable. */
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->ArbitraryProperty = fake_variable; }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->FakeVariable = \"hello\"; }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->ArbitraryProperty = object->FakeVariable; }");
+
+	/* Missing reply/throw statement, or reply/throw statement used incorrectly. */
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on method TwoStateEcho { object->ArbitraryProperty = \"no reply\"; }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { reply (\"bad reply\"); }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { throw BadError; }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on method TwoStateEcho { reply (\"good reply\"); throw BadError; }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on method TwoStateEcho { reply (\"good reply\"); reply (\"bad reply\"); }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on method TwoStateEcho { throw GoodError; throw BadError; }");
+
+	/* Throw statement: invalid error identifier. */
+	ASSERT_TRANSITION_FAILS (SYNTAX, "transition inside Main on method TwoStateEcho { throw \"Invalid identifier\"; }");
+
+	/* Reply statement: incorrect type. */
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on method TwoStateEcho { reply \"not in a struct\"; }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on method TwoStateEcho { reply (false); }");
+
+	/* Emit statement: no data, invalid signal, incorrect type. */
+	ASSERT_TRANSITION_FAILS (SYNTAX, "transition inside Main on random { emit SingleStateSignal; }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { emit NonExistentSignal (true); }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { emit SingleStateSignal (5u); }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { emit SingleStateSignal \"not in a struct\"; }");
+
+	/* Assignments: type mismatches, assignments to non-variables and structures of non-variables. */
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->ArbitraryProperty = false; }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { false = true; }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { (object->ArbitraryProperty, \"not a variable\") = (\"\", \"\"); }");
+
+	/* Binary expression: type mismatches. */
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Integer = 5u + false; }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Bool = \"what\" <= false; }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Bool = \"/obj/path\" == @o \"/obj/path\"; }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Bool = true && 1u; }");
+
+	/* Unary expression: type mismatches. */
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Bool = !0u; }");
+
+	/* Function call: invalid function name, parameter type mismatch, return type mismatch. */
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Integer = makeMeAnInt (\"shan't\"); }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->ArbitraryProperty = stringJoin (false, @as []); }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Integer = stringJoin (\"\", @as []); }");
+
+	/* Precondition: invalid error identifier, type mismatches, throwing error in random transition. */
+	ASSERT_TRANSITION_FAILS (SYNTAX, "transition inside Main on method TwoStateEcho {"
+		"precondition throwing \"Invalid identifier\" { false }"
+		"reply (\"\");"
+	"}");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on method TwoStateEcho {"
+		"precondition throwing GoodError { \"this isn't a boolean\" }"
+		"reply (\"\");"
+	"}");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random {"
+		"precondition throwing GoodError { true }"
+		"emit SingleStateSignal (\"\");"
+	"}");
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -185,6 +269,7 @@ main (int argc, char *argv[])
 
 	g_test_add_func ("/ast/single-object", test_ast_single_object);
 	g_test_add_func ("/ast/parser", test_ast_parser);
+	g_test_add_func ("/ast/parser/errors", test_ast_parser_errors);
 
 	return g_test_run ();
 }
