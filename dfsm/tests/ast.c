@@ -68,10 +68,110 @@ test_ast_single_object (void)
 	test_machine_description ("simple-test.machine", "simple-test.xml");
 }
 
+static GPtrArray/*<DfsmObject>*/ *
+test_machine_description_transition_snippet (const gchar *snippet, GError **error)
+{
+	gchar *machine_description, *introspection_xml;
+	GPtrArray/*<DfsmObject>*/ *object_array;
+	const gchar *introspection_xml_filename = "simple-test.xml";
+
+	machine_description = g_strdup_printf (
+		"object at /uk/ac/cam/cl/DBusSimulator/ParserTest implements uk.ac.cam.cl.DBusSimulator.SimpleTest {"
+			"data {"
+				"ArbitraryProperty = \"foo\";"
+				"EmptyString = \"\";"
+				"SingleCharacter = \"a\";"
+				"SingleUnicodeCharacter = \"ö\";"
+				"NonEmptyString = \"hello world\";"
+				"UnicodeString = \"hállö wèrlđ\";"
+				"TypeSignature = @av [];"
+			"}"
+			"states {"
+				"Main;"
+				"NotMain;"
+			"}"
+			"%s"
+		"}", snippet);
+	introspection_xml = load_test_file (introspection_xml_filename);
+
+	object_array = dfsm_object_factory_from_files (machine_description, introspection_xml, error);
+
+	g_free (introspection_xml);
+	g_free (machine_description);
+
+	return object_array;
+}
+
+#define ASSERT_TRANSITION_PARSES(Snippet) G_STMT_START { \
+	object_array = test_machine_description_transition_snippet ((Snippet), &error); \
+	\
+	g_assert_no_error (error); \
+	g_assert (object_array != NULL); \
+	\
+	g_clear_error (&error); \
+	if (object_array != NULL) { \
+		g_ptr_array_unref (object_array); \
+	} \
+} G_STMT_END
+
 static void
 test_ast_parser (void)
 {
-	test_machine_description ("parser-test.machine", "simple-test.xml");
+	GPtrArray/*<DfsmObject>*/ *object_array = NULL;
+	GError *error = NULL;
+	
+	/* Random triggering, inside transitions, signal emissions. */
+	ASSERT_TRANSITION_PARSES ("transition inside Main on random { emit CounterSignal (1u); }");
+
+	/* Method triggering, from…to transitions, replies. */
+	ASSERT_TRANSITION_PARSES ("transition from Main to Main on method TwoStateEcho { reply (\"baz\"); }");
+
+	/* Throwing errors. */
+	ASSERT_TRANSITION_PARSES ("transition from Main to Main on method TwoStateEcho { throw RandomError; }");
+
+	/* Property triggering. */
+	ASSERT_TRANSITION_PARSES ("transition inside Main on property ArbitraryProperty { emit CounterSignal (1u); }");
+
+	/* Preconditions, -> operator, == operator, != operator. */
+	ASSERT_TRANSITION_PARSES ("transition inside Main on random {"
+		"precondition { object->ArbitraryProperty == \"foo\" }"
+		"precondition throwing RandomError { object->ArbitraryProperty != \"foo\" }"
+		"emit SingleStateSignal (\"\");"
+	"}");
+
+	/* Arithmetic operators. */
+	ASSERT_TRANSITION_PARSES ("transition inside Main on random { emit CounterSignal (1u * 1u / 1u + 1u - 1u % 1u); }");
+
+	/* Operator precedence. */
+	ASSERT_TRANSITION_PARSES ("transition inside Main on random { emit CounterSignal (⟨1u * 1u⟩ / ⟨1u + 1u⟩ - 1u % 1u); }");
+
+	/* Boolean operators. */
+	ASSERT_TRANSITION_PARSES ("transition inside Main on random {"
+		"precondition { !false == true && false || true }"
+		"emit SingleStateSignal (\"\");"
+	"}");
+
+	/* Numeric comparisons. */
+	ASSERT_TRANSITION_PARSES ("transition inside Main on random {"
+		"precondition { 0.5d <~ 0.0d || 0.5d <= 0.0d || 0.5d >= 0.0d || 0.5d ~> 0.0d }"
+		"emit SingleStateSignal (\"\");"
+	"}");
+
+	/* Arrays, variants, dicts, structs. */
+	ASSERT_TRANSITION_PARSES ("transition inside Main on random {"
+		"object->TypeSignature = [<1u>];"
+		"object->TypeSignature = [<{ \"foo\" : \"bar\" }>];"
+		"object->TypeSignature = [<( \"foo\", \"bar\" )>];"
+	"}");
+
+	/* Fuzzing. */
+	ASSERT_TRANSITION_PARSES ("transition inside Main on random { object->TypeSignature = @av []?; }");
+
+	/* Transition state lists. */
+	ASSERT_TRANSITION_PARSES ("transition inside Main, inside NotMain on random { emit SingleStateSignal (\"\"); }");
+
+	/* Multiple assignment. */
+	ASSERT_TRANSITION_PARSES ("transition inside Main on random { (object->UnicodeString, object->NonEmptyString) = (\"…\", \"Test string\"); }");
 }
 
 int
