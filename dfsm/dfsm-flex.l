@@ -85,13 +85,13 @@ DBUS_NAME				{DBUS_NAME_ELEMENT}\.{DBUS_NAME_ELEMENT}(\.{DBUS_NAME_ELEMENT})*
 IDENTIFIER				[A-Za-z_]+[A-Za-z0-9_]*
 
 BYTE					[0-9]+y
-INT16					(\+-)?[0-9]+n
+INT16					[\+-]?[0-9]+n
 UINT16					[0-9]+q
-INT32					(\+-)?[0-9]+i
+INT32					[\+-]?[0-9]+i
 UINT32					[0-9]+u
-INT64					(\+-)?[0-9]+x
+INT64					[\+-]?[0-9]+x
 UINT64					[0-9]+t
-DOUBLE					(\+-)?[0-9]+\.[0-9]+d
+DOUBLE					[\+-]?[0-9]+\.[0-9]+d
 
 TYPE_ANNOTATION				@[\(\)\{\}ybnqiuxtdsogarvehm\*\?@&^]+[ \t\n\r\v\f]+
 
