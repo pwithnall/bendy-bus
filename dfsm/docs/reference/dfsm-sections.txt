@@ -207,6 +207,8 @@ dfsm_ast_statement_get_type
 <TITLE>DfsmAstStatementAssignment</TITLE>
 DfsmAstStatementAssignment
 DfsmAstStatementAssignmentClass
+dfsm_ast_statement_assignment_get_variable
+dfsm_ast_statement_assignment_get_expression
 <SUBSECTION Standard>
 DFSM_AST_STATEMENT_ASSIGNMENT
 DFSM_AST_STATEMENT_ASSIGNMENT_CLASS

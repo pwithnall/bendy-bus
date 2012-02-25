@@ -199,3 +199,35 @@ dfsm_ast_statement_assignment_new (DfsmAstDataStructure *data_structure, DfsmAst
 
 	return DFSM_AST_STATEMENT (statement);
 }
+
+/**
+ * dfsm_ast_statement_assignment_get_variable:
+ * @self: a #DfsmAstStatementAssignment
+ *
+ * Gets the variable being assigned to in the assignment (i.e. the l-value of the assignment).
+ *
+ * Return value: (transfer none): variable being assigned to
+ */
+DfsmAstDataStructure *
+dfsm_ast_statement_assignment_get_variable (DfsmAstStatementAssignment *self)
+{
+	g_return_val_if_fail (DFSM_IS_AST_STATEMENT_ASSIGNMENT (self), NULL);
+
+	return self->priv->data_structure;
+}
+
+/**
+ * dfsm_ast_statement_assignment_get_expression:
+ * @self: a #DfsmAstStatementAssignment
+ *
+ * Gets the expression being evaluated and assigned in the assignment (i.e. the r-value of the assignment).
+ *
+ * Return value: (transfer none): unevaluated form of the expression being evaluated and assigned
+ */
+DfsmAstExpression *
+dfsm_ast_statement_assignment_get_expression (DfsmAstStatementAssignment *self)
+{
+	g_return_val_if_fail (DFSM_IS_AST_STATEMENT_ASSIGNMENT (self), NULL);
+
+	return self->priv->expression;
+}

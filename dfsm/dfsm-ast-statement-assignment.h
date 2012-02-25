@@ -63,6 +63,9 @@ typedef struct {
 
 GType dfsm_ast_statement_assignment_get_type (void) G_GNUC_CONST;
 
+DfsmAstDataStructure *dfsm_ast_statement_assignment_get_variable (DfsmAstStatementAssignment *self) G_GNUC_PURE;
+DfsmAstExpression *dfsm_ast_statement_assignment_get_expression (DfsmAstStatementAssignment *self) G_GNUC_PURE;
+
 G_END_DECLS
 
 #endif /* !DFSM_AST_STATEMENT_ASSIGNMENT_H */
