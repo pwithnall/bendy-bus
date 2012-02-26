@@ -62,14 +62,22 @@ arrayRemove (object->ArrayOfThings, 0u)]]></code>
 
 <p>A standard selection of numerical operators are defined in the language, all binary operators. The type of such a numerical expression is the
 type of its left-hand child expression. The types of the two child expressions do not have to be equal, though both have to be numeric types.</p>
+<p>Integer arithmetic saturates on over- or under-flow in the language, so for example the value of <code>2 - 6</code> is <code>0</code> for unsigned
+integer types, rather than under-flowing and wrapping round to a high positive number. As with other programming languages, the value zero is unsigned
+for signed integer types — there is no distinction between <code>0</code> and <code>-0</code>.</p>
 <terms>
 	<item><title><code><input>x</input> * <input>y</input></code></title>
 		<p>Multiply one numeric value with another.</p></item>
 	<item><title><code><input>x</input> / <input>y</input></code></title>
-		<p>Divide one numeric value by another. Integer division truncates fractional parts.</p></item>
+		<p>Divide one numeric value by another. Integer division truncates fractional parts, rounding towards zero.</p>
+		<p>Division by zero results in the maximum value for the type, with the same sign as the dividend (<code>x</code>). Dividing zero by
+			zero gives zero. This is so that simulation descriptions don't have to handle division by zero exceptions.</p></item>
 	<item><title><code><input>x</input> % <input>y</input></code></title>
 		<p>Take the modulus of one numeric value with respect to another. Floating point values are converted
-			to 64-bit unsigned integers before the modulus is taken.</p></item>
+			to 64-bit signed integers before the modulus is taken.</p>
+		<p>The modulus of two signed numbers takes the sign of the dividend (<code>x</code>). Taking the modulus of a number with zero gives
+			zero as the result. This preserves the invariant that <code>y * (x / y) + (x % y) ≡ y</code> for all <code>x</code> and
+			<code>y</code> (except <code>y == 0</code>, which gives zero as the result).</p></item>
 	<item><title><code><input>x</input> + <input>y</input></code></title>
 		<p>Add one numeric value to another.</p></item>
 	<item><title><code><input>x</input> - <input>y</input></code></title>
