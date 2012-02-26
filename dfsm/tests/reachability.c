@@ -50,7 +50,7 @@ test_reachability (void)
 	machine_description = load_test_file ("reachability-test.machine");
 	introspection_xml = load_test_file ("simple-test.xml");
 
-	object_array = dfsm_object_factory_from_files (machine_description, introspection_xml, &error);
+	object_array = dfsm_object_factory_from_data (machine_description, introspection_xml, &error);
 	g_assert_no_error (error);
 
 	/* Calculate reachability of the states in the object. */

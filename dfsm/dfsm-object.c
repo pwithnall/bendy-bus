@@ -414,8 +414,153 @@ _dfsm_object_new (DfsmMachine *machine, const gchar *object_path, GPtrArray/*<st
 	                     NULL);
 }
 
+typedef struct {
+	gchar *simulation_code;
+	gchar *introspection_xml;
+} FactoryFromFilesData;
+
+static void
+factory_from_files_data_free (FactoryFromFilesData *data)
+{
+	g_free (data->simulation_code);
+	g_free (data->introspection_xml);
+	g_slice_free (FactoryFromFilesData, data);
+}
+
+static void
+cancelled_cb (GCancellable *cancelland, GCancellable *cancellee)
+{
+	g_cancellable_cancel (cancellee);
+}
+
+static void
+simulation_code_file_loaded_cb (GFile *simulation_code_file, GAsyncResult *async_result, GSimpleAsyncResult *parent_async_result)
+{
+	FactoryFromFilesData *data;
+	GError *error = NULL;
+
+	data = g_simple_async_result_get_op_res_gpointer (parent_async_result);
+	g_file_load_contents_finish (simulation_code_file, async_result, &(data->simulation_code), NULL, NULL, &error);
+
+	if (error != NULL) {
+		/* Error. */
+		g_free (data->simulation_code);
+		data->simulation_code = NULL;
+
+		g_simple_async_result_take_error (parent_async_result, error);
+		error = NULL;
+
+		g_simple_async_result_complete_in_idle (parent_async_result);
+	} else if (data->simulation_code != NULL && data->introspection_xml != NULL) {
+		/* Success! */
+		g_simple_async_result_complete_in_idle (parent_async_result);
+	}
+}
+
+static void
+introspection_xml_file_loaded_cb (GFile *introspection_xml_file, GAsyncResult *async_result, GSimpleAsyncResult *parent_async_result)
+{
+	FactoryFromFilesData *data;
+	GError *error = NULL;
+
+	data = g_simple_async_result_get_op_res_gpointer (parent_async_result);
+	g_file_load_contents_finish (introspection_xml_file, async_result, &(data->introspection_xml), NULL, NULL, &error);
+
+	if (error != NULL) {
+		/* Error. */
+		g_free (data->introspection_xml);
+		data->introspection_xml = NULL;
+
+		g_simple_async_result_take_error (parent_async_result, error);
+		error = NULL;
+
+		g_simple_async_result_complete_in_idle (parent_async_result);
+	} else if (data->simulation_code != NULL && data->introspection_xml != NULL) {
+		/* Success! */
+		g_simple_async_result_complete_in_idle (parent_async_result);
+	}
+}
+
 /**
- * dfsm_object_factory_asts_from_files:
+ * dfsm_object_factory_from_files:
+ * @simulation_code_file: file containing code describing the DFSM of one or more D-Bus objects to be simulated
+ * @introspection_xml_file: file containing D-Bus introspection XML describing all of the interfaces referenced by @simulation_code_file
+ * @cancellable: (allow-none): a #GCancellable to cancel the operation, or %NULL
+ * @callback: a callback to call once creating the objects is complete
+ * @user_data: (allow-none): data to pass to @callback
+ *
+ * Asynchronous version of dfsm_object_factory_from_data(). Parses the code in the given @simulation_code_file and constructs one or more
+ * #DfsmAstObject<!-- -->s from it, each of which is the AST of the code representing that simulated D-Bus object. The XML in the given
+ * @introspection_xml_file should be a fully formed introspection XML document which, at a minimum, describes all the D-Bus interfaces implemented by
+ * all the objects defined in @simulation_code_file.
+ */
+void
+dfsm_object_factory_from_files (GFile *simulation_code_file, GFile *introspection_xml_file, GCancellable *cancellable,
+                                GAsyncReadyCallback callback, gpointer user_data)
+{
+	GCancellable *simulation_cancellable, *introspection_cancellable;
+	FactoryFromFilesData *data;
+	GSimpleAsyncResult *async_result;
+
+	g_return_if_fail (G_IS_FILE (simulation_code_file));
+	g_return_if_fail (G_IS_FILE (introspection_xml_file));
+	g_return_if_fail (cancellable == NULL || G_IS_CANCELLABLE (cancellable));
+
+	/* Chain cancellables so that both load operations can be cancelled. */
+	simulation_cancellable = g_cancellable_new ();
+	introspection_cancellable = g_cancellable_new ();
+
+	if (cancellable != NULL) {
+		g_cancellable_connect (cancellable, (GCallback) cancelled_cb, g_object_ref (simulation_cancellable), g_object_unref);
+		g_cancellable_connect (cancellable, (GCallback) cancelled_cb, g_object_ref (introspection_cancellable), g_object_unref);
+	}
+
+	/* Start loading the files. */
+	async_result = g_simple_async_result_new (NULL, callback, user_data, dfsm_object_factory_from_files);
+
+	data = g_slice_new (FactoryFromFilesData);
+	data->simulation_code = NULL;
+	data->introspection_xml = NULL;
+
+	g_simple_async_result_set_op_res_gpointer (async_result, data, (GDestroyNotify) factory_from_files_data_free);
+
+	g_file_load_contents_async (simulation_code_file, simulation_cancellable, (GAsyncReadyCallback) simulation_code_file_loaded_cb, async_result);
+	g_file_load_contents_async (introspection_xml_file, introspection_cancellable, (GAsyncReadyCallback) introspection_xml_file_loaded_cb,
+	                            async_result);
+
+	g_object_unref (introspection_cancellable);
+	g_object_unref (simulation_cancellable);
+}
+
+/**
+ * dfsm_object_factory_from_files_finish:
+ * @async_result: result from the asynchronous callback
+ * @error: (allow-none): a #GError, or %NULL
+ *
+ * Finishes an asynchronous parsing operation started by dfsm_object_factory_from_files().
+ *
+ * Return value: (transfer full): an array of #DfsmAstObject<!-- -->s, each of which must be freed using g_object_unref()
+ */
+GPtrArray *
+dfsm_object_factory_from_files_finish (GAsyncResult *async_result, GError **error)
+{
+	FactoryFromFilesData *data;
+
+	g_return_val_if_fail (G_IS_ASYNC_RESULT (async_result), NULL);
+	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
+	g_return_val_if_fail (g_simple_async_result_is_valid (async_result, NULL, dfsm_object_factory_from_files) == TRUE, NULL);
+
+	if (g_simple_async_result_propagate_error (G_SIMPLE_ASYNC_RESULT (async_result), error) == TRUE) {
+		return NULL;
+	}
+
+	data = g_simple_async_result_get_op_res_gpointer (G_SIMPLE_ASYNC_RESULT (async_result));
+
+	return dfsm_object_factory_from_data (data->simulation_code, data->introspection_xml, error);
+}
+
+/**
+ * dfsm_object_factory_asts_from_data:
  * @simulation_code: code describing the DFSM of one or more D-Bus objects to be simulated
  * @introspection_xml: D-Bus introspection XML describing all the interfaces referenced by @simulation_code
  * @error: (allow-none): a #GError, or %NULL
@@ -427,7 +572,7 @@ _dfsm_object_new (DfsmMachine *machine, const gchar *object_path, GPtrArray/*<st
  * Return value: (transfer full): an array of #DfsmAstObject<!-- -->s, each of which must be freed using g_object_unref()
  */
 GPtrArray/*<DfsmAstObject>*/ *
-dfsm_object_factory_asts_from_files (const gchar *simulation_code, const gchar *introspection_xml, GError **error)
+dfsm_object_factory_asts_from_data (const gchar *simulation_code, const gchar *introspection_xml, GError **error)
 {
 	GPtrArray/*<DfsmAstObject>*/ *ast_object_array;
 	guint i;
@@ -498,7 +643,7 @@ dfsm_object_factory_asts_from_files (const gchar *simulation_code, const gchar *
 }
 
 /**
- * dfsm_object_factory_from_files:
+ * dfsm_object_factory_from_data:
  * @simulation_code: code describing the DFSM of one or more D-Bus objects to be simulated
  * @introspection_xml: D-Bus introspection XML describing all the interfaces referenced by @simulation_code
  * @error: (allow-none): a #GError, or %NULL
@@ -510,7 +655,7 @@ dfsm_object_factory_asts_from_files (const gchar *simulation_code, const gchar *
  * Return value: (transfer full): an array of #DfsmObject<!-- -->s, each of which must be freed using g_object_unref()
  */
 GPtrArray/*<DfsmObject>*/ *
-dfsm_object_factory_from_files (const gchar *simulation_code, const gchar *introspection_xml, GError **error)
+dfsm_object_factory_from_data (const gchar *simulation_code, const gchar *introspection_xml, GError **error)
 {
 	GPtrArray/*<DfsmAstObject>*/ *ast_object_array;
 	GPtrArray/*<DfsmObject>*/ *object_array;
@@ -522,7 +667,7 @@ dfsm_object_factory_from_files (const gchar *simulation_code, const gchar *intro
 	g_return_val_if_fail (error == NULL || *error == NULL, NULL);
 
 	/* Load and parse the files into DfsmAstObjects. */
-	ast_object_array = dfsm_object_factory_asts_from_files (simulation_code, introspection_xml, &child_error);
+	ast_object_array = dfsm_object_factory_asts_from_data (simulation_code, introspection_xml, &child_error);
 
 	if (child_error != NULL) {
 		/* Error! */

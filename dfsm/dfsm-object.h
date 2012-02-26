@@ -83,10 +83,15 @@ typedef struct {
 
 GType dfsm_object_get_type (void) G_GNUC_CONST;
 
-GPtrArray/*<DfsmAstObject>*/ *dfsm_object_factory_asts_from_files (const gchar *simulation_code, const gchar *introspection_xml,
-                                                                   GError **error) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
-GPtrArray/*<DfsmObject>*/ *dfsm_object_factory_from_files (const gchar *simulation_code, const gchar *introspection_xml,
-                                                           GError **error) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC;
+GPtrArray *dfsm_object_factory_asts_from_data (const gchar *simulation_code, const gchar *introspection_xml,
+                                               GError **error) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC; /* array of DfsmAstObjects */
+GPtrArray *dfsm_object_factory_from_data (const gchar *simulation_code, const gchar *introspection_xml,
+                                          GError **error) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC; /* array of DfsmObjects */
+
+void dfsm_object_factory_from_files (GFile *simulation_code_file, GFile *introspection_xml_file, GCancellable *cancellable,
+                                     GAsyncReadyCallback callback, gpointer user_data);
+GPtrArray *dfsm_object_factory_from_files_finish (GAsyncResult *async_result,
+                                                  GError **error) G_GNUC_WARN_UNUSED_RESULT G_GNUC_MALLOC; /* array of DfsmObjects */
 
 void dfsm_object_factory_set_unfuzzed_transition_limit (guint transition_limit);
 

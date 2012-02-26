@@ -32,7 +32,7 @@ test_machine_description (const gchar *machine_description_filename, const gchar
 	machine_description = load_test_file (machine_description_filename);
 	introspection_xml = load_test_file (introspection_xml_filename);
 
-	object_array = dfsm_object_factory_from_files (machine_description, introspection_xml, &error);
+	object_array = dfsm_object_factory_from_data (machine_description, introspection_xml, &error);
 
 	g_assert_no_error (error);
 	g_assert (object_array != NULL);
@@ -79,7 +79,7 @@ build_machine_description_from_transition_snippet (const gchar *snippet, GError 
 		"}", snippet);
 	introspection_xml = load_test_file (introspection_xml_filename);
 
-	object_array = dfsm_object_factory_from_files (machine_description, introspection_xml, error);
+	object_array = dfsm_object_factory_from_data (machine_description, introspection_xml, error);
 
 	g_free (introspection_xml);
 	g_free (machine_description);

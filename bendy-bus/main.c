@@ -1085,7 +1085,7 @@ main (int argc, char *argv[])
 	}
 
 	/* Build the DfsmObjects. */
-	simulated_objects = dfsm_object_factory_from_files (simulation_code, introspection_xml, &error);
+	simulated_objects = dfsm_object_factory_from_data (simulation_code, introspection_xml, &error);
 
 	g_free (introspection_xml);
 	g_free (simulation_code);

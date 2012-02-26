@@ -51,7 +51,7 @@ build_data_structure_from_snippet (const gchar *snippet, DfsmEnvironment **envir
 		"}", snippet);
 	introspection_xml = load_test_file ("simple-test.xml");
 
-	ast_objects = dfsm_object_factory_asts_from_files (simulation_description, introspection_xml, &error);
+	ast_objects = dfsm_object_factory_asts_from_data (simulation_description, introspection_xml, &error);
 	g_assert_no_error (error);
 	g_assert (ast_objects != NULL);
 	g_assert_cmpuint (ast_objects->len, ==, 1);
