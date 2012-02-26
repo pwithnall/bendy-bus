@@ -20,6 +20,8 @@ DOC_PAGES = \
 GITIGNOREFILES = \
 	$(_DOC_LC_PAGES) \
 	$(_DOC_MOFILES) \
+	html/ \
+	xhtml/ \
 	$(NULL)
 
 html:
