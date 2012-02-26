@@ -1259,8 +1259,8 @@ fuzz_string (const gchar *default_value)
 	default_value_length = strlen (default_value);
 
 	/* If the default_value is the empty string, we:
-	 *  • keep the empty string with probability 0.4; or
-	 *  • generate a random string of random length with probability 0.6.
+	 *  • keep the empty string with probability 0.6; or
+	 *  • generate a random string of random length with probability 0.4.
 	 *
 	 * There's no point then going on and applying any of the transformations above, since they're all designed to fuzz structured strings,
 	 * which a randomly generated string most definitely isn't.
