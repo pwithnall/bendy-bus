@@ -18,6 +18,7 @@
  */
 
 #include <glib.h>
+#include <dfsm/dfsm.h>
 
 #ifndef TEST_UTILS_H
 #define TEST_UTILS_H
@@ -26,6 +27,7 @@ G_BEGIN_DECLS
 
 gchar *load_test_file (const gchar *filename) G_GNUC_MALLOC G_GNUC_WARN_UNUSED_RESULT;
 GVariant *new_unary_tuple (GVariant *element) G_GNUC_MALLOC G_GNUC_WARN_UNUSED_RESULT;
+guint get_counter_from_environment (DfsmEnvironment *environment, const gchar *counter_name);
 
 G_END_DECLS
 

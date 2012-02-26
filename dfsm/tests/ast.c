@@ -68,7 +68,7 @@ build_machine_description_from_transition_snippet (const gchar *snippet, GError 
 				"NonEmptyString = \"hello world\";"
 				"UnicodeString = \"hállö wèrlđ\";"
 				"TypeSignature = @av [];"
-				"Integer = 5u;"
+				"Integer = 0u;"
 				"Bool = false;"
 			"}"
 			"states {"
@@ -301,6 +301,165 @@ test_ast_execution_output_sequence (void)
 	g_ptr_array_unref (simulated_objects);
 }
 
+static void
+test_ast_execution_integer_saturation (void)
+{
+	DfsmOutputSequence *output_sequence;
+	GPtrArray/*<DfsmObject>*/ *simulated_objects;
+	DfsmObject *simulated_object;
+	DfsmMachine *machine;
+	DfsmEnvironment *environment;
+	GError *error = NULL;
+
+#define ASSERT_ARITHMETIC_EXPRESSION(ARITHMETIC) G_STMT_START { \
+	simulated_objects = build_machine_description_from_transition_snippet ( \
+		"transition inside Main on random {" \
+			"precondition { " ARITHMETIC " }" \
+			"object->Integer = object->Integer + 1u;" /* count successful executions */ \
+		"}", &error); \
+	g_assert_no_error (error); \
+	g_assert_cmpuint (simulated_objects->len, ==, 1); \
+	\
+	simulated_object = g_ptr_array_index (simulated_objects, 0); \
+	machine = dfsm_object_get_machine (simulated_object); \
+	environment = dfsm_machine_get_environment (machine); \
+	\
+	output_sequence = test_output_sequence_new (ENTRY_NONE); \
+	dfsm_machine_make_arbitrary_transition (machine, output_sequence, TRUE); \
+	g_object_unref (output_sequence); \
+	\
+	g_assert_cmpuint (get_counter_from_environment (environment, "Integer"), ==, 1); \
+	\
+	g_ptr_array_unref (simulated_objects); \
+} G_STMT_END
+
+	/* Addition. */
+	ASSERT_ARITHMETIC_EXPRESSION ("254y + 0y == 254y");
+	ASSERT_ARITHMETIC_EXPRESSION ("254y + 1y == 255y");
+	ASSERT_ARITHMETIC_EXPRESSION ("254y + 2y == 255y");
+	ASSERT_ARITHMETIC_EXPRESSION ("255y + 0y == 255y");
+	ASSERT_ARITHMETIC_EXPRESSION ("255y + 1y == 255y");
+
+	ASSERT_ARITHMETIC_EXPRESSION ("32766n + 0n == 32766n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32766n + 1n == 32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32766n + 2n == 32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n + 0n == 32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n + 1n == 32767n");
+
+	ASSERT_ARITHMETIC_EXPRESSION ("-32767n + -0n == -32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32767n + -1n == -32768n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32767n + -2n == -32768n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n + -0n == -32768n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n + -1n == -32768n");
+
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n + 32767n == -1n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n + -32768n == -1n");
+
+	/* Subtraction. */
+	ASSERT_ARITHMETIC_EXPRESSION ("1y - 0y == 1y");
+	ASSERT_ARITHMETIC_EXPRESSION ("1y - 1y == 0y");
+	ASSERT_ARITHMETIC_EXPRESSION ("1y - 2y == 0y");
+	ASSERT_ARITHMETIC_EXPRESSION ("0y - 0y == 0y");
+	ASSERT_ARITHMETIC_EXPRESSION ("0y - 1y == 0y");
+
+	ASSERT_ARITHMETIC_EXPRESSION ("-32767n - 0n == -32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32767n - 1n == -32768n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32767n - 2n == -32768n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n - 0n == -32768n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n - 1n == -32768n");
+
+	ASSERT_ARITHMETIC_EXPRESSION ("32766n - -0n == 32766n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32766n - -1n == 32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32766n - -2n == 32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n - -0n == 32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n - -1n == 32767n");
+
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n - 32767n == 0n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n - -32768n == 0n");
+
+	/* Multiplication. */
+	ASSERT_ARITHMETIC_EXPRESSION ("255y * 0y == 0y");
+	ASSERT_ARITHMETIC_EXPRESSION ("255y * 1y == 255y");
+	ASSERT_ARITHMETIC_EXPRESSION ("255y * 2y == 255y");
+	ASSERT_ARITHMETIC_EXPRESSION ("85y * 2y == 170y");
+	ASSERT_ARITHMETIC_EXPRESSION ("85y * 3y == 255y");
+	ASSERT_ARITHMETIC_EXPRESSION ("85y * 4y == 255y");
+
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n * 0n == 0n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n * 1n == -32768n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n * 2n == -32768n");
+
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n * -0n == 0n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n * -1n == -32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n * -2n == -32768n");
+
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n * -0n == 0n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n * -1n == 32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n * -2n == 32767n");
+
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n * 0n == 0n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n * 1n == 32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n * 2n == 32767n");
+
+	/* Division. */
+	ASSERT_ARITHMETIC_EXPRESSION ("255y / 0y == 255y");
+	ASSERT_ARITHMETIC_EXPRESSION ("255y / 1y == 255y");
+	ASSERT_ARITHMETIC_EXPRESSION ("255y / 2y == 127y");
+	ASSERT_ARITHMETIC_EXPRESSION ("0y / 0y == 0y");
+	ASSERT_ARITHMETIC_EXPRESSION ("0y / 255y == 0y");
+
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n / 0n == -32768n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n / 1n == -32768n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n / 2n == -16384n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n / 32767n == -1n");
+
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n / -0n == 32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n / -1n == -32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n / -2n == -16383n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n / -32768n == 0n");
+
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n / -0n == -32768n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n / -1n == 32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n / -2n == 16384n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n / -32768n == 1n");
+
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n / 0n == 32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n / 1n == 32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n / 2n == 16383n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n / 32767n == 1n");
+
+	/* Modulus. */
+	ASSERT_ARITHMETIC_EXPRESSION ("255y % 0y == 0y");
+	ASSERT_ARITHMETIC_EXPRESSION ("255y % 1y == 0y");
+	ASSERT_ARITHMETIC_EXPRESSION ("255y % 2y == 1y");
+	ASSERT_ARITHMETIC_EXPRESSION ("255y % 255y == 0y");
+
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % 0n == 0n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % 1n == 0n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % 2n == 0n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % 3n == -2n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % 32767n == -1n");
+
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n % -0n == 0n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n % -1n == 0n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n % -2n == 1n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n % -32768n == 32767n");
+
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % -0n == 0n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % -1n == 0n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % -2n == 0n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % -3n == -2n");
+	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % -32767n == -1n");
+
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n % 0n == 0n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n % 1n == 0n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n % 2n == 1n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n % 3n == 1n");
+	ASSERT_ARITHMETIC_EXPRESSION ("32767n % 32767n == 0n");
+
+#undef ASSERT_ARITHMETIC_EXPRESSION
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -314,6 +473,7 @@ main (int argc, char *argv[])
 	g_test_add_func ("/ast/parser", test_ast_parser);
 	g_test_add_func ("/ast/parser/errors", test_ast_parser_errors);
 	g_test_add_func ("/ast/execution/output-sequence", test_ast_execution_output_sequence);
+	g_test_add_func ("/ast/execution/integer-saturation", test_ast_execution_integer_saturation);
 
 	return g_test_run ();
 }

@@ -256,72 +256,97 @@ dfsm_ast_expression_binary_evaluate (DfsmAstExpression *expression, DfsmEnvironm
 	switch (priv->expression_type) {
 		/* Numeric operators */
 		/* See the NOTE in dfsm_ast_expression_binary_calculate_type() for information about the poor coercion and type handling
-		 * going on here. */
-		#define NUMERIC_OPS(OP) { \
+		 * going on here.
+		 *
+		 * Note that we perform *saturation arithmetic* here, rather than allow values to over- or under-flow and wrap around. Since the
+		 * calculations about which values will saturate are quite specific to the operator, the macro takes a since CALC parameter as the
+		 * calculation code, which should be width-independent. In many cases, this can't just call the underlying C operator since that would
+		 * introduce a dependency on undefined behaviour (e.g. with division of -INTMIN by -1 or modulus by a negative number).
+		 * CALC can make use of the variables: lvalue, rvalue, min_value and max_value.
+		 *
+		 * Consequently, the behaviour of integer arithmetic in the language can be summarised as:
+		 *  • Saturating.
+		 *  • Truncating on division.
+		 *  • Division by zero is defined as the signed maximum value of the type (e.g. 1/0 == MAX, -1/0 == -MAX); except zero divided by zero
+		 *    which gives zero.
+		 *  • Signed modular arithmetic takes the sign of the dividend, i.e. the first operand (e.g. 5 % -2 == 1, -5 % 3 == -2, -5 % -2 == -1).
+		 *    This preserves the invariant that x == (x / y) * y + (x % y) regardless of the signs of x and y.
+		 *  • Zero is unsigned.
+		 */
+		#define NUMERIC_OP_SIGNED(type, TYPE, gtype, TYPE_MIN, TYPE_MAX, CALC) \
+			if (g_variant_type_equal (left_value_type, G_VARIANT_TYPE_##TYPE) == TRUE) { \
+				gtype lvalue, rvalue, min_value = TYPE_MIN, max_value = TYPE_MAX; \
+				lvalue = g_variant_get_##type (left_value); \
+				rvalue = g_variant_get_##type (right_value); \
+				binary_value = g_variant_new_##type (CALC); \
+				(void) min_value; (void) max_value; /* prevent unused variable warnings */ \
+			}
+		#define NUMERIC_OP_UNSIGNED(type, TYPE, gtype, TYPE_MAX, CALC) \
+			if (g_variant_type_equal (left_value_type, G_VARIANT_TYPE_##TYPE) == TRUE) { \
+				gtype lvalue, rvalue, min_value = 0, max_value = TYPE_MAX; \
+				lvalue = g_variant_get_##type (left_value); \
+				rvalue = g_variant_get_##type (right_value); \
+				binary_value = g_variant_new_##type (CALC); \
+				(void) min_value; (void) max_value; /* prevent unused variable warnings */ \
+			}
+		#define NUMERIC_OPS(UNSIGNED_CALC, SIGNED_CALC, DOUBLE_CALC) { \
 			const GVariantType *left_value_type; \
 			\
 			left_value_type = g_variant_get_type (left_value); \
 			\
-			if (g_variant_type_equal (left_value_type, G_VARIANT_TYPE_BYTE) == TRUE) { \
-				binary_value = g_variant_new_byte (g_variant_get_byte (left_value) OP g_variant_get_byte (right_value)); \
-			} else if (g_variant_type_equal (left_value_type, G_VARIANT_TYPE_DOUBLE) == TRUE) { \
-				binary_value = g_variant_new_double (g_variant_get_double (left_value) OP g_variant_get_double (right_value)); \
-			} else if (g_variant_type_equal (left_value_type, G_VARIANT_TYPE_INT16) == TRUE) { \
-				binary_value = g_variant_new_int16 (g_variant_get_int16 (left_value) OP g_variant_get_int16 (right_value)); \
-			} else if (g_variant_type_equal (left_value_type, G_VARIANT_TYPE_INT32) == TRUE) { \
-				binary_value = g_variant_new_int32 (g_variant_get_int32 (left_value) OP g_variant_get_int32 (right_value)); \
-			} else if (g_variant_type_equal (left_value_type, G_VARIANT_TYPE_INT64) == TRUE) { \
-				binary_value = g_variant_new_int64 (g_variant_get_int64 (left_value) OP g_variant_get_int64 (right_value)); \
-			} else if (g_variant_type_equal (left_value_type, G_VARIANT_TYPE_UINT16) == TRUE) { \
-				binary_value = g_variant_new_uint16 (g_variant_get_uint16 (left_value) OP g_variant_get_uint16 (right_value)); \
-			} else if (g_variant_type_equal (left_value_type, G_VARIANT_TYPE_UINT32) == TRUE) { \
-				binary_value = g_variant_new_uint32 (g_variant_get_uint32 (left_value) OP g_variant_get_uint32 (right_value)); \
-			} else if (g_variant_type_equal (left_value_type, G_VARIANT_TYPE_UINT64) == TRUE) { \
-				binary_value = g_variant_new_uint64 (g_variant_get_uint64 (left_value) OP g_variant_get_uint64 (right_value)); \
-			} else { \
+			if (g_variant_type_equal (left_value_type, G_VARIANT_TYPE_DOUBLE) == TRUE) { \
+				gdouble lvalue, rvalue; \
+				gint64 lvalue_int, rvalue_int; \
+				lvalue = g_variant_get_double (left_value); \
+				rvalue = g_variant_get_double (right_value); \
+				lvalue_int = (gint64) lvalue; rvalue_int = (gint64) rvalue; \
+				binary_value = g_variant_new_double (DOUBLE_CALC); \
+				(void) lvalue_int; (void) rvalue_int; /* prevent unused variable warnings */ \
+			} \
+			else NUMERIC_OP_UNSIGNED (byte, BYTE, guchar, 255, UNSIGNED_CALC) \
+			else NUMERIC_OP_SIGNED (int16, INT16, gint16, G_MININT16, G_MAXINT16, SIGNED_CALC) \
+			else NUMERIC_OP_UNSIGNED (uint16, UINT16, guint16, G_MAXUINT16, UNSIGNED_CALC) \
+			else NUMERIC_OP_SIGNED (int32, INT32, gint32, G_MININT32, G_MAXINT32, SIGNED_CALC) \
+			else NUMERIC_OP_UNSIGNED (uint32, UINT32, guint32, G_MAXUINT32, UNSIGNED_CALC) \
+			else NUMERIC_OP_SIGNED (int64, INT64, gint64, G_MININT64, G_MAXINT64, SIGNED_CALC) \
+			else NUMERIC_OP_UNSIGNED (uint64, UINT64, guint64, G_MAXUINT64, UNSIGNED_CALC) \
+			else { \
 				g_assert_not_reached (); \
 			} \
 			\
 			break; \
 		}
 		case DFSM_AST_EXPRESSION_BINARY_TIMES:
-			NUMERIC_OPS(*)
+			NUMERIC_OPS ((rvalue == 0 || lvalue <= max_value / rvalue) ? lvalue * rvalue : max_value,
+			             (rvalue == 0 || ABS (lvalue) <= ABS (max_value / rvalue)) ? lvalue * rvalue :
+			                 ((lvalue >= 0) == (rvalue >= 0) ? max_value : min_value),
+			             lvalue * rvalue)
 		case DFSM_AST_EXPRESSION_BINARY_DIVIDE:
-			NUMERIC_OPS(/)
-		case DFSM_AST_EXPRESSION_BINARY_MODULUS: {
-			/* We can't use NUMERIC_OPS() here because modulus is defined in a shonky way for doubles. */
-			const GVariantType *left_value_type;
-
-			left_value_type = g_variant_get_type (left_value);
-
-			if (g_variant_type_equal (left_value_type, G_VARIANT_TYPE_BYTE) == TRUE) {
-				binary_value = g_variant_new_byte (g_variant_get_byte (left_value) % g_variant_get_byte (right_value));
-			} else if (g_variant_type_equal (left_value_type, G_VARIANT_TYPE_DOUBLE) == TRUE) {
-				binary_value = g_variant_new_double (((guint64) g_variant_get_double (left_value)) %
-				                                     ((guint64) g_variant_get_double (right_value)));
-			} else if (g_variant_type_equal (left_value_type, G_VARIANT_TYPE_INT16) == TRUE) {
-				binary_value = g_variant_new_int16 (g_variant_get_int16 (left_value) % g_variant_get_int16 (right_value));
-			} else if (g_variant_type_equal (left_value_type, G_VARIANT_TYPE_INT32) == TRUE) {
-				binary_value = g_variant_new_int32 (g_variant_get_int32 (left_value) % g_variant_get_int32 (right_value));
-			} else if (g_variant_type_equal (left_value_type, G_VARIANT_TYPE_INT64) == TRUE) {
-				binary_value = g_variant_new_int64 (g_variant_get_int64 (left_value) % g_variant_get_int64 (right_value));
-			} else if (g_variant_type_equal (left_value_type, G_VARIANT_TYPE_UINT16) == TRUE) {
-				binary_value = g_variant_new_uint16 (g_variant_get_uint16 (left_value) % g_variant_get_uint16 (right_value));
-			} else if (g_variant_type_equal (left_value_type, G_VARIANT_TYPE_UINT32) == TRUE) {
-				binary_value = g_variant_new_uint32 (g_variant_get_uint32 (left_value) % g_variant_get_uint32 (right_value));
-			} else if (g_variant_type_equal (left_value_type, G_VARIANT_TYPE_UINT64) == TRUE) {
-				binary_value = g_variant_new_uint64 (g_variant_get_uint64 (left_value) % g_variant_get_uint64 (right_value));
-			} else {
-				g_assert_not_reached ();
-			}
-
-			break;
-		}
+			NUMERIC_OPS ((rvalue != 0) ? lvalue / rvalue : (lvalue == 0 ? 0 : max_value),
+			             (lvalue >= 0)
+			                 ? ((rvalue != 0) ? lvalue / rvalue : (lvalue == 0 ? 0 : max_value))
+			                 : ((rvalue != 0 && (lvalue != min_value || rvalue != -1)) ? lvalue / rvalue :
+			                     ((lvalue == min_value && rvalue == -1) ? max_value : min_value)),
+			             (rvalue != 0.0) ? lvalue / rvalue : 0.0)
+		case DFSM_AST_EXPRESSION_BINARY_MODULUS:
+			NUMERIC_OPS ((rvalue != 0) ? lvalue % rvalue : 0,
+			             (rvalue != 0) ? ((lvalue >= 0) ? 1 : -1) * (ABS (lvalue) % ABS (rvalue)) : 0,
+			             (rvalue_int != 0) ? ((lvalue_int >= 0) ? 1 : -1) * (ABS (lvalue_int) % ABS (rvalue_int)) : 0)
 		case DFSM_AST_EXPRESSION_BINARY_PLUS:
-			NUMERIC_OPS(+)
+			NUMERIC_OPS ((lvalue <= max_value - rvalue) ? lvalue + rvalue : max_value,
+			             (rvalue >= 0)
+			                 ? ((lvalue <= max_value - rvalue) ? lvalue + rvalue : max_value)
+			                 : ((lvalue >= min_value - rvalue) ? lvalue + rvalue : min_value),
+			             lvalue + rvalue)
 		case DFSM_AST_EXPRESSION_BINARY_MINUS:
-			NUMERIC_OPS(-)
+			NUMERIC_OPS ((lvalue >= min_value + rvalue) ? lvalue - rvalue : min_value,
+			             (rvalue >= 0)
+			                 ? ((lvalue >= min_value + rvalue) ? lvalue - rvalue : min_value)
+			                 : ((lvalue <= max_value + rvalue) ? lvalue - rvalue : max_value),
+			             lvalue - rvalue)
 		#undef NUMERIC_OPS
+		#undef NUMERIC_OP_UNSIGNED
+		#undef NUMERIC_OP_SIGNED
 		/* Boolean relations */
 		case DFSM_AST_EXPRESSION_BINARY_LT:
 			binary_value = g_variant_new_boolean (g_variant_compare (left_value, right_value) < 0);

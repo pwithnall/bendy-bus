@@ -56,19 +56,6 @@ build_machine_description_from_transition_snippet (const gchar *snippet, GError 
 	return object_array;
 }
 
-static guint
-get_counter_from_environment (DfsmEnvironment *environment, const gchar *counter_name)
-{
-	GVariant *variant;
-	guint retval;
-
-	variant = dfsm_environment_dup_variable_value (environment, DFSM_VARIABLE_SCOPE_OBJECT, counter_name);
-	retval = g_variant_get_uint32 (variant);
-	g_variant_unref (variant);
-
-	return retval;
-}
-
 static void
 test_simulation_probabilities (void)
 {

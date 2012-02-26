@@ -19,6 +19,7 @@
 
 #include <glib.h>
 #include <gio/gio.h>
+#include <dfsm/dfsm.h>
 
 #include "test-utils.h"
 
@@ -47,4 +48,17 @@ new_unary_tuple (GVariant *element)
 {
 	GVariant *elements[2] = { element, NULL };
 	return g_variant_new_tuple (elements, 1);
+}
+
+guint
+get_counter_from_environment (DfsmEnvironment *environment, const gchar *counter_name)
+{
+	GVariant *variant;
+	guint retval;
+
+	variant = dfsm_environment_dup_variable_value (environment, DFSM_VARIABLE_SCOPE_OBJECT, counter_name);
+	retval = g_variant_get_uint32 (variant);
+	g_variant_unref (variant);
+
+	return retval;
 }
