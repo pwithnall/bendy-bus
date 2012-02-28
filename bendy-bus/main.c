@@ -636,22 +636,30 @@ dbus_daemon_notify_bus_address_cb (GObject *gobject, GParamSpec *pspec, MainData
 	test_program_envp = g_ptr_array_new_with_free_func (g_free);
 
 	if (pass_through_environment == FALSE) {
+		guint i;
+
 		/* Set up a minimal environment with just the necessary environment variables required for things to function.
 		 * Note that this list of necessary environment variables is probably incomplete, and is built on the basis of
 		 * trial and error rather than research or standards. */
-		forward_envp_pair (test_program_envp, "DISPLAY");
-		forward_envp_pair (test_program_envp, "XDG_DATA_HOME");
-		forward_envp_pair (test_program_envp, "XDG_CONFIG_HOME");
-		forward_envp_pair (test_program_envp, "XDG_DATA_DIRS");
-		forward_envp_pair (test_program_envp, "XDG_CONFIG_DIRS");
-		forward_envp_pair (test_program_envp, "XDG_CACHE_HOME");
-		forward_envp_pair (test_program_envp, "XDG_RUNTIME_DIR");
-		forward_envp_pair (test_program_envp, "HOME");
-		forward_envp_pair (test_program_envp, "USER");
-		forward_envp_pair (test_program_envp, "HOSTNAME");
-		forward_envp_pair (test_program_envp, "SSH_CLIENT");
-		forward_envp_pair (test_program_envp, "SSH_TTY");
-		forward_envp_pair (test_program_envp, "SSH_CONNECTION");
+		const gchar *forward_variables[] = {
+			"DISPLAY",
+			"XDG_DATA_HOME",
+			"XDG_CONFIG_HOME",
+			"XDG_DATA_DIRS",
+			"XDG_CONFIG_DIRS",
+			"XDG_CACHE_HOME",
+			"XDG_RUNTIME_DIR",
+			"HOME",
+			"USER",
+			"HOSTNAME",
+			"SSH_CLIENT",
+			"SSH_TTY",
+			"SSH_CONNECTION",
+		};
+
+		for (i = 0; i < G_N_ELEMENTS (forward_variables); i++) {
+			forward_envp_pair (test_program_envp, forward_variables[i]);
+		}
 	} else {
 		/* Forward everything from the simulator's environment to the test program's environment. This might make the test
 		 * results slightly less reliable. */
