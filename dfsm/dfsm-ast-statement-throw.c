@@ -17,6 +17,15 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-ast-statement-throw
+ * @short_description: AST throw statement
+ * @stability: Unstable
+ * @include: dfsm/dfsm-ast-statement-throw.h
+ *
+ * AST throw statement implementation for supporting method replies with errors.
+ */
+
 #include "config.h"
 
 #include <glib.h>

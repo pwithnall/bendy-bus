@@ -17,6 +17,15 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-ast-data-structure
+ * @short_description: AST data structure node
+ * @stability: Unstable
+ * @include: dfsm/dfsm-ast-data-structure.h
+ *
+ * AST node representing any instance of a basic or compound data structure. This supports (recursive) fuzzing of data structure values.
+ */
+
 #include "config.h"
 
 #include <limits.h>
@@ -870,6 +879,14 @@ dfsm_ast_data_structure_set_type_annotation (DfsmAstDataStructure *self, const g
 	self->priv->type_annotation = g_strdup (type_annotation);
 }
 
+/**
+ * dfsm_ast_data_structure_get_nickname:
+ * @self: a #DfsmAstDataStructure
+ *
+ * Get the user-provided nickname for this structure, or %NULL if none was set.
+ *
+ * Return value: (allow-none): nickname of the data structure, or %NULL
+ */
 const gchar *
 dfsm_ast_data_structure_get_nickname (DfsmAstDataStructure *self)
 {

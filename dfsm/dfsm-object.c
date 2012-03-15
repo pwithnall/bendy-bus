@@ -17,6 +17,15 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-object
+ * @short_description: high-level simulated D-Bus object
+ * @stability: Unstable
+ * @include: dfsm/dfsm-object.h
+ *
+ * A high-level simulated D-Bus object, wrapping up an AST, the simulation environment and the necessary policy for simulating a single D-Bus object.
+ */
+
 #include "config.h"
 
 #include <math.h>

@@ -17,6 +17,15 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-ast-expression-binary
+ * @short_description: AST binary expression node
+ * @stability: Unstable
+ * @include: dfsm/dfsm-ast-expression-binary.h
+ *
+ * AST node representing an expression with two subexpressions. Most arithmetic and logic operations are implemented by this AST node.
+ */
+
 #include "config.h"
 
 #include <glib.h>

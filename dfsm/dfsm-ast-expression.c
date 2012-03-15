@@ -17,6 +17,15 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-ast-expression
+ * @short_description: AST expression node
+ * @stability: Unstable
+ * @include: dfsm/dfsm-ast-expression.h
+ *
+ * Abstract AST node representing an evaluatable, typed expression with no side-effects.
+ */
+
 #include <glib.h>
 
 #include "dfsm-ast-expression.h"

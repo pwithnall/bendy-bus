@@ -17,6 +17,15 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-ast-variable
+ * @short_description: AST variable reference node
+ * @stability: Unstable
+ * @include: dfsm/dfsm-ast-variable.h
+ *
+ * AST node representing a variable reference, either for getting the value of the variable or for storing to the variable.
+ */
+
 #include "config.h"
 
 #include <glib.h>

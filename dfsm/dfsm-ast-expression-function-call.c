@@ -17,6 +17,16 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-ast-expression-function-call
+ * @short_description: AST function call expression node
+ * @stability: Unstable
+ * @include: dfsm/dfsm-ast-expression-function-call.h
+ *
+ * AST function call expression node implementing support for calling built-in language functions from within expressions. Functions don't have
+ * side-effects.
+ */
+
 #include "config.h"
 
 #include <glib.h>

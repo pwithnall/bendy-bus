@@ -17,6 +17,15 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-utils
+ * @short_description: language utilities
+ * @stability: Unstable
+ * @include: dfsm/dfsm-utils.h
+ *
+ * Utility functions used inside and outside the library.
+ */
+
 #include <glib.h>
 
 #ifndef DFSM_UTILS_H

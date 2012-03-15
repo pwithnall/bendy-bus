@@ -31,6 +31,11 @@ G_BEGIN_DECLS
 #define DFSM_IS_OUTPUT_SEQUENCE(o)		(G_TYPE_CHECK_INSTANCE_TYPE ((o), DFSM_TYPE_OUTPUT_SEQUENCE))
 #define DFSM_OUTPUT_SEQUENCE_GET_IFACE(o)	(G_TYPE_INSTANCE_GET_INTERFACE ((o), DFSM_TYPE_OUTPUT_SEQUENCE, DfsmOutputSequenceInterface))
 
+/**
+ * DfsmOutputSequence:
+ *
+ * All the fields in the #DfsmOutputSequence structure are private and should never be accessed directly.
+ */
 typedef struct _DfsmOutputSequence		DfsmOutputSequence; /* dummy typedef */
 
 /**

@@ -17,6 +17,16 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-machine
+ * @short_description: EFSM machine simulation
+ * @stability: Unstable
+ * @include: dfsm/dfsm-machine.h
+ *
+ * Container for the simulation of an EFSM which forms the core of each simulated D-Bus object. This doesn't include any D-Bus specifics; these are
+ * provided by #DfsmObject.
+ */
+
 #include "config.h"
 
 #include <stdio.h>

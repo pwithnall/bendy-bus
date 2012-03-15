@@ -17,6 +17,15 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-ast-statement
+ * @short_description: AST statement node
+ * @stability: Unstable
+ * @include: dfsm/dfsm-ast-statement.h
+ *
+ * Abstract AST node representing a single statement. Statements form the bodies of transitions, and change the state of the simulation or the bus.
+ */
+
 #include <glib.h>
 
 #include "dfsm-ast-statement.h"

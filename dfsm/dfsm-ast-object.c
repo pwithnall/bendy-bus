@@ -17,6 +17,16 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-ast-object
+ * @short_description: AST object node
+ * @stability: Unstable
+ * @include: dfsm/dfsm-ast-object.h
+ *
+ * Top-level AST node which represents a D-Bus object in a simulation description. No simulation functionality is implemented in #DfsmAstObject, but it
+ * does implement checking and validation of the AST.
+ */
+
 #include "config.h"
 
 #include <string.h>
@@ -29,10 +39,27 @@
 #include "dfsm-parser.h"
 #include "dfsm-parser-internal.h"
 
+/**
+ * dfsm_ast_object_transition_new:
+ * @from_state: state to transition out of
+ * @to_state: state to transition into
+ * @transition: the #DfsmAstTransition providing the code
+ * @nickname: (allow-none): user-provided nickname for this combination of transition and states, or %NULL
+ *
+ * Create a new #DfsmAstObjectTransition wrapping the given parameters. The object is constructed with a reference count of 1.
+ *
+ * Return value: a new #DfsmAstObjectTransition wrapping the given parameters
+ */
 DfsmAstObjectTransition *
 dfsm_ast_object_transition_new (DfsmMachineStateNumber from_state, DfsmMachineStateNumber to_state, DfsmAstTransition *transition, const gchar *nickname)
 {
-	DfsmAstObjectTransition *object_transition = g_slice_new (DfsmAstObjectTransition);
+	DfsmAstObjectTransition *object_transition;
+
+	g_return_val_if_fail (from_state != DFSM_MACHINE_INVALID_STATE, NULL);
+	g_return_val_if_fail (to_state != DFSM_MACHINE_INVALID_STATE, NULL);
+	g_return_val_if_fail (DFSM_IS_AST_TRANSITION (transition), NULL);
+
+	object_transition = g_slice_new (DfsmAstObjectTransition);
 
 	object_transition->from_state = from_state;
 	object_transition->to_state = to_state;
@@ -43,6 +70,14 @@ dfsm_ast_object_transition_new (DfsmMachineStateNumber from_state, DfsmMachineSt
 	return object_transition;
 }
 
+/**
+ * dfsm_ast_object_transition_ref:
+ * @object_transition: a #DfsmAstObjectTransition
+ *
+ * Increase the reference count on the given @object_transition.
+ *
+ * Return value: the same pointer @object_transition, for convenience of chaining function calls
+ */
 DfsmAstObjectTransition *
 dfsm_ast_object_transition_ref (DfsmAstObjectTransition *object_transition)
 {
@@ -53,6 +88,12 @@ dfsm_ast_object_transition_ref (DfsmAstObjectTransition *object_transition)
 	return object_transition;
 }
 
+/**
+ * dfsm_ast_object_transition_unref:
+ * @object_transition: a #DfsmAstObjectTransition
+ *
+ * Decrease the reference count on the given @object_transition. If its reference count reaches 0, the @object_transition will be freed.
+ */
 void
 dfsm_ast_object_transition_unref (DfsmAstObjectTransition *object_transition)
 {
@@ -66,11 +107,22 @@ dfsm_ast_object_transition_unref (DfsmAstObjectTransition *object_transition)
 	}
 }
 
+/**
+ * dfsm_ast_object_transition_build_friendly_name:
+ * @object_transition: a #DfsmAstObjectTransition
+ *
+ * Build a friendly name for the @object_transition. This uses the transition's nickname, if set, and if not uses the value of the @object_transition
+ * pointer. A non-empty string will always be returned by this function.
+ *
+ * Return value: (transfer full): a friendly name for the @object_transition; free with g_free()
+ */
 gchar *
 dfsm_ast_object_transition_build_friendly_name (DfsmAstObjectTransition *object_transition)
 {
+	g_return_val_if_fail (object_transition != NULL, NULL);
+
 	if (object_transition->nickname != NULL) {
-		return g_strdup_printf ("‘%s’ (%p)", object_transition->nickname, object_transition->transition);
+		return g_strdup_printf (_("‘%s’ (%p)"), object_transition->nickname, object_transition->transition);
 	}
 
 	return g_strdup_printf ("%p", object_transition->transition);

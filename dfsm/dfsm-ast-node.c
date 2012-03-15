@@ -17,6 +17,15 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-ast-node
+ * @short_description: AST node
+ * @stability: Unstable
+ * @include: dfsm/dfsm-ast-node.h
+ *
+ * Abstract base class for all AST nodes implementing the basis of the checking code.
+ */
+
 #include <glib.h>
 
 #include "dfsm-ast-node.h"

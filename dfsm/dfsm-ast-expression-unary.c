@@ -17,6 +17,15 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-ast-expression-unary
+ * @short_description: AST unary expression node
+ * @stability: Unstable
+ * @include: dfsm/dfsm-ast-expression-unary.h
+ *
+ * AST unary expression node implementing support for unary operations such as logical negation.
+ */
+
 #include "config.h"
 
 #include <glib.h>

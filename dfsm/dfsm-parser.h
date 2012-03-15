@@ -17,6 +17,15 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-parser
+ * @short_description: parser utilities
+ * @stability: Unstable
+ * @include: dfsm/dfsm-parser.h
+ *
+ * Parser utilities and error handling. The actual parser is implemented as dfsm_object_factory_from_files() and friends.
+ */
+
 #ifndef DFSM_PARSER_H
 #define DFSM_PARSER_H
 

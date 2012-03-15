@@ -1,14 +1,4 @@
 <SECTION>
-<FILE>dfsm</FILE>
-
-</SECTION>
-
-<SECTION>
-<FILE>dfsm-ast</FILE>
-
-</SECTION>
-
-<SECTION>
 <FILE>dfsm-ast-data-structure</FILE>
 <TITLE>DfsmAstDataStructure</TITLE>
 DfsmAstDataStructure
@@ -421,6 +411,7 @@ dfsm_simulation_status_get_type
 <SECTION>
 <FILE>dfsm-output-sequence</FILE>
 <TITLE>DfsmOutputSequence</TITLE>
+DfsmOutputSequence
 DfsmOutputSequenceInterface
 dfsm_output_sequence_add_emit
 dfsm_output_sequence_add_reply
@@ -440,6 +431,7 @@ dfsm_output_sequence_get_type
 <TITLE>Parser</TITLE>
 DFSM_PARSE_ERROR
 DfsmParseError
+<SUBSECTION Standard>
 dfsm_parse_error_quark
 </SECTION>
 

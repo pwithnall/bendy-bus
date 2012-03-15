@@ -17,6 +17,17 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-dbus-output-sequence
+ * @short_description: D-Bus output sequence
+ * @stability: Unstable
+ * @include: dfsm/dfsm-dbus-output-sequence.h
+ *
+ * D-Bus based implementation of #DfsmOutputSequence which allows for replies to method calls (successful or erroneous ones) and emits signals onto
+ * the bus. All actions are queued up when added to the output sequence, and are only propagated to the bus when dfsm_output_sequence_output() is
+ * called.
+ */
+
 #include <string.h>
 #include <glib.h>
 

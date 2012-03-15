@@ -17,6 +17,16 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-environment
+ * @short_description: simulation environment
+ * @stability: Unstable
+ * @include: dfsm/dfsm-environment.h
+ *
+ * Simulation environment for a single simulated D-Bus object, storing its local- and object-scoped variables, and allowing for built-in functions
+ * to be executed using that variable store.
+ */
+
 #include "config.h"
 
 #include <string.h>

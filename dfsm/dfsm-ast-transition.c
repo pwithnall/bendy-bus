@@ -17,6 +17,16 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-ast-transition
+ * @short_description: AST transition node
+ * @stability: Unstable
+ * @include: dfsm/dfsm-ast-transition.h
+ *
+ * AST transition node containing the trigger, preconditions and statement list for a transition. It does not contain the from and to states for the
+ * transition (as in the simulation description), as these are provided by #DfsmAstObjectTransition wrappers around the #DfsmAstTransition.
+ */
+
 #include "config.h"
 
 #include <string.h>

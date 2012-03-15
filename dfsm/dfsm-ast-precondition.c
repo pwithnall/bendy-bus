@@ -17,6 +17,15 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-ast-precondition
+ * @short_description: AST precondition node
+ * @stability: Unstable
+ * @include: dfsm/dfsm-ast-precondition.h
+ *
+ * AST precondition node implementing support for representing and evaluating a single precondition on a #DfsmAstTransition.
+ */
+
 #include "config.h"
 
 #include <glib.h>

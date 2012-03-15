@@ -17,6 +17,15 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-ast-statement-reply
+ * @short_description: AST reply statement node
+ * @stability: Unstable
+ * @include: dfsm/dfsm-ast-statement-reply.h
+ *
+ * AST reply statement implementation which supports replying to D-Bus method calls with a set of out parameters.
+ */
+
 #include <glib.h>
 
 #include "dfsm-ast-statement-reply.h"

@@ -17,6 +17,15 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-output-sequence
+ * @short_description: output sequence interface
+ * @stability: Unstable
+ * @include: dfsm/dfsm-output-sequence.h
+ *
+ * Interface for queuing up actions resulting from the execution of a transition, and then outputting them in order at a later time.
+ */
+
 #include <glib.h>
 
 #include "dfsm-output-sequence.h"

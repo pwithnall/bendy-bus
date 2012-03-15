@@ -17,6 +17,15 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-ast-statement-emit
+ * @short_description: AST emit statement node
+ * @stability: Unstable
+ * @include: dfsm/dfsm-ast-statement-emit.h
+ *
+ * AST emit statement implementing support for D-Bus signal emission.
+ */
+
 #include "config.h"
 
 #include <glib.h>

@@ -17,6 +17,15 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-ast-expression-data-structure
+ * @short_description: AST data structure expression node
+ * @stability: Unstable
+ * @include: dfsm/dfsm-ast-expression-data-structure.h
+ *
+ * AST node representing a data structure expression; that is, an instance of a data structure, #DfsmAstDataStructure.
+ */
+
 #include <glib.h>
 
 #include "dfsm-ast-expression-data-structure.h"

@@ -17,6 +17,15 @@
  * along with D-Bus Simulator.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/**
+ * SECTION:dfsm-ast-statement-assignment
+ * @short_description: AST assignment statement node
+ * @stability: Unstable
+ * @include: dfsm/dfsm-ast-statement-assignment.h
+ *
+ * AST assignment statement implementing support for assigning new values to variables and structures of variables.
+ */
+
 #include "config.h"
 
 #include <glib.h>
