@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<page xmlns="http://projectmallard.org/1.0/" type="guide" id="simulator">
+<info>
+	<link type="guide" xref="index"/>
+	<link type="next" xref="bendy-bus"/>
+	<credit type="author">
+		<name>Philip Withnall</name>
+		<email>philip@tecnocode.co.uk</email>
+	</credit>
+	<license><p>Creative Commons Share Alike 3.0</p></license>
+</info>
+<title>Simulator</title>
+
+<p>The simulator comes as a collection of small programs which can be used together to perform testing and integrate with the build system of a project.</p>
+
+<p>The simulator itself is implemented as <cmd>bendy-bus</cmd> (<link xref="bendy-bus"/>). The code coverage tool built on the simulator is
+<cmd>bendy-bus-lcov</cmd> (<link xref="bendy-bus-lcov"/>). Bendy Bus comes with two other utilities: <cmd>bendy-bus-lint</cmd>
+(<link xref="bendy-bus-lint"/>) and <cmd>bendy-bus-viz</cmd> (<link xref="bendy-bus-viz"/>) which, respectively, are used to check simulation descriptions
+and to generate Graphviz diagrams of their finite state machines.</p>
+
+</page>

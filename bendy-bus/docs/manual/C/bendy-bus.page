@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<page xmlns="http://projectmallard.org/1.0/" type="topic" id="bendy-bus">
+<info>
+	<link type="guide" xref="simulator"/>
+	<link type="next" xref="bendy-bus-lcov"/>
+	<credit type="author">
+		<name>Philip Withnall</name>
+		<email>philip@tecnocode.co.uk</email>
+	</credit>
+	<license><p>Creative Commons Share Alike 3.0</p></license>
+</info>
+<title>Bendy Bus Simulator</title>
+
+<p>The simulator takes a simulation description (written in the <link xref="language"/>) plus an introspection XML file and uses them to simulate a D-Bus
+server, running the simulation inside a private bus created by running its own instance of <cmd>dbus-daemon</cmd>. A <em>client program</em> command
+given to the simulator is then run with this private bus as its session bus, and the simulator runs until a termination condition is hit, or until the
+client program exits or aborts.</p>
+
+<section id="usage">
+<title>Command Line Usage</title>
+
+<p>The command line usage of the simulator is: <cmd>bendy-bus <var>[options]</var> <var>[simulation code file]</var> <var>[introspection XML file]</var>
+-- <var>[executable file]</var> <var>[arguments]</var></cmd>. The available options are described in <link xref="#options"/>. The simulation code file
+and introspection XML file must be files containing a simulation description (<link xref="language"/>) and the corresponding D-Bus introspection XML,
+respectively. The executable file and associated arguments give the client program to run under the simulation. Note that there must be a <cmd>--</cmd>
+separator before the client program is specified.</p>
+
+</section>
+
+<section id="options">
+<title>Options</title>
+
+<p>All log output (from <sys>stdout</sys> and <sys>stderr</sys>) produced by the client program is passed through the simulator and piped either into a
+log file or an existing user-specific file descriptor. The simulator prepends some metadata, such as the current time into the simulation, when passing
+through a log message so that log files may be compared, and separate log files from the same test run combined if necessary.</p>
+
+<p>Logging is separated into three different domains, and each may be passed to a different file or file descriptor:</p>
+<terms>
+	<item><title>Test program</title><p>Output from the client program.</p></item>
+	<item><title>D-Bus daemon</title><p>Output from the private <cmd>dbus-daemon</cmd>.</p></item>
+	<item><title>Simulator</title><p>Output from the simulator itself.</p></item>
+</terms>
+
+<p>The file descriptor or file to pass log output to is specified using the <cmd>--<var>[domain]</var>-log-file</cmd> and
+<cmd>--<var>[domain]</var>-log-fd</cmd> command line options. If none are specified for a domain, the default is to output log messages from that domain
+to the simulator's <sys>stdout</sys>.</p>
+
+<example>
+<screen><output style="prompt">$ </output><input>bendy-bus --test-program-log-file=my-test-program.log --simulator-log-file=simulator.log \
+	example.machine example.xml -- my-test-program</input></screen>
+</example>
+
+<p>The available termination condition options instruct the simulator when to end a given test run, or to exit the set of test runs completely.</p>
+<terms>
+	<item><title><cmd>--test-timeout=<var>SECS</var></cmd></title>
+		<p>Timeout (in seconds) since the most recent D-Bus activity after which a single test run is ended.</p></item>
+	<item><title><cmd>--run-time=<var>SECS</var></cmd></title>
+		<p>Maximum time for the whole set of test runs (in seconds). Once this timeout has been reached since the first test run was started,
+		the set of test runs is exited completely.</p></item>
+	<item><title><cmd>--run-iters=<var>COUNT</var></cmd></title>
+		<p>Maximum number of individual test runs which should be performed in a set of test runs. The default value is 1. To perform test runs
+			in a loop without bound, use <cmd>--run-infinitely</cmd>.</p></item>
+	<item><title><cmd>--run-infinitely</cmd></title>
+		<p>Set the maximum number of test runs to be performed in a set of test runs to be unbounded. This will cause the simulator to continue
+			looping through test runs until some other termination condition applies, such as until the client program crashes during a test
+			run.</p></item>
+	<item><title><cmd>--unfuzzed-transition-limit=<var>COUNT</var></cmd></title>
+		<p>Number of unfuzzed transitions to execute before enabling fuzzing in each test run. The default value is 0, meaning that test runs
+			can fuzz the data structures in any transition from the start.</p></item>
+</terms>
+
+<p>By default, the simulator sanitises the environment in which the client program is executed so that the user's environment variables can't affect how
+the client program is executed. However, by using the <cmd>--pass-through-environment</cmd> option, the user's environment will be passed through without
+modification. A more fine-grained (and recommended) approach is to only pass through specific environment variables which are needed, using the
+<cmd>--env=<var>KEY</var>=<var>VALUE</var></cmd> option one or more times. Each instane of the option declares an environment variable with the given
+value in the environment used by the client program.</p>
+
+<p>The following environment variables are always passed through to the client program (unless overridden using <cmd>--env</cmd>):</p>
+<list>
+	<item><p><sys>DISPLAY</sys></p></item>
+	<item><p><sys>XDG_DATA_HOME</sys></p></item>
+	<item><p><sys>XDG_CONFIG_HOME</sys></p></item>
+	<item><p><sys>XDG_DATA_DIRS</sys></p></item>
+	<item><p><sys>XDG_CONFIG_DIRS</sys></p></item>
+	<item><p><sys>XDG_CACHE_HOME</sys></p></item>
+	<item><p><sys>XDG_RUNTIME_DIR</sys></p></item>
+	<item><p><sys>HOME</sys></p></item>
+	<item><p><sys>USER</sys></p></item>
+	<item><p><sys>HOSTNAME</sys></p></item>
+	<item><p><sys>SSH_CLIENT</sys></p></item>
+	<item><p><sys>SSH_TTY</sys></p></item>
+	<item><p><sys>SSH_CONNECTION</sys></p></item>
+</list>
+
+<example>
+<screen><output style="prompt">$ </output><input>bendy-bus --env=G_MESSAGES_DEBUG=all --env=G_SLICE=always-malloc \
+	example.machine example.xml -- my-test-program</input></screen>
+</example>
+
+<p>A default configuration file (based closely on a typical session bus configuration file) is used for the private <cmd>dbus-daemon</cmd> instance.
+However, it might be desirable to override it and use a custom D-Bus configuration file. This can be achieved using the
+<cmd>--dbus-daemon-config-file=<var>FILE</var></cmd> option to specify the filename of this custom configuration file.</p>
+
+<p>The seed value for the PRNG used in all random sampling operations in the simulator is seeded from the system clock each time the simulator is run,
+and its current seed value is outputted in a log message from the simulator. In order to reproduce a given test run, it is possible to set the seed
+value by using the <cmd>--random-seed=<var>SEED</var></cmd> option.</p>
+
+</section>
+
+</page>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<page xmlns="http://projectmallard.org/1.0/" type="topic" id="bendy-bus-lint">
+<info>
+	<link type="guide" xref="simulator"/>
+	<link type="prev" xref="bendy-bus-lcov"/>
+	<link type="next" xref="bendy-bus-viz"/>
+	<credit type="author">
+		<name>Philip Withnall</name>
+		<email>philip@tecnocode.co.uk</email>
+	</credit>
+	<license><p>Creative Commons Share Alike 3.0</p></license>
+</info>
+<title>Simulation Description Lint Utility</title>
+
+<p>The lint utility takes a simulation description and D-Bus introspection XML file, just like the simulator does. It checks that they're syntactically
+valid, type safe and that there are no definitely unreachable simulation states in the finite state machines in the simulation description.</p>
+
+<p>It is intended that the lint utility is used as part of the <cmd>make check</cmd> rule in a build system to check that any simulation descriptions in
+a project's source tree are always valid. The exit status of the lint utility is 0 if the simulation description passed all the tests, and a positive
+number otherwise. There is no guaranteed mapping between specific exit statuses and error messages outputted by the lint utility.</p>
+
+<section id="usage">
+<title>Command Line Usage</title>
+
+<p>The command line usage of the lint utility is: <cmd>bendy-bus-lint <var>[simulation code file]</var> <var>[introspection XML file]</var></cmd>.</p>
+
+<p>The simulation code file and introspection XML file must be files containing a simulation description (<link xref="language"/>) and the corresponding
+D-Bus introspection XML, respectively.</p>
+
+</section>
+
+</page>

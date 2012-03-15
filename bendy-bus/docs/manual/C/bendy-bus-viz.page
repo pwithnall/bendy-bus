@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<page xmlns="http://projectmallard.org/1.0/" type="topic" id="bendy-bus-viz">
+<info>
+	<link type="guide" xref="simulator"/>
+	<link type="prev" xref="bendy-bus-lint"/>
+	<credit type="author">
+		<name>Philip Withnall</name>
+		<email>philip@tecnocode.co.uk</email>
+	</credit>
+	<license><p>Creative Commons Share Alike 3.0</p></license>
+</info>
+<title>Simulation Description Visualizer</title>
+
+<p>The visualizer takes a simulation description and D-Bus introspection XML file, just like the simulator does. It parses the simulation description and
+outputs a Graphviz graph of all the objects in the simulation description on standard output. This can then be passed to a Graphviz program such as
+<cmd>dot</cmd> to produce an image file.</p>
+
+<section id="usage">
+<title>Command Line Usage</title>
+
+<p>The command line usage of the visualizer is: <cmd>bendy-bus-viz <var>[options]</var> <var>[simulation code file]</var>
+<var>[introspection XML file]</var></cmd>.</p>
+
+<p>The simulation code file and introspection XML file must be files containing a simulation description (<link xref="language"/>) and the corresponding
+D-Bus introspection XML, respectively.</p>
+
+<example>
+<screen><output style="prompt">$ </output><input>bendy-bus-viz example.machine example.xml | dot -Tpng > example.png</input></screen>
+</example>
+
+<p>The dot-language ID of the outermost graph block can be changed from its default value of <code>bendy_bus</code> using the
+<cmd>--graph-id=<var>ID</var></cmd> option.</p>
+
+<p>If a graph visualizing only one simulated object from the given simulation description is desired, the <cmd>--object-path=<var>OBJECT PATH</var></cmd>
+option can be used to specify the D-Bus object path of the desired object. A Graphviz graph representing only that object will then be outputted. If this
+option isn't specified, all objects are outputted in the graph.</p>
+
+</section>
+
+</page>
