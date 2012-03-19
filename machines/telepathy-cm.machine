@@ -5,7 +5,7 @@ object at /org/freedesktop/Telepathy/AccountManager, org.freedesktop.Telepathy.A
 			"org.freedesktop.Telepathy.AccountManager",
 		];
 		ValidAccounts = @ao [
-			@o "/org/freedesktop/Telepathy/Account/cmname/proto/account",
+			@o "/org/freedesktop/Telepathy/Account/cm/protocol/account",
 		];
 		InvalidAccounts = @ao [];
 		SupportedAccountProperties = @as [
@@ -445,7 +445,7 @@ object at /org/freedesktop/Telepathy/Connection/cm/protocol/account/subscribe im
 	}
 }
 
-object at /org/freedesktop/Telepathy/Connection/cmname/proto/account/group1 implements org.freedesktop.Telepathy.Channel, org.freedesktop.Telepathy.Channel.Type.ContactList, org.freedesktop.Telepathy.Channel.Interface.Group {
+object at /org/freedesktop/Telepathy/Connection/cm/protocol/account/group1 implements org.freedesktop.Telepathy.Channel, org.freedesktop.Telepathy.Channel.Type.ContactList, org.freedesktop.Telepathy.Channel.Interface.Group {
 	data {
 		/* Channel */
 		ChannelType = "org.freedesktop.Telepathy.Channel.Type.ContactList";
