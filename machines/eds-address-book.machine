@@ -23,7 +23,7 @@ object at /org/gnome/evolution/dataserver/AddressBookFactory, org.gnome.evolutio
 
 object at /org/gnome/evolution/dataserver/AddressBook implements org.gnome.evolution.dataserver.AddressBook {
 	data {
-		_opid_counter = 0u;
+		_opid_counter = @u 0;
 	}
 
 	states {
@@ -38,7 +38,7 @@ object at /org/gnome/evolution/dataserver/AddressBook implements org.gnome.evolu
 		emit opened (["", ""]);
 		emit open_done (object->_opid_counter, "", "");
 
-		object->_opid_counter = object->_opid_counter + 1u;
+		object->_opid_counter = object->_opid_counter + @u 1;
 	}
 
 	/* Already open. */
@@ -46,7 +46,7 @@ object at /org/gnome/evolution/dataserver/AddressBook implements org.gnome.evolu
 		emit open_done (object->_opid_counter, "", "");
 		reply (object->_opid_counter);
 
-		object->_opid_counter = object->_opid_counter + 1u;
+		object->_opid_counter = object->_opid_counter + @u 1;
 	}
 
 	/* Closing. */
@@ -61,20 +61,20 @@ object at /org/gnome/evolution/dataserver/AddressBook implements org.gnome.evolu
 
 		reply (object->_opid_counter);
 		emit get_backend_property_done (object->_opid_counter, "", "", "local,do-initial-query,bulk-removes,contact-lists");
-		object->_opid_counter = object->_opid_counter + 1u;
+		object->_opid_counter = object->_opid_counter + @u 1;
 	}
 
 	transition inside Authenticated on method get_backend_property {
 		reply (object->_opid_counter);
 		emit get_backend_property_done (object->_opid_counter, "", "", "value"?);
-		object->_opid_counter = object->_opid_counter + 1u;
+		object->_opid_counter = object->_opid_counter + @u 1;
 	}
 
 	/* View. */
 	transition inside Authenticated on method get_view {
 		reply (object->_opid_counter);
 		emit get_view_done (object->_opid_counter, "", "", "/org/gnome/evolution/dataserver/AddressBookView");
-		object->_opid_counter = object->_opid_counter + 1u;
+		object->_opid_counter = object->_opid_counter + @u 1;
 	}
 }
 
@@ -89,7 +89,7 @@ object at /org/gnome/evolution/dataserver/AddressBookView implements org.gnome.e
 	transition from Started to Stopped on method stop { reply (); }
 
 	transition inside Started on random {
-		emit progress (0u?, "Loading"?);
+		emit progress (@u 0?, "Loading"?);
 	}
 
 	transition inside Started on random {

@@ -45,9 +45,6 @@
 
 %union {
 	gchar *str;
-	gint64 integer;
-	guint64 unsigned_integer;
-	gdouble flt;
 	GPtrArray *ptr_array;
 	GHashTable *hash_table;
 	DfsmAstObject *ast_object;
@@ -64,7 +61,6 @@
 }
 
 %destructor { free ($$); } <str>
-%destructor {} <integer> <unsigned_integer> <flt>
 %destructor { if ($$ != NULL) { g_ptr_array_unref ($$); } } <ptr_array>
 %destructor { if ($$ != NULL) { g_hash_table_unref ($$); } } <hash_table>
 %destructor { g_object_unref ($$); } <ast_object> <ast_data_structure> <ast_expression> <ast_transition>
@@ -81,14 +77,8 @@
 %token <str> TYPE_ANNOTATION
 
 %token <str> STRING
-%token <unsigned_integer> BYTE
-%token <integer> INT16
-%token <unsigned_integer> UINT16
-%token <integer> INT32
-%token <unsigned_integer> UINT32
-%token <integer> INT64
-%token <unsigned_integer> UINT64
-%token <flt> DOUBLE
+%token <str> INTEGER
+%token <str> DOUBLE
 %token TRUE_LITERAL
 %token FALSE_LITERAL
 
@@ -429,12 +419,13 @@ Variable: VariableName								{ $$ = dfsm_ast_variable_new (DFSM_VARIABLE_SCOPE_
 /* Returns a new DfsmAstDataStructure. */
 FuzzyDataStructure: AnnotatedDataStructure					{ $$ = $1; }
                   | AnnotatedDataStructure FUZZY				{ $$ = $1; dfsm_ast_data_structure_set_weight ($$, 1.0); }
-                  | AnnotatedDataStructure FUZZY DOUBLE				{ $$ = $1; dfsm_ast_data_structure_set_weight ($$, $3); }
+                  | AnnotatedDataStructure FUZZY DOUBLE				{ $$ = $1;
+										  dfsm_ast_data_structure_set_weight ($$, g_ascii_strtod ($3, NULL)); }
                   | AnnotatedDataStructure FUZZY IDENTIFIER			{ $$ = $1;
 										  dfsm_ast_data_structure_set_weight ($$, 1.0);
 										  dfsm_ast_data_structure_set_nickname ($$, $3); g_free ($3); }
-                  | AnnotatedDataStructure FUZZY DOUBLE	IDENTIFIER		{ $$ = $1;
-										  dfsm_ast_data_structure_set_weight ($$, $3);
+                  | AnnotatedDataStructure FUZZY DOUBLE IDENTIFIER		{ $$ = $1;
+										  dfsm_ast_data_structure_set_weight ($$, g_ascii_strtod ($3, NULL));
 										  dfsm_ast_data_structure_set_nickname ($$, $4); g_free ($4); }
 ;
 
@@ -445,16 +436,10 @@ AnnotatedDataStructure: DataStructure						{ $$ = $1; }
 ;
 
 /* Returns a new DfsmAstDataStructure. */
-DataStructure: BYTE					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BYTE, &$1); }
-             | TRUE_LITERAL				{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BOOLEAN, GUINT_TO_POINTER (TRUE)); }
+DataStructure: TRUE_LITERAL				{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BOOLEAN, GUINT_TO_POINTER (TRUE)); }
              | FALSE_LITERAL				{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_BOOLEAN, GUINT_TO_POINTER (FALSE)); }
-             | INT16					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_INT16, &$1); }
-             | UINT16					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_UINT16, &$1); }
-             | INT32					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_INT32, &$1); }
-             | UINT32					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_UINT32, &$1); }
-             | INT64					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_INT64, &$1); }
-             | UINT64					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_UINT64, &$1); }
-             | DOUBLE					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_DOUBLE, &$1); }
+             | INTEGER					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_INT32 /* default type */, $1); g_free ($1); }
+             | DOUBLE					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_DOUBLE, $1); g_free ($1); }
              | String					{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_STRING, $1); g_free ($1); }
              | '<' Expression '>'			{ $$ = dfsm_ast_data_structure_new (DFSM_AST_DATA_VARIANT, $2); g_object_unref ($2); }
              | '<' error '>'				{ $$ = NULL; YYABORT; }

@@ -84,14 +84,8 @@ DBUS_NAME				{DBUS_NAME_ELEMENT}\.{DBUS_NAME_ELEMENT}(\.{DBUS_NAME_ELEMENT})*
  */
 IDENTIFIER				[A-Za-z_]+[A-Za-z0-9_]*
 
-BYTE					[0-9]+y
-INT16					[\+-]?[0-9]+n
-UINT16					[0-9]+q
-INT32					[\+-]?[0-9]+i
-UINT32					[0-9]+u
-INT64					[\+-]?[0-9]+x
-UINT64					[0-9]+t
-DOUBLE					[\+-]?[0-9]+\.[0-9]+d
+INTEGER					[\+-]?[0-9]+
+DOUBLE					[\+-]?[0-9]+\.[0-9]+
 
 TYPE_ANNOTATION				@[\(\)\{\}ybnqiuxtdsogarvehm\*\?@&^]+[ \t\n\r\v\f]+
 
@@ -207,14 +201,9 @@ TYPE_ANNOTATION				@[\(\)\{\}ybnqiuxtdsogarvehm\*\?@&^]+[ \t\n\r\v\f]+
 
 {IDENTIFIER} { yylval->str = strdup (yytext); return IDENTIFIER; }
 
-{BYTE} { yylval->unsigned_integer = g_ascii_strtoull (yytext, NULL, 10); return BYTE; }
-{INT16} { yylval->integer = g_ascii_strtoll (yytext, NULL, 10); return INT16; }
-{UINT16} { yylval->unsigned_integer = g_ascii_strtoull (yytext, NULL, 10); return UINT16; }
-{INT32} { yylval->integer = g_ascii_strtoll (yytext, NULL, 10); return INT32; }
-{UINT32} { yylval->unsigned_integer = g_ascii_strtoull (yytext, NULL, 10); return UINT32; }
-{INT64} { yylval->integer = g_ascii_strtoll (yytext, NULL, 10); return INT64; }
-{UINT64} { yylval->unsigned_integer = g_ascii_strtoull (yytext, NULL, 10); return UINT64; }
-{DOUBLE} { yylval->flt = g_ascii_strtod (yytext, NULL); return DOUBLE; }
+{INTEGER} { yylval->str = strdup (yytext); return INTEGER; /* return strings because it would be icky to detect overflow here and propagate the error
+                                                            * all the way through to the AST */ }
+{DOUBLE} { yylval->str = strdup (yytext); return DOUBLE; }
 
 [\t] { /* Ignore tabs, but ensure they change the source code location appropriately. */ yycolumn += tab_width - 1 /* will be counted once later */; }
 [ \n\r\v\f] { /* Ignore whitespace */ }

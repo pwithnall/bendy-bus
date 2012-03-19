@@ -28,6 +28,7 @@
 
 #include "config.h"
 
+#include <errno.h>
 #include <limits.h>
 #include <string.h>
 #include <glib.h>
@@ -51,6 +52,7 @@ struct _DfsmAstDataStructurePrivate {
 	gdouble weight;
 	gchar *type_annotation; /* may not match the actual data in the structure until after dfsm_ast_data_structure_check() is called */
 	gchar *nickname; /* may be NULL; must not be the empty string */
+	gchar *unparsed_string; /* may be NULL; used by integer/double values before being parsed in pre_check_and_register() */
 	union {
 		guchar byte_val;
 		gboolean boolean_val;
@@ -107,6 +109,7 @@ dfsm_ast_data_structure_finalize (GObject *object)
 
 	g_free (priv->type_annotation);
 	g_free (priv->nickname);
+	g_free (priv->unparsed_string);
 
 	switch (priv->data_structure_type) {
 		case DFSM_AST_DATA_BYTE:
@@ -231,29 +234,171 @@ dfsm_ast_data_structure_sanity_check (DfsmAstNode *node)
 	}
 }
 
+static guint64
+parse_unsigned_integer (DfsmAstDataStructure *self, guint64 max_val, GError **error)
+{
+	guint64 parsed_val;
+
+	/* Parse the string value and check for overflow. */
+	errno = 0;
+	parsed_val = g_ascii_strtoull (self->priv->unparsed_string, NULL, 10);
+
+	if (errno == ERANGE || parsed_val > max_val) {
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Unsigned integer too wide: %s"), self->priv->unparsed_string);
+		return 0;
+	}
+
+	/* Free the unparsed string. */
+	g_free (self->priv->unparsed_string);
+	self->priv->unparsed_string = NULL;
+
+	return parsed_val;
+}
+
+static gint64
+parse_signed_integer (DfsmAstDataStructure *self, gint64 min_val, gint64 max_val, GError **error)
+{
+	gint64 parsed_val;
+
+	/* Parse the string value and check for overflow. */
+	errno = 0;
+	parsed_val = g_ascii_strtoll (self->priv->unparsed_string, NULL, 10);
+
+	if (errno == ERANGE || parsed_val < min_val || parsed_val > max_val) {
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Signed integer too wide: %s"), self->priv->unparsed_string);
+		return 0;
+	}
+
+	/* Free the unparsed string. */
+	g_free (self->priv->unparsed_string);
+	self->priv->unparsed_string = NULL;
+
+	return parsed_val;
+}
+
+static gdouble
+parse_double (DfsmAstDataStructure *self, GError **error)
+{
+	gdouble parsed_val;
+
+	/* Parse the string value and check for overflow. */
+	errno = 0;
+	parsed_val = g_ascii_strtod (self->priv->unparsed_string, NULL);
+
+	if (errno == ERANGE) {
+		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Double too wide: %s"), self->priv->unparsed_string);
+		return 0.0;
+	}
+
+	/* Free the unparsed string. */
+	g_free (self->priv->unparsed_string);
+	self->priv->unparsed_string = NULL;
+
+	return parsed_val;
+}
+
+static gboolean
+is_integer_type (DfsmAstDataStructureType data_structure_type)
+{
+	switch (data_structure_type) {
+		case DFSM_AST_DATA_BYTE:
+		case DFSM_AST_DATA_UINT16:
+		case DFSM_AST_DATA_UINT32:
+		case DFSM_AST_DATA_UINT64:
+		case DFSM_AST_DATA_INT16:
+		case DFSM_AST_DATA_INT32:
+		case DFSM_AST_DATA_INT64:
+			return TRUE;
+		case DFSM_AST_DATA_BOOLEAN:
+		case DFSM_AST_DATA_DOUBLE:
+		case DFSM_AST_DATA_STRING:
+		case DFSM_AST_DATA_OBJECT_PATH:
+		case DFSM_AST_DATA_SIGNATURE:
+		case DFSM_AST_DATA_ARRAY:
+		case DFSM_AST_DATA_STRUCT:
+		case DFSM_AST_DATA_VARIANT:
+		case DFSM_AST_DATA_DICT:
+		case DFSM_AST_DATA_UNIX_FD:
+		case DFSM_AST_DATA_VARIABLE:
+			return FALSE;
+		default:
+			g_assert_not_reached ();
+	}
+}
+
 static void
 dfsm_ast_data_structure_pre_check_and_register (DfsmAstNode *node, DfsmEnvironment *environment, GError **error)
 {
-	DfsmAstDataStructurePrivate *priv = DFSM_AST_DATA_STRUCTURE (node)->priv;
+	DfsmAstDataStructure *self = DFSM_AST_DATA_STRUCTURE (node);
+	DfsmAstDataStructurePrivate *priv = self->priv;
+	GVariantType *annotated_type;
 	guint i;
 
-	/* See if our type annotation is sane (if we have one). */
-	if (priv->type_annotation != NULL && g_variant_type_string_is_valid (priv->type_annotation) == FALSE) {
-		g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid type annotation: %s"), priv->type_annotation);
-		return;
+	/* See if our type annotation is sane (if we have one), and set the data_structure_type from it if appropriate. Note that this only works
+	 * when handling literal values, rather than variables, since we don't know the types of variables at this point. That's fine, though, because
+	 * in the case of literal values, we're only using type annotations to infer their actual type. */
+	if (priv->type_annotation != NULL) {
+		if (g_variant_type_string_is_valid (priv->type_annotation) == FALSE) {
+			g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID, _("Invalid type annotation: %s"), priv->type_annotation);
+			return;
+		}
+
+		annotated_type = g_variant_type_new (priv->type_annotation);
+
+		if (is_integer_type (priv->data_structure_type) == TRUE) {
+			if (g_variant_type_equal (annotated_type, G_VARIANT_TYPE_BYTE) == TRUE) {
+				priv->data_structure_type = DFSM_AST_DATA_BYTE;
+			} else if (g_variant_type_equal (annotated_type, G_VARIANT_TYPE_UINT16) == TRUE) {
+				priv->data_structure_type = DFSM_AST_DATA_UINT16;
+			} else if (g_variant_type_equal (annotated_type, G_VARIANT_TYPE_UINT32) == TRUE) {
+				priv->data_structure_type = DFSM_AST_DATA_UINT32;
+			} else if (g_variant_type_equal (annotated_type, G_VARIANT_TYPE_UINT64) == TRUE) {
+				priv->data_structure_type = DFSM_AST_DATA_UINT64;
+			} else if (g_variant_type_equal (annotated_type, G_VARIANT_TYPE_INT16) == TRUE) {
+				priv->data_structure_type = DFSM_AST_DATA_INT16;
+			} else if (g_variant_type_equal (annotated_type, G_VARIANT_TYPE_INT32) == TRUE) {
+				priv->data_structure_type = DFSM_AST_DATA_INT32;
+			} else if (g_variant_type_equal (annotated_type, G_VARIANT_TYPE_INT64) == TRUE) {
+				priv->data_structure_type = DFSM_AST_DATA_INT64;
+			}
+		} else if (g_variant_type_equal (annotated_type, G_VARIANT_TYPE_OBJECT_PATH) == TRUE &&
+		           (priv->data_structure_type == DFSM_AST_DATA_OBJECT_PATH || priv->data_structure_type == DFSM_AST_DATA_STRING)) {
+			priv->data_structure_type = DFSM_AST_DATA_OBJECT_PATH;
+		} else if (g_variant_type_equal (annotated_type, G_VARIANT_TYPE_SIGNATURE) == TRUE &&
+		           (priv->data_structure_type == DFSM_AST_DATA_SIGNATURE || priv->data_structure_type == DFSM_AST_DATA_STRING)) {
+			priv->data_structure_type = DFSM_AST_DATA_SIGNATURE;
+		}
+
+		g_variant_type_free (annotated_type);
 	}
 
 	switch (priv->data_structure_type) {
-		case DFSM_AST_DATA_BYTE:
 		case DFSM_AST_DATA_BOOLEAN:
-		case DFSM_AST_DATA_INT16:
-		case DFSM_AST_DATA_UINT16:
-		case DFSM_AST_DATA_INT32:
-		case DFSM_AST_DATA_UINT32:
-		case DFSM_AST_DATA_INT64:
-		case DFSM_AST_DATA_UINT64:
-		case DFSM_AST_DATA_DOUBLE:
 			/* Nothing to do here */
+			break;
+		case DFSM_AST_DATA_BYTE:
+			priv->byte_val = parse_unsigned_integer (self, 255, error);
+			break;
+		case DFSM_AST_DATA_UINT16:
+			priv->uint16_val = parse_unsigned_integer (self, G_MAXUINT16, error);
+			break;
+		case DFSM_AST_DATA_UINT32:
+			priv->uint32_val = parse_unsigned_integer (self, G_MAXUINT32, error);
+			break;
+		case DFSM_AST_DATA_UINT64:
+			priv->uint64_val = parse_unsigned_integer (self, G_MAXUINT64, error);
+			break;
+		case DFSM_AST_DATA_INT16:
+			priv->int16_val = parse_signed_integer (self, G_MININT16, G_MAXINT16, error);
+			break;
+		case DFSM_AST_DATA_INT32:
+			priv->int32_val = parse_signed_integer (self, G_MININT32, G_MAXINT32, error);
+			break;
+		case DFSM_AST_DATA_INT64:
+			priv->int64_val = parse_signed_integer (self, G_MININT64, G_MAXINT64, error);
+			break;
+		case DFSM_AST_DATA_DOUBLE:
+			priv->double_val = parse_double (self, error);
 			break;
 		case DFSM_AST_DATA_STRING:
 			/* Valid UTF-8? */
@@ -261,22 +406,6 @@ dfsm_ast_data_structure_pre_check_and_register (DfsmAstNode *node, DfsmEnvironme
 				g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
 				             _("Invalid UTF-8 in string: %s"), priv->string_val);
 				return;
-			}
-
-			/* If we have a type annotation marking us as an object path, check the string constant is a valid object path. */
-			if (priv->type_annotation != NULL) {
-				GVariantType *annotated_type;
-				gboolean is_object_path;
-
-				annotated_type = g_variant_type_new (priv->type_annotation);
-				is_object_path = g_variant_type_equal (annotated_type, G_VARIANT_TYPE_OBJECT_PATH);
-				g_variant_type_free (annotated_type);
-
-				if (is_object_path == TRUE && g_variant_is_object_path (priv->object_path_val) == FALSE) {
-					g_set_error (error, DFSM_PARSE_ERROR, DFSM_PARSE_ERROR_AST_INVALID,
-					             _("Invalid D-Bus object path: %s"), priv->string_val);
-					return;
-				}
 			}
 
 			break;
@@ -541,13 +670,7 @@ _calculate_type (DfsmAstDataStructure *self, DfsmEnvironment *environment, GErro
 			calculated_type = __calculate_type (self, environment);
 			annotated_type = g_variant_type_new (self->priv->type_annotation);
 
-			/* We specifically ignore the cases where the calculated type is a string but the annotated type is an object path or
-			 * D-Bus signature, since we require object paths and signatures to use string syntax in the language. */
-			if (g_variant_type_is_subtype_of (annotated_type, calculated_type) == FALSE &&
-			    !(g_variant_type_equal (calculated_type, G_VARIANT_TYPE_STRING) == TRUE &&
-			      g_variant_type_equal (annotated_type, G_VARIANT_TYPE_OBJECT_PATH) == TRUE) &&
-			    !(g_variant_type_equal (calculated_type, G_VARIANT_TYPE_STRING) == TRUE &&
-			      g_variant_type_equal (annotated_type, G_VARIANT_TYPE_SIGNATURE) == TRUE)) {
+			if (g_variant_type_is_subtype_of (annotated_type, calculated_type) == FALSE) {
 				gchar *annotated_type_string, *calculated_type_string;
 
 				annotated_type_string = g_variant_type_dup_string (annotated_type);
@@ -732,32 +855,19 @@ dfsm_ast_data_structure_new (DfsmAstDataStructureType data_structure_type, gpoin
 	priv = data_structure->priv;
 
 	switch (data_structure_type) {
-		case DFSM_AST_DATA_BYTE:
-			priv->byte_val = *((guint64*) value);
-			break;
 		case DFSM_AST_DATA_BOOLEAN:
 			priv->boolean_val = (GPOINTER_TO_UINT (value) == 1) ? TRUE : FALSE;
 			break;
+		case DFSM_AST_DATA_BYTE:
 		case DFSM_AST_DATA_INT16:
-			priv->int16_val = *((gint64*) value);
-			break;
 		case DFSM_AST_DATA_UINT16:
-			priv->uint16_val = *((guint64*) value);
-			break;
 		case DFSM_AST_DATA_INT32:
-			priv->int32_val = *((gint64*) value);
-			break;
 		case DFSM_AST_DATA_UINT32:
-			priv->uint32_val = *((guint64*) value);
-			break;
 		case DFSM_AST_DATA_INT64:
-			priv->int64_val = *((gint64*) value);
-			break;
 		case DFSM_AST_DATA_UINT64:
-			priv->uint64_val = *((guint64*) value);
-			break;
 		case DFSM_AST_DATA_DOUBLE:
-			priv->double_val = *((gdouble*) value);
+			/* Parsed during pre_check_and_register() */
+			priv->unparsed_string = g_strdup ((gchar*) value);
 			break;
 		case DFSM_AST_DATA_STRING:
 			priv->string_val = g_strdup ((gchar*) value);

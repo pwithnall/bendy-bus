@@ -3,7 +3,6 @@
 <TITLE>DfsmAstDataStructure</TITLE>
 DfsmAstDataStructure
 DfsmAstDataStructureClass
-DfsmAstDataStructureType
 DfsmAstDictionaryEntry
 dfsm_ast_data_structure_calculate_type
 dfsm_ast_data_structure_get_nickname

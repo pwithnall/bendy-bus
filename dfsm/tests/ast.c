@@ -68,7 +68,7 @@ build_machine_description_from_transition_snippet (const gchar *snippet, GError 
 				"NonEmptyString = \"hello world\";"
 				"UnicodeString = \"hállö wèrlđ\";"
 				"TypeSignature = @av [];"
-				"Integer = 0u;"
+				"Integer = @u 0;"
 				"Bool = false;"
 			"}"
 			"states {"
@@ -106,7 +106,7 @@ test_ast_parser (void)
 	GError *error = NULL;
 	
 	/* Random triggering, inside transitions, signal emissions. */
-	ASSERT_TRANSITION_PARSES ("transition inside Main on random { emit CounterSignal (1u); }");
+	ASSERT_TRANSITION_PARSES ("transition inside Main on random { emit CounterSignal (1); }");
 
 	/* Method triggering, from…to transitions, replies. */
 	ASSERT_TRANSITION_PARSES ("transition from Main to Main on method TwoStateEcho { reply (\"baz\"); }");
@@ -115,7 +115,7 @@ test_ast_parser (void)
 	ASSERT_TRANSITION_PARSES ("transition from Main to Main on method TwoStateEcho { throw RandomError; }");
 
 	/* Property triggering. */
-	ASSERT_TRANSITION_PARSES ("transition inside Main on property ArbitraryProperty { emit CounterSignal (1u); }");
+	ASSERT_TRANSITION_PARSES ("transition inside Main on property ArbitraryProperty { emit CounterSignal (1); }");
 
 	/* Preconditions, -> operator, == operator, != operator. */
 	ASSERT_TRANSITION_PARSES ("transition inside Main on method TwoStateEcho {"
@@ -125,10 +125,10 @@ test_ast_parser (void)
 	"}");
 
 	/* Arithmetic operators. */
-	ASSERT_TRANSITION_PARSES ("transition inside Main on random { emit CounterSignal (1u * 1u / 1u + 1u - 1u % 1u); }");
+	ASSERT_TRANSITION_PARSES ("transition inside Main on random { emit CounterSignal (1 * 1 / 1 + 1 - 1 % 1); }");
 
 	/* Operator precedence. */
-	ASSERT_TRANSITION_PARSES ("transition inside Main on random { emit CounterSignal (⟨1u * 1u⟩ / ⟨1u + 1u⟩ - 1u % 1u); }");
+	ASSERT_TRANSITION_PARSES ("transition inside Main on random { emit CounterSignal (⟨1 * 1⟩ / ⟨1 + 1⟩ - 1 % 1); }");
 
 	/* Boolean operators. */
 	ASSERT_TRANSITION_PARSES ("transition inside Main on random {"
@@ -138,13 +138,13 @@ test_ast_parser (void)
 
 	/* Numeric comparisons. */
 	ASSERT_TRANSITION_PARSES ("transition inside Main on random {"
-		"precondition { 0.5d <~ 0.0d || 0.5d <= 0.0d || 0.5d >= 0.0d || 0.5d ~> 0.0d }"
+		"precondition { 0.5 <~ 0.0 || 0.5 <= 0.0 || 0.5 >= 0.0 || 0.5 ~> 0.0 }"
 		"emit SingleStateSignal (\"\");"
 	"}");
 
 	/* Arrays, variants, dicts, structs. */
 	ASSERT_TRANSITION_PARSES ("transition inside Main on random {"
-		"object->TypeSignature = [<1u>];"
+		"object->TypeSignature = [<1>];"
 		"object->TypeSignature = [<{ \"foo\" : \"bar\" }>];"
 		"object->TypeSignature = [<( \"foo\", \"bar\" )>];"
 	"}");
@@ -177,9 +177,13 @@ test_ast_parser_errors (void)
 	GPtrArray/*<DfsmObject>*/ *object_array = NULL;
 	GError *error = NULL;
 
-	/* Unannotated integers. */
-	ASSERT_TRANSITION_FAILS (SYNTAX, "transition inside Main on random { object->Integer = 5; }");
-	ASSERT_TRANSITION_FAILS (SYNTAX, "transition inside Main on random { object->Integer = -5; }");
+	/* Wrong annotations. */
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Integer = @i 5; }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Integer = @u -5; }");
+
+	/* Integers which are too wide. */
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Bool = @y 1000 == @y 1000; }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Bool = @q -50 == @q -50; }");
 
 	/* Reference non-existent variable. */
 	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->ArbitraryProperty = fake_variable; }");
@@ -204,7 +208,7 @@ test_ast_parser_errors (void)
 	/* Emit statement: no data, invalid signal, incorrect type. */
 	ASSERT_TRANSITION_FAILS (SYNTAX, "transition inside Main on random { emit SingleStateSignal; }");
 	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { emit NonExistentSignal (true); }");
-	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { emit SingleStateSignal (5u); }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { emit SingleStateSignal (@u 5); }");
 	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { emit SingleStateSignal \"not in a struct\"; }");
 
 	/* Assignments: type mismatches, assignments to non-variables and structures of non-variables. */
@@ -213,13 +217,13 @@ test_ast_parser_errors (void)
 	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { (object->ArbitraryProperty, \"not a variable\") = (\"\", \"\"); }");
 
 	/* Binary expression: type mismatches. */
-	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Integer = 5u + false; }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Integer = @u 5 + false; }");
 	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Bool = \"what\" <= false; }");
 	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Bool = \"/obj/path\" == @o \"/obj/path\"; }");
-	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Bool = true && 1u; }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Bool = true && 1; }");
 
 	/* Unary expression: type mismatches. */
-	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Bool = !0u; }");
+	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Bool = !0; }");
 
 	/* Function call: invalid function name, parameter type mismatch, return type mismatch. */
 	ASSERT_TRANSITION_FAILS (AST_INVALID, "transition inside Main on random { object->Integer = makeMeAnInt (\"shan't\"); }");
@@ -261,7 +265,7 @@ test_ast_execution_output_sequence (void)
 		"transition inside Main on method TwoStateEcho {"
 			"reply (\"another reply\");"
 			"emit SingleStateSignal (\"message\");"
-			"emit CounterSignal (1153u);"
+			"emit CounterSignal (1153);"
 		"}", &error);
 	g_assert_no_error (error);
 	g_assert_cmpuint (simulated_objects->len, ==, 1);
@@ -290,7 +294,7 @@ test_ast_execution_output_sequence (void)
 	                                            ENTRY_EMIT, "uk.ac.cam.cl.DBusSimulator.SimpleTest", "SingleStateSignal",
 	                                                        new_unary_tuple (g_variant_new_string ("message")),
 	                                            ENTRY_EMIT, "uk.ac.cam.cl.DBusSimulator.SimpleTest", "CounterSignal",
-	                                                        new_unary_tuple (g_variant_new_uint32 (1153)),
+	                                                        new_unary_tuple (g_variant_new_int32 (1153)),
 	                                            ENTRY_NONE);
 	dfsm_machine_call_method (machine, output_sequence, "uk.ac.cam.cl.DBusSimulator.SimpleTest", "TwoStateEcho", params, TRUE);
 	dfsm_output_sequence_output (output_sequence, &error);
@@ -315,7 +319,7 @@ test_ast_execution_integer_saturation (void)
 	simulated_objects = build_machine_description_from_transition_snippet ( \
 		"transition inside Main on random {" \
 			"precondition { " ARITHMETIC " }" \
-			"object->Integer = object->Integer + 1u;" /* count successful executions */ \
+			"object->Integer = object->Integer + @u 1;" /* count successful executions */ \
 		"}", &error); \
 	g_assert_no_error (error); \
 	g_assert_cmpuint (simulated_objects->len, ==, 1); \
@@ -334,128 +338,128 @@ test_ast_execution_integer_saturation (void)
 } G_STMT_END
 
 	/* Addition. */
-	ASSERT_ARITHMETIC_EXPRESSION ("254y + 0y == 254y");
-	ASSERT_ARITHMETIC_EXPRESSION ("254y + 1y == 255y");
-	ASSERT_ARITHMETIC_EXPRESSION ("254y + 2y == 255y");
-	ASSERT_ARITHMETIC_EXPRESSION ("255y + 0y == 255y");
-	ASSERT_ARITHMETIC_EXPRESSION ("255y + 1y == 255y");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 254 + @y 0 == @y 254");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 254 + @y 1 == @y 255");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 254 + @y 2 == @y 255");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 255 + @y 0 == @y 255");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 255 + @y 1 == @y 255");
 
-	ASSERT_ARITHMETIC_EXPRESSION ("32766n + 0n == 32766n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32766n + 1n == 32767n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32766n + 2n == 32767n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n + 0n == 32767n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n + 1n == 32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32766 + @n 0 == @n 32766");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32766 + @n 1 == @n 32767");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32766 + @n 2 == @n 32767");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 + @n 0 == @n 32767");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 + @n 1 == @n 32767");
 
-	ASSERT_ARITHMETIC_EXPRESSION ("-32767n + -0n == -32767n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32767n + -1n == -32768n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32767n + -2n == -32768n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n + -0n == -32768n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n + -1n == -32768n");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32767 + @n -0 == @n -32767");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32767 + @n -1 == @n -32768");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32767 + @n -2 == @n -32768");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 + @n -0 == @n -32768");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 + @n -1 == @n -32768");
 
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n + 32767n == -1n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n + -32768n == -1n");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 + @n 32767 == @n -1");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 + @n -32768 == @n -1");
 
 	/* Subtraction. */
-	ASSERT_ARITHMETIC_EXPRESSION ("1y - 0y == 1y");
-	ASSERT_ARITHMETIC_EXPRESSION ("1y - 1y == 0y");
-	ASSERT_ARITHMETIC_EXPRESSION ("1y - 2y == 0y");
-	ASSERT_ARITHMETIC_EXPRESSION ("0y - 0y == 0y");
-	ASSERT_ARITHMETIC_EXPRESSION ("0y - 1y == 0y");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 1 - @y 0 == @y 1");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 1 - @y 1 == @y 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 1 - @y 2 == @y 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 0 - @y 0 == @y 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 0 - @y 1 == @y 0");
 
-	ASSERT_ARITHMETIC_EXPRESSION ("-32767n - 0n == -32767n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32767n - 1n == -32768n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32767n - 2n == -32768n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n - 0n == -32768n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n - 1n == -32768n");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32767 - @n 0 == @n -32767");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32767 - @n 1 == @n -32768");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32767 - @n 2 == @n -32768");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 - @n 0 == @n -32768");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 - @n 1 == @n -32768");
 
-	ASSERT_ARITHMETIC_EXPRESSION ("32766n - -0n == 32766n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32766n - -1n == 32767n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32766n - -2n == 32767n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n - -0n == 32767n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n - -1n == 32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32766 - @n -0 == @n 32766");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32766 - @n -1 == @n 32767");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32766 - @n -2 == @n 32767");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 - @n -0 == @n 32767");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 - @n -1 == @n 32767");
 
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n - 32767n == 0n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n - -32768n == 0n");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 - @n 32767 == @n 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 - @n -32768 == @n 0");
 
 	/* Multiplication. */
-	ASSERT_ARITHMETIC_EXPRESSION ("255y * 0y == 0y");
-	ASSERT_ARITHMETIC_EXPRESSION ("255y * 1y == 255y");
-	ASSERT_ARITHMETIC_EXPRESSION ("255y * 2y == 255y");
-	ASSERT_ARITHMETIC_EXPRESSION ("85y * 2y == 170y");
-	ASSERT_ARITHMETIC_EXPRESSION ("85y * 3y == 255y");
-	ASSERT_ARITHMETIC_EXPRESSION ("85y * 4y == 255y");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 255 * @y 0 == @y 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 255 * @y 1 == @y 255");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 255 * @y 2 == @y 255");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 85 * @y 2 == @y 170");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 85 * @y 3 == @y 255");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 85 * @y 4 == @y 255");
 
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n * 0n == 0n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n * 1n == -32768n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n * 2n == -32768n");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 * @n 0 == @n 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 * @n 1 == @n -32768");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 * @n 2 == @n -32768");
 
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n * -0n == 0n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n * -1n == -32767n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n * -2n == -32768n");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 * @n -0 == @n 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 * @n -1 == @n -32767");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 * @n -2 == @n -32768");
 
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n * -0n == 0n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n * -1n == 32767n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n * -2n == 32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 * @n -0 == @n 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 * @n -1 == @n 32767");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 * @n -2 == @n 32767");
 
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n * 0n == 0n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n * 1n == 32767n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n * 2n == 32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 * @n 0 == @n 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 * @n 1 == @n 32767");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 * @n 2 == @n 32767");
 
 	/* Division. */
-	ASSERT_ARITHMETIC_EXPRESSION ("255y / 0y == 255y");
-	ASSERT_ARITHMETIC_EXPRESSION ("255y / 1y == 255y");
-	ASSERT_ARITHMETIC_EXPRESSION ("255y / 2y == 127y");
-	ASSERT_ARITHMETIC_EXPRESSION ("0y / 0y == 0y");
-	ASSERT_ARITHMETIC_EXPRESSION ("0y / 255y == 0y");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 255 / @y 0 == @y 255");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 255 / @y 1 == @y 255");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 255 / @y 2 == @y 127");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 0 / @y 0 == @y 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 0 / @y 255 == @y 0");
 
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n / 0n == -32768n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n / 1n == -32768n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n / 2n == -16384n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n / 32767n == -1n");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 / @n 0 == @n -32768");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 / @n 1 == @n -32768");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 / @n 2 == @n -16384");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 / @n 32767 == @n -1");
 
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n / -0n == 32767n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n / -1n == -32767n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n / -2n == -16383n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n / -32768n == 0n");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 / @n -0 == @n 32767");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 / @n -1 == @n -32767");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 / @n -2 == @n -16383");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 / @n -32768 == @n 0");
 
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n / -0n == -32768n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n / -1n == 32767n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n / -2n == 16384n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n / -32768n == 1n");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 / @n -0 == @n -32768");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 / @n -1 == @n 32767");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 / @n -2 == @n 16384");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 / @n -32768 == @n 1");
 
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n / 0n == 32767n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n / 1n == 32767n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n / 2n == 16383n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n / 32767n == 1n");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 / @n 0 == @n 32767");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 / @n 1 == @n 32767");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 / @n 2 == @n 16383");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 / @n 32767 == @n 1");
 
 	/* Modulus. */
-	ASSERT_ARITHMETIC_EXPRESSION ("255y % 0y == 0y");
-	ASSERT_ARITHMETIC_EXPRESSION ("255y % 1y == 0y");
-	ASSERT_ARITHMETIC_EXPRESSION ("255y % 2y == 1y");
-	ASSERT_ARITHMETIC_EXPRESSION ("255y % 255y == 0y");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 255 % @y 0 == @y 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 255 % @y 1 == @y 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 255 % @y 2 == @y 1");
+	ASSERT_ARITHMETIC_EXPRESSION ("@y 255 % @y 255 == @y 0");
 
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % 0n == 0n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % 1n == 0n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % 2n == 0n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % 3n == -2n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % 32767n == -1n");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 % @n 0 == @n 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 % @n 1 == @n 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 % @n 2 == @n 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 % @n 3 == @n -2");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 % @n 32767 == @n -1");
 
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n % -0n == 0n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n % -1n == 0n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n % -2n == 1n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n % -32768n == 32767n");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 % @n -0 == @n 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 % @n -1 == @n 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 % @n -2 == @n 1");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 % @n -32768 == @n 32767");
 
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % -0n == 0n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % -1n == 0n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % -2n == 0n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % -3n == -2n");
-	ASSERT_ARITHMETIC_EXPRESSION ("-32768n % -32767n == -1n");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 % @n -0 == @n 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 % @n -1 == @n 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 % @n -2 == @n 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 % @n -3 == @n -2");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n -32768 % @n -32767 == @n -1");
 
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n % 0n == 0n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n % 1n == 0n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n % 2n == 1n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n % 3n == 1n");
-	ASSERT_ARITHMETIC_EXPRESSION ("32767n % 32767n == 0n");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 % @n 0 == @n 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 % @n 1 == @n 0");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 % @n 2 == @n 1");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 % @n 3 == @n 1");
+	ASSERT_ARITHMETIC_EXPRESSION ("@n 32767 % @n 32767 == @n 0");
 
 #undef ASSERT_ARITHMETIC_EXPRESSION
 }

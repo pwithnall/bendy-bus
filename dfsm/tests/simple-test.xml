@@ -13,7 +13,7 @@
 			<arg type="s" name="message"/>
 		</signal>
 		<signal name="CounterSignal">
-			<arg type="u" name="counter"/>
+			<arg type="i" name="counter"/>
 		</signal>
 		<property type="s" name="ArbitraryProperty" access="readwrite"/>
 	</interface>

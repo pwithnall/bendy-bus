@@ -97,7 +97,7 @@ test_fuzzing_integers_unsigned (void)
 		LARGE_RANGE,
 	};
 
-	data_structure = build_data_structure_from_snippet ("666u?", &environment);
+	data_structure = build_data_structure_from_snippet ("@u 666?", &environment);
 
 	/* Evaluate the expression a number of times, building up an approximation of the probability distribution used for fuzzing integers. */
 	for (i = 0; i < TEST_COUNT; i++) {
@@ -153,7 +153,7 @@ test_fuzzing_integers_signed (void)
 		LARGE_RANGE,
 	};
 
-	data_structure = build_data_structure_from_snippet ("666i?", &environment);
+	data_structure = build_data_structure_from_snippet ("666?", &environment);
 
 	/* Evaluate the expression a number of times, building up an approximation of the probability distribution used for fuzzing integers. */
 	for (i = 0; i < TEST_COUNT; i++) {

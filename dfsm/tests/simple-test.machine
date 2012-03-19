@@ -1,7 +1,7 @@
 object at /uk/ac/cam/cl/DBusSimulator/SimpleTest implements uk.ac.cam.cl.DBusSimulator.SimpleTest {
 	data {
 		stored_greeting = "Initial";
-		counter = 0u;
+		counter = 0;
 		ArbitraryProperty = "";
 	}
 
@@ -26,6 +26,6 @@ object at /uk/ac/cam/cl/DBusSimulator/SimpleTest implements uk.ac.cam.cl.DBusSim
 
 	transition from Main to Main on random {
 		emit CounterSignal (object->counter);
-		object->counter = object->counter + 1u;
+		object->counter = object->counter + 1;
 	}
 }
