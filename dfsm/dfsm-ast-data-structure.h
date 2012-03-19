@@ -54,7 +54,7 @@ void dfsm_ast_dictionary_entry_free (DfsmAstDictionaryEntry *entry);
  * @DFSM_AST_DATA_UINT32: a 32-bit unsigned integer
  * @DFSM_AST_DATA_INT64: a 64-bit signed integer
  * @DFSM_AST_DATA_UINT64: a 64-bit unsigned integer
- * @DFSM_AST_DATA_DOUBLE: an IEE 754 double (binary64 format)
+ * @DFSM_AST_DATA_DOUBLE: an IEEE 754 double (binary64 format)
  * @DFSM_AST_DATA_STRING: a UTF-8 string
  * @DFSM_AST_DATA_OBJECT_PATH: a D-Bus object path
  * @DFSM_AST_DATA_SIGNATURE: a D-Bus type signature
