@@ -289,7 +289,7 @@ object at /org/freedesktop/Telepathy/Connection/cm/protocol/account, org.freedes
 	}
 
 	transition inside Connected on random {
-		emit PresencesChanged (pairKeys (@au [@u 0]?, (@u 6?, "busy"?, "I’m busy."?)));
+		emit PresencesChanged (pairKeys (@au [@u 0]?, (@u 6?, "busy"?, "I'm busy."?)));
 	}
 
 	transition inside Connected on random {
