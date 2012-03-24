@@ -429,6 +429,7 @@ MAINTAINERCLEANFILES += \
 	missing \
 	mkinstalldirs \
 	`find "$(srcdir)" -type f -name Makefile.in -print` \
+	`find "m4" -type f -name "*.m4" -print` \
 	po/Makevars.template \
 	po/Rules-quot \
 	po/boldquot.sed \
