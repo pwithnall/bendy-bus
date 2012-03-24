@@ -1,0 +1,16 @@
+Bendy Bus TODO
+==============
+
+Nice to have:
+ • Add variable length delays before replies/errors/emissions to allow interleaving of replies & arbitrary transitions
+ • Automake integration
+
+ • Better dict fuzzing
+ • Verify bendy-bus with Klee
+ • Split up random number generators to lessen the impact of code changes
+
+Future:
+ • Inclusions
+ • Split test utility up into simulator and controller, separated by a D-Bus control interface
+ • GtkSourceView highlighter
+ • Support creating new objects by a pattern
