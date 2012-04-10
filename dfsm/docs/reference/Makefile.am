@@ -25,7 +25,7 @@ HTML_IMAGES =
 content_files =
 expand_content_files =
 
-INCLUDES = -I$(top_srcdir)
+INCLUDES = -I$(top_srcdir) $(GLIB_CFLAGS)
 GTKDOC_LIBS = $(top_builddir)/dfsm/libdfsm.la
 
 # This includes the standard gtk-doc make rules, copied by gtkdocize.
