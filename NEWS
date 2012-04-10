@@ -1,0 +1,7 @@
+Initial release of bendy-bus 0.1.0
+==================================
+
+Major changes:
+ • Create project
+ • Add support for simulating D-Bus servers
+ • Add documentation for initial version of the simulation language
