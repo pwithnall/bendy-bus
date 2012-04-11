@@ -367,8 +367,12 @@ CLEANFILES += $(bendy_bus_marshal_sources)
 
 # Example machines
 EXTRA_DIST += \
+	machines/eds-address-book.machine \
+	machines/eds-address-book.xml \
+	machines/eds-address-book_full.machine \
 	machines/telepathy-cm.machine \
 	machines/telepathy-cm.xml \
+	machines/telepathy-cm_full.machine \
 	$(NULL)
 
 # Version header (see git-version-gen)
