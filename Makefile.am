@@ -278,14 +278,6 @@ GITIGNOREFILES += \
 	bendy-bus/.libs/ \
 	$(NULL)
 
-# bendy-bus manual
-EXTRA_DIST += gnome-doc-utils.make
-MAINTAINERCLEANFILES += \
-	gnome-doc-utils.make \
-	omf.make \
-	xmldocs.make \
-	$(NULL)
-
 # bendy-bus-lcov
 dist_bin_SCRIPTS += bendy-bus/bendy-bus-lcov
 

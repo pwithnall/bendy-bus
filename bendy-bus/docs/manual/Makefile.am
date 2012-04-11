@@ -1,10 +1,7 @@
-include $(top_srcdir)/gnome-doc-utils.make
-dist-hook: doc-dist-hook
+@YELP_HELP_RULES@
 
-DOC_ID = bendy-bus
-DOC_LINGUAS =
-DOC_FIGURES =
-DOC_PAGES = \
+HELP_ID = bendy-bus
+HELP_FILES = \
 	data-structures.page \
 	expressions.page \
 	functions.page \
@@ -18,8 +15,6 @@ DOC_PAGES = \
 	$(NULL)
 
 GITIGNOREFILES = \
-	$(_DOC_LC_PAGES) \
-	$(_DOC_MOFILES) \
 	html/ \
 	xhtml/ \
 	$(NULL)
@@ -32,16 +27,10 @@ xhtml:
 	rm -rf $(builddir)/xhtml && mkdir $(builddir)/xhtml && \
 	yelp-build html -o $(builddir)/xhtml $(addprefix C/,$(DOC_PAGES))
 
-check: check-yelp
-check-yelp:
-	$(foreach command,links orphans status validate, \
-		yelp-check $(command) $(addprefix C/,$(DOC_PAGES)); \
-	)
-
 maintainer-clean-local: maintainer-clean-manual
 maintainer-clean-manual: clean
 	rm -rf $(builddir)/html $(builddir)/xhtml
 
-.PHONY: html xhtml check-yelp maintainer-clean-manual
+.PHONY: html xhtml maintainer-clean-manual
 
 -include $(top_srcdir)/git.mk

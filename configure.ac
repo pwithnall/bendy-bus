@@ -27,11 +27,7 @@ GTK_DOC_CHECK([1.14],[--flavour no-tmpl])
 AM_CONDITIONAL([ENABLE_GTK_DOC], false)
 ])
 
-m4_ifdef([GNOME_DOC_INIT],[
-GNOME_DOC_INIT
-],[
-AM_CONDITIONAL([ENABLE_GNOME_DOC_UTILS], false)
-])
+YELP_HELP_INIT
 
 # Internationalisation
 GETTEXT_PACKAGE=bendy-bus
