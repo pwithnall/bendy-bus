@@ -167,7 +167,10 @@ CLEANFILES += $(pkgconfig_DATA)
 
 # libdfsm tests
 test_sources = \
+	dfsm/tests/test-output-sequence.c \
+	dfsm/tests/test-output-sequence.h \
 	dfsm/tests/test-utils.c \
+	dfsm/tests/test-utils.h \
 	$(NULL)
 
 test_cppflags = \
@@ -189,7 +192,7 @@ test_ldadd = \
 
 noinst_PROGRAMS += dfsm/tests/ast
 
-dfsm_tests_ast_SOURCES = $(test_sources) dfsm/tests/ast.c dfsm/tests/test-output-sequence.c
+dfsm_tests_ast_SOURCES = $(test_sources) dfsm/tests/ast.c
 dfsm_tests_ast_CPPFLAGS = $(test_cppflags)
 dfsm_tests_ast_CFLAGS = $(test_cflags)
 dfsm_tests_ast_LDADD = $(test_ldadd)
@@ -210,7 +213,7 @@ dfsm_tests_reachability_LDADD = $(test_ldadd)
 
 noinst_PROGRAMS += dfsm/tests/simulation
 
-dfsm_tests_simulation_SOURCES = $(test_sources) dfsm/tests/simulation.c dfsm/tests/test-output-sequence.c
+dfsm_tests_simulation_SOURCES = $(test_sources) dfsm/tests/simulation.c
 dfsm_tests_simulation_CPPFLAGS = $(test_cppflags)
 dfsm_tests_simulation_CFLAGS = $(test_cflags)
 dfsm_tests_simulation_LDADD = $(test_ldadd)
