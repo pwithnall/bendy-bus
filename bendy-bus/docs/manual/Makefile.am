@@ -2,6 +2,10 @@
 
 HELP_ID = bendy-bus
 HELP_FILES = \
+	bendy-bus.page \
+	bendy-bus-lcov.page \
+	bendy-bus-lint.page \
+	bendy-bus-viz.page \
 	data-structures.page \
 	expressions.page \
 	functions.page \
@@ -9,6 +13,7 @@ HELP_FILES = \
 	language.page \
 	objects.page \
 	preconditions.page \
+	simulator.page \
 	statements.page \
 	structure.page \
 	transitions.page \
