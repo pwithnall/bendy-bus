@@ -936,7 +936,7 @@ schedule_arbitrary_transition (DfsmObject *self)
 	g_assert (self->priv->timeout_id == 0);
 
 	/* Add a random timeout to the next potential arbitrary transition. */
-	timeout_period = floor (dfsm_random_normal_distribution (TRANSITION_TIMEOUT_MU, TRANSITION_TIMEOUT_SIGMA));
+	timeout_period = fabs (floor (dfsm_random_normal_distribution (TRANSITION_TIMEOUT_MU, TRANSITION_TIMEOUT_SIGMA)));
 	g_debug ("Scheduling the next arbitrary transition in %u ms.", timeout_period);
 	self->priv->timeout_id = g_timeout_add (timeout_period, (GSourceFunc) arbitrary_transition_timeout_cb, self);
 }
