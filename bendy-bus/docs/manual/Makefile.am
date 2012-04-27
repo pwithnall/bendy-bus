@@ -26,11 +26,11 @@ GITIGNOREFILES = \
 
 html:
 	rm -rf $(builddir)/html && mkdir $(builddir)/html && \
-	yelp-build html -o $(builddir)/html $(addprefix C/,$(DOC_PAGES))
+	yelp-build html -o $(builddir)/html $(addprefix C/,$(HELP_FILES))
 
 xhtml:
 	rm -rf $(builddir)/xhtml && mkdir $(builddir)/xhtml && \
-	yelp-build html -o $(builddir)/xhtml $(addprefix C/,$(DOC_PAGES))
+	yelp-build html -o $(builddir)/xhtml $(addprefix C/,$(HELP_FILES))
 
 maintainer-clean-local: maintainer-clean-manual
 maintainer-clean-manual: clean
