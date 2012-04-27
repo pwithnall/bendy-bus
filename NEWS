@@ -1,3 +1,9 @@
+Overview of changes from Bendy Bus 0.1.1 to Bendy Bus 0.1.2
+===========================================================
+
+Major changes:
+ • Fix a potential crash if a negative arbitrary timeout is generated
+
 Overview of changes from Bendy Bus 0.1.0 to Bendy Bus 0.1.1
 ===========================================================
 
