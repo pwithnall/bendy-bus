@@ -400,6 +400,7 @@ EXTRA_DIST += \
 	intltool-update.in \
 	README \
 	COPYING \
+	COPYING-DOCS \
 	AUTHORS \
 	INSTALL \
 	NEWS \
