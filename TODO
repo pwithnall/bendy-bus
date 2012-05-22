@@ -4,6 +4,7 @@ Bendy Bus TODO
 Nice to have:
  • Add variable length delays before replies/errors/emissions to allow interleaving of replies & arbitrary transitions
  • Automake integration
+ • GObject introspection for libdfsm
 
  • Better dict fuzzing
  • Verify bendy-bus with Klee

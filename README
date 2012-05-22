@@ -1,7 +1,10 @@
-D-Bus Simulator
-===============
+Bendy Bus
+=========
 
-D-Bus Simulator is a system to mock up parts of D-Bus server–client systems in order to test the other part.
+Bendy Bus is a system to mock up parts of D-Bus server–client systems in order to test the other parts.
+
+It allows fuzz and unit testing of D-Bus clients by simulating the corresponding D-Bus servers.
+Simulations are written in a simple FSM-based language.
 
 The user manual is available online at http://tecnocode.co.uk/bendy-bus/manual/, or can be compiled using
 	cd bendy-bus/docs/manual
