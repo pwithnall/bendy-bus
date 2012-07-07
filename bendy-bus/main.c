@@ -168,6 +168,8 @@ typedef struct {
 	guint test_program_sigkill_timeout_id;
 } MainData;
 
+static void remove_inactivity_timeout (MainData *data);
+
 static void
 main_data_clear (MainData *data)
 {
@@ -176,10 +178,7 @@ main_data_clear (MainData *data)
 	g_free (data->dbus_address);
 	g_ptr_array_unref (data->simulated_objects);
 
-	if (data->test_run_inactivity_timeout_id != 0) {
-		g_source_remove (data->test_run_inactivity_timeout_id);
-		data->test_run_inactivity_timeout_id = 0;
-	}
+	remove_inactivity_timeout (data);
 
 	if (data->test_program != NULL) {
 		dsim_program_wrapper_kill (DSIM_PROGRAM_WRAPPER (data->test_program), FALSE);
@@ -257,8 +256,10 @@ set_inactivity_timeout (MainData *data)
 static void
 simulated_object_dbus_activity_count_notify_cb (GObject *obj, GParamSpec *pspec, MainData *data)
 {
-	remove_inactivity_timeout (data);
-	set_inactivity_timeout (data);
+	if (data->test_run_inactivity_timeout_id != 0) {
+		remove_inactivity_timeout (data);
+		set_inactivity_timeout (data);
+	}
 }
 
 static void
@@ -326,10 +327,7 @@ stop_simulation (MainData *data)
 	g_debug ("stop_simulation()");
 
 	/* Stop timers. */
-	if (data->test_run_inactivity_timeout_id != 0) {
-		g_source_remove (data->test_run_inactivity_timeout_id);
-		data->test_run_inactivity_timeout_id = 0;
-	}
+	remove_inactivity_timeout (data);
 
 	/* Remove intra-simulation signal handlers and add our own. */
 	if (data->test_program_spawn_end_signal != 0) {
