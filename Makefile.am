@@ -370,6 +370,8 @@ EXTRA_DIST += \
 	machines/eds-address-book.machine \
 	machines/eds-address-book.xml \
 	machines/eds-address-book_full.machine \
+	machines/hamster-server.machine \
+	machines/hamster-server.xml \
 	machines/telepathy-cm.machine \
 	machines/telepathy-cm.xml \
 	machines/telepathy-cm_full.machine \

@@ -1,0 +1,60 @@
+object at /org/gnome/Hamster, org.gnome.Hamster implements org.gnome.Hamster {
+	states {
+		Main
+	}
+
+	transition inside Main on method GetActivities {
+		/* Parameter: search */
+		reply ([
+			("Something"?, "Activity"?),
+		]?);
+	}
+
+	transition inside Main on method GetCategories {
+		reply ([
+			(0?, "Category"?),
+		]?);
+	}
+
+	transition inside Main on method GetTags {
+		/* Parameter: only_autocomplete */
+		reply ([
+			(0?, "Tag"?, false?),
+		]?);
+	}
+
+	transition inside Main on method GetTodaysFacts {
+		reply ([
+			(0?, 0?, 0?, "Fact"?, "Factoid?", 0?, "Factless"?, ["Array string"?]?, 0?, 0?),
+		]?);
+	}
+
+	transition inside Main on random {
+		emit FactsChanged ();
+	}
+
+	transition inside Main on random {
+		emit ActivitiesChanged ();
+	}
+
+	transition inside Main on random {
+		emit ToggleCalled ();
+	}
+
+	transition inside Main on random {
+		emit TagsChanged ();
+	}
+
+	transition inside Main on method AddFact {
+		/* Parameters: activity_name, tags, start_time, end_time, category_name, description, temporary */
+		reply (0?);
+		emit FactsChanged ();
+	}
+
+	transition inside Main on method GetFacts {
+		/* Parameters: start_date, end_date, search_terms */
+		reply ([
+			(0?, 0?, 0?, "Fact"?, "Factoid?", 0?, "Factless"?, ["Array string"?]?, 0?, 0?),
+		]?);
+	}
+}
