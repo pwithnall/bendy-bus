@@ -11,7 +11,11 @@ Nice to have:
  • Split up random number generators to lessen the impact of code changes
 
 Future:
- • Inclusions
+ • Inclusions (allowing re-use of code between simulation descriptions)
  • Split test utility up into simulator and controller, separated by a D-Bus control interface
  • GtkSourceView highlighter
  • Support creating new objects by a pattern
+ • Support the D-Bus ObjectManager pattern natively
+ • Allow explicit annotation of preferred transition paths in simulation descriptions
+ • Model checking of client behaviour by annotating transitions with whether they're expected in a given server state
+ • UI fuzzing of clients
