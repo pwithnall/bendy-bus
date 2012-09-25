@@ -59,6 +59,7 @@ static GPtrArray *test_program_environment = NULL;
 static gboolean pass_through_environment = FALSE;
 static gchar *dbus_daemon_config_file_path = NULL;
 static guint unfuzzed_transition_limit = 0;
+static gboolean system_bus = FALSE;
 
 static gboolean
 option_env_parse_cb (const gchar *option_name, const gchar *value, gpointer data, GError **error)
@@ -131,6 +132,7 @@ static const GOptionEntry test_program_entries[] = {
 static const GOptionEntry dbus_daemon_entries[] = {
 	{ "dbus-daemon-config-file", 0, 0, G_OPTION_ARG_FILENAME, &dbus_daemon_config_file_path,
 	  N_("URI or path of a config.xml file for the dbus-daemon"), N_("FILE") },
+	{ "system-bus", 0, 0, G_OPTION_ARG_NONE, &system_bus, N_("Run local system instead of session bus"), NULL },
 	{ NULL }
 };
 
@@ -673,7 +675,11 @@ dbus_daemon_notify_bus_address_cb (GObject *gobject, GParamSpec *pspec, MainData
 		g_strfreev (env_variable_names);
 	}
 
-	envp_pair = g_strdup_printf ("DBUS_SESSION_BUS_ADDRESS=%s", data->dbus_address);
+	if (system_bus) {   
+		envp_pair = g_strdup_printf ("DBUS_SYSTEM_BUS_ADDRESS=%s", data->dbus_address);
+	} else {
+		envp_pair = g_strdup_printf ("DBUS_SESSION_BUS_ADDRESS=%s", data->dbus_address);
+	}
 	g_ptr_array_add (test_program_envp, envp_pair);
 
 	/* Copy the environment pairs set on the command line. */

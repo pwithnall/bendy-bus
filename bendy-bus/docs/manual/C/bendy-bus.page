@@ -13,7 +13,7 @@
 
 <p>The simulator takes a simulation description (written in the <link xref="language"/>) plus an introspection XML file and uses them to simulate a D-Bus
 server, running the simulation inside a private bus created by running its own instance of <cmd>dbus-daemon</cmd>. A <em>client program</em> command
-given to the simulator is then run with this private bus as its session bus, and the simulator runs until a termination condition is hit, or until the
+given to the simulator is then run with this private bus as its session bus (or system bus if the <cmd>--system-bus</cmd> option is given), and the simulator runs until a termination condition is hit, or until the
 client program exits or aborts.</p>
 
 <section id="usage">
