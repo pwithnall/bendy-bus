@@ -59,6 +59,7 @@ static GPtrArray *test_program_environment = NULL;
 static gboolean pass_through_environment = FALSE;
 static gchar *dbus_daemon_config_file_path = NULL;
 static guint unfuzzed_transition_limit = 0;
+static gboolean system_bus = FALSE;
 
 static gboolean
 option_env_parse_cb (const gchar *option_name, const gchar *value, gpointer data, GError **error)
@@ -132,6 +133,7 @@ static const GOptionEntry test_program_entries[] = {
 static const GOptionEntry dbus_daemon_entries[] = {
 	{ "dbus-daemon-config-file", 0, 0, G_OPTION_ARG_FILENAME, &dbus_daemon_config_file_path,
 	  N_("URI or path of a config.xml file for the dbus-daemon"), N_("FILE") },
+	{ "system-bus", 0, 0, G_OPTION_ARG_NONE, &system_bus, N_("Run local system instead of session bus"), NULL },
 	{ NULL }
 };
 
@@ -674,7 +676,11 @@ dbus_daemon_notify_bus_address_cb (GObject *gobject, GParamSpec *pspec, MainData
 		g_strfreev (env_variable_names);
 	}
 
-	envp_pair = g_strdup_printf ("DBUS_SESSION_BUS_ADDRESS=%s", data->dbus_address);
+	if (system_bus) {
+		envp_pair = g_strdup_printf ("DBUS_SYSTEM_BUS_ADDRESS=%s", data->dbus_address);
+	} else {
+		envp_pair = g_strdup_printf ("DBUS_SESSION_BUS_ADDRESS=%s", data->dbus_address);
+	}
 	g_ptr_array_add (test_program_envp, envp_pair);
 
 	/* Copy the environment pairs set on the command line. */
@@ -735,11 +741,16 @@ sigint_handler_cb (MainData *data)
 }
 
 static gchar *
-build_config_file (GFile *working_directory_file, gsize *length_out)
+build_config_file (GFile *working_directory_file, gsize *length_out, gboolean for_system_bus)
 {
 	gchar *working_directory_path, *output;
+	const gchar *bus_type;
 
 	working_directory_path = g_file_get_path (working_directory_file);
+
+	/* This is currently the only differentiator between the config files for system and session buses as used by Bendy Bus. In the future, user
+	 * demand could cause further changes to the system bus configuration file generated below. */
+	bus_type = for_system_bus ? "system" : "session";
 
 	/* Heavily based on the config.xml for the session bus. */
 	output = g_strdup_printf (
@@ -747,7 +758,7 @@ build_config_file (GFile *working_directory_file, gsize *length_out)
 		         "'http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd'>"
 		"<busconfig>"
 			/* Our well-known bus type. Don't change this. */
-			"<type>session</type>"
+			"<type>%s</type>"
 
 			/* If we fork, keep the user's original umask to avoid affecting the behavior of child processes. */
 			"<keep_umask/>"
@@ -786,7 +797,7 @@ build_config_file (GFile *working_directory_file, gsize *length_out)
 			"<limit name='max_names_per_connection'>50000</limit>"
 			"<limit name='max_match_rules_per_connection'>50000</limit>"
 			"<limit name='max_replies_per_connection'>50000</limit>"
-		"</busconfig>", working_directory_path, working_directory_path);
+		"</busconfig>", bus_type, working_directory_path, working_directory_path);
 
 	g_free (working_directory_path);
 
@@ -869,7 +880,7 @@ prepare_dbus_daemon_working_directory (GFile **test_program_working_directory_ou
 	/* Create the default config.xml file. */
 	tmp_dir_file_daemon_config = g_file_get_child (tmp_dir_file_daemon, "config.xml");
 
-	config_file = build_config_file (tmp_dir_file_daemon, &config_file_length);
+	config_file = build_config_file (tmp_dir_file_daemon, &config_file_length, system_bus);
 	g_file_replace_contents (tmp_dir_file_daemon_config, config_file, config_file_length, NULL, FALSE, G_FILE_CREATE_REPLACE_DESTINATION, NULL,
 	                         NULL, &child_error);
 	g_free (config_file);
