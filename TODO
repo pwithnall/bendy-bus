@@ -4,7 +4,8 @@ Bendy Bus TODO
 Nice to have:
  • Add variable length delays before replies/errors/emissions to allow interleaving of replies & arbitrary transitions
  • Automake integration
- • GObject introspection for libdfsm
+ • GObject introspection for libdfsm, especially so it can be used from Python
+ • Default implementations for D-Bus methods automatically generated from introspection XML, which just spew (correctly typed) fuzzy data
 
  • Better dict fuzzing
  • Verify bendy-bus with Klee
