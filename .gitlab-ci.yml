@@ -1,0 +1,22 @@
+image: debian:unstable
+
+before_script:
+  - apt update -qq
+  - apt install -y -qq build-essential autoconf automake pkg-config libtool m4 autoconf-archive gtk-doc-tools libglib2.0-dev intltool bison flex yelp-tools git
+
+stages:
+  - build
+
+build-distcheck:
+  stage: build
+  script:
+    - mkdir build
+    - cd build
+    - ../autogen.sh
+    - make V=1 VERBOSE=1
+    - make distcheck V=1 VERBOSE=1
+
+  # The files which are to be made available in GitLab
+  artifacts:
+    paths:
+      - build/*
