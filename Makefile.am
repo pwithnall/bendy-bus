@@ -151,10 +151,11 @@ dfsm_marshal_sources = \
 	$(NULL)
 
 dfsm/dfsm-marshal.h: $(top_srcdir)/dfsm/dfsm-marshal.list
-	$(AM_V_GEN) $(GLIB_GENMARSHAL) --prefix=dfsm_marshal --header $< > $@
+	$(AM_V_GEN)$(GLIB_GENMARSHAL) --prefix=dfsm_marshal --header --output $@ $<
 dfsm/dfsm-marshal.c: $(top_srcdir)/dfsm/dfsm-marshal.list dfsm/dfsm-marshal.h
-	$(AM_V_GEN) $(GLIB_GENMARSHAL) --prefix=dfsm_marshal --header --body $< > $@
+	$(AM_V_GEN)$(GLIB_GENMARSHAL) --prefix=dfsm_marshal --include-header dfsm/dfsm-marshal.h --body --output $@ $<
 
+BUILT_SOURCES += $(dfsm_marshal_sources)
 EXTRA_DIST += $(top_srcdir)/dfsm/dfsm-marshal.list
 CLEANFILES += $(dfsm_marshal_sources)
 
@@ -362,10 +363,11 @@ bendy_bus_marshal_sources = \
 	$(NULL)
 
 bendy-bus/marshal.h: $(top_srcdir)/bendy-bus/marshal.list
-	$(AM_V_GEN) $(GLIB_GENMARSHAL) --prefix=dsim_marshal --header $< > $@
+	$(AM_V_GEN)$(GLIB_GENMARSHAL) --prefix=dsim_marshal --header --output $@ $<
 bendy-bus/marshal.c: $(top_srcdir)/bendy-bus/marshal.list bendy-bus/marshal.h
-	$(AM_V_GEN) $(GLIB_GENMARSHAL) --prefix=dsim_marshal --header --body $< > $@
+	$(AM_V_GEN)$(GLIB_GENMARSHAL) --prefix=dsim_marshal --include-header bendy-bus/marshal.h --body --output $@ $<
 
+BUILT_SOURCES += $(bendy_bus_marshal_sources)
 EXTRA_DIST += $(top_srcdir)/bendy-bus/marshal.list
 CLEANFILES += $(bendy_bus_marshal_sources)
 
