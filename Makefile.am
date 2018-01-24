@@ -98,7 +98,7 @@ dfsm_libdfsm_la_YFLAGS = \
 
 dfsm_libdfsm_la_CPPFLAGS = \
 	-I$(top_srcdir) \
-	-I$(top_srcdir)/dfsm \
+	-I$(top_builddir) \
 	-DG_LOG_DOMAIN=\"libdfsm\" \
 	$(DISABLE_DEPRECATED) \
 	$(AM_CPPFLAGS) \
@@ -175,6 +175,7 @@ test_sources = \
 
 test_cppflags = \
 	-I$(top_srcdir) \
+	-I$(top_builddir) \
 	$(DISABLE_DEPRECATED) \
 	$(AM_CPPFLAGS) \
 	$(NULL)
@@ -252,6 +253,7 @@ bendy_bus_bendy_bus_SOURCES = \
 
 bendy_bus_bendy_bus_CPPFLAGS = \
 	-I$(top_srcdir) \
+	-I$(top_builddir) \
 	-DPACKAGE_LOCALE_DIR=\""$(datadir)/locale"\" \
 	-DG_LOG_DOMAIN=\"bendy-bus\" \
 	$(DISABLE_DEPRECATED) \
@@ -290,6 +292,7 @@ bendy_bus_lint_bendy_bus_lint_SOURCES = \
 
 bendy_bus_lint_bendy_bus_lint_CPPFLAGS = \
 	-I$(top_srcdir) \
+	-I$(top_builddir) \
 	-DPACKAGE_LOCALE_DIR=\""$(datadir)/locale"\" \
 	-DG_LOG_DOMAIN=\"bendy-bus-lint\" \
 	$(DISABLE_DEPRECATED) \
@@ -325,6 +328,7 @@ bendy_bus_viz_bendy_bus_viz_SOURCES = \
 
 bendy_bus_viz_bendy_bus_viz_CPPFLAGS = \
 	-I$(top_srcdir) \
+	-I$(top_builddir) \
 	-DPACKAGE_LOCALE_DIR=\""$(datadir)/locale"\" \
 	-DG_LOG_DOMAIN=\"bendy-bus-viz\" \
 	$(DISABLE_DEPRECATED) \

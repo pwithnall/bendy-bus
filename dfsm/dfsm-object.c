@@ -36,7 +36,7 @@
 #include "dfsm-ast.h"
 #include "dfsm-dbus-output-sequence.h"
 #include "dfsm-machine.h"
-#include "dfsm-marshal.h"
+#include "dfsm/dfsm-marshal.h"
 #include "dfsm-parser.h"
 #include "dfsm-parser-internal.h"
 #include "dfsm-probabilities.h"

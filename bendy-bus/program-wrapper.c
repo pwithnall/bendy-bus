@@ -24,7 +24,7 @@
 #include <gio/gio.h>
 
 #include "program-wrapper.h"
-#include "marshal.h"
+#include "bendy-bus/marshal.h"
 
 static void dsim_program_wrapper_dispose (GObject *object);
 static void dsim_program_wrapper_finalize (GObject *object);

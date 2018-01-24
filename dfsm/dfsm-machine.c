@@ -37,7 +37,7 @@
 #include "dfsm-ast.h"
 #include "dfsm-environment.h"
 #include "dfsm-machine.h"
-#include "dfsm-marshal.h"
+#include "dfsm/dfsm-marshal.h"
 #include "dfsm-output-sequence.h"
 #include "dfsm-parser.h"
 #include "dfsm-parser-internal.h"
