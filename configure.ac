@@ -1,6 +1,6 @@
 # autofoo
 AC_INIT([Bendy Bus],m4_esyscmd([./git-version-gen .tarball-version]),[],[bendy-bus],[])
-AM_INIT_AUTOMAKE([check-news dist-bzip2 no-dist-gzip subdir-objects])
+AM_INIT_AUTOMAKE([dist-bzip2 no-dist-gzip subdir-objects])
 
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_HEADERS([config.h])
