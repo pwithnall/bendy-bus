@@ -184,12 +184,14 @@ test_cppflags = \
 test_cflags = \
 	$(WARN_CFLAGS) \
 	$(GLIB_CFLAGS) \
+	$(GIO_CFLAGS) \
 	$(AM_CFLAGS) \
 	$(NULL)
 
 test_ldadd = \
 	$(top_builddir)/dfsm/libdfsm.la \
 	$(GLIB_LIBS) \
+	$(GIO_LIBS) \
 	$(NULL)
 
 noinst_PROGRAMS += dfsm/tests/ast
