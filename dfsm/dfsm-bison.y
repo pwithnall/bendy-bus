@@ -20,9 +20,9 @@
 }
 
 %code requires {
-	#include "dfsm-ast.h"
-	#include "dfsm-parser.h"
-	#include "dfsm-parser-internal.h"
+	#include "dfsm/dfsm-ast.h"
+	#include "dfsm/dfsm-parser.h"
+	#include "dfsm/dfsm-parser-internal.h"
 }
 
 %code {
