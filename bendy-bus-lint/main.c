@@ -45,7 +45,7 @@ print_help_text (GOptionContext *context)
 }
 
 int
-main (int argc, char *argv[])
+main (int args, char *argv[])
 {
 	GError *error = NULL;
 	GOptionContext *context;
@@ -71,7 +71,7 @@ main (int argc, char *argv[])
 	g_option_context_set_translation_domain (context, GETTEXT_PACKAGE);
 	g_option_context_set_summary (context, _("Checks the FSM simulation code for a D-Bus client–server conversation simulation."));
 
-	if (g_option_context_parse (context, &argc, &argv, &error) == FALSE) {
+	if (g_option_context_parse (context, &args, &argv, &error) == FALSE) {
 		g_printerr (_("Error parsing command line options: %s"), error->message);
 		g_printerr ("\n");
 
@@ -84,7 +84,7 @@ main (int argc, char *argv[])
 	}
 
 	/* Extract the simulation and the introspection filenames. */
-	if (argc < 3) {
+	if (args < 3) {
 		g_printerr (_("Error parsing command line options: %s"), _("Simulation and introspection filenames must be provided"));
 		g_printerr ("\n");
 
